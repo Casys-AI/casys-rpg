@@ -1,0 +1,91 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Empêche la page de défiler */
+}
+
+.container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    max-width: 100%;
+}
+
+#chat-container {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column; /* Direction normale pour empiler les messages */
+    justify-content: flex-start; /* Commence les messages en haut */
+    align-items: center; /* Centre le contenu horizontalement */
+    padding-top: 20px; /* Ajoute un espace en haut */
+    padding-bottom: 60px; /* Évite le chevauchement avec la barre en bas */
+    max-height: calc(100vh - 60px); /* Ajuste pour tenir compte de la barre en bas */
+}
+
+.messages-box {
+    flex: 1;
+    overflow-y: auto; /* Active le défilement dans la boîte des messages */
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 800px; /* Définit la largeur désirée */
+    margin: 0 auto;   /* Centre horizontalement */
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    text-align: justify;
+    font-size: 14px; /* Réduit la taille du texte */
+}
+
+.narrator-message {
+    background-color: #e9ecef;
+}
+
+.user-message {
+    background-color: #007bff;
+    color: white;
+}
+
+.controls {
+    position: fixed; /* Fixe la barre de saisie en bas */
+    bottom: 0;
+    width: 100%;
+    background-color: white;
+    padding: 10px;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    flex-direction: column; /* Empile les éléments verticalement */
+    align-items: center;
+}
+
+.controls .input-group {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px; /* Sépare du bouton "Passer" */
+    justify-content: space-between; /* Ajoute cet élément */
+}
+
+.controls .input-group button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#skip-btn {
+    align-self: flex-end; /* Aligne le bouton "Passer" à droite */
+    margin-left: 10px; /* Ajoute une marge à gauche */
+}
