@@ -1,8 +1,6 @@
 github: [Casys-AI]
-custom: 
-  - 'https://www.casys.ai/sponsor'
-  - 'https://buymeacoffee.com/casys.ai'
-  - 'USDT TRC20: TNFUckYNkMa9AMzTWHDdVWWC5SwFjgx1RP'
+ko_fi: casysai
+custom: ["https://buymeacoffee.com/casys.ai", "TNFUckYNkMa9AMzTWHDdVWWC5SwFjgx1RP"]
 
 # Plateformes de financement supportées
 #github: # Remplacer par jusqu'à 4 noms d'utilisateurs GitHub avec Sponsors activé
