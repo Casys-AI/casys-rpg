@@ -1,6 +1,7 @@
 import random
 import streamlit as st
 from game_logic import GameState
+from utils.game_utils import roll_dice
 
 def init_session_state():
     """Initialise l'état de la session Streamlit."""
@@ -44,42 +45,16 @@ def render_character_stats():
                     st.write(f"- {item}")
 
 def display_game_content(result):
-    if not isinstance(result, dict):
-        st.error("Erreur: format de données invalide")
-        return
-        
-    if "error" in result and result["error"]:
-        st.error(result["error"])
-        return
-        
-    if "section_content" not in result:
-        st.error("Erreur: contenu de section manquant")
-        return
-        
-    content = result["section_content"]
-    if not isinstance(content, str):
+    """Affiche le contenu du jeu."""
+    if not result or "error" in result:
         st.error("Erreur: contenu de section invalide")
         return
     
     # Afficher le texte narratif avec le style personnalisé
-    st.markdown(f'<div class="story-content">{content}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="story-content">{result["section_content"]}</div>', unsafe_allow_html=True)
     
     # Afficher les choix dans une section distincte
     st.markdown("### Que souhaitez-vous faire ?")
-
-def roll_dice() -> int:
-    """
-    Effectue un lancer de 2d6 (deux dés à 6 faces).
-    
-    Returns:
-        int: valeur du lancer
-    """
-    # Lancer 2d6
-    dice_value = random.randint(1, 6) + random.randint(1, 6)
-    
-    # Note : La comparaison avec le score de chance est faite par l'agent de décision
-    # car elle dépend des règles qui peuvent changer
-    return dice_value
 
 def process_user_input():
     """Traite la saisie de l'utilisateur."""

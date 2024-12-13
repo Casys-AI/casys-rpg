@@ -1,148 +1,207 @@
-# Livre dont vous êtes le héros - Système de jeu interactif
+# 🎲 Casys RPG - Interactive Game Book Engine
 
-## Description
-Application interactive permettant de jouer à un livre dont vous êtes le héros, avec gestion intelligente des règles et des décisions grâce à des agents LLM.
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/streamlit-1.28.0-FF4B4B.svg)](https://streamlit.io)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-00A36C.svg)](https://openai.com/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Casys-AI/casys-rpg/graphs/commit-activity)
 
-## Architecture
+<div align="center">
 
-Le système utilise quatre agents spécialisés avec LangChain :
+🎮 A modern AI-powered engine for interactive game books, leveraging LLM agents for intelligent rule management and decision-making.
 
-### 1. RulesAgent (Agent de Règles)
-- Utilise RAG (Retrieval Augmented Generation) pour analyser les règles
-- Indexe toutes les règles avec FAISS pour une recherche sémantique
-- Pour chaque section :
-  - Analyse les règles spécifiques
-  - Trouve des règles similaires dans d'autres sections
-  - Combine les règles pour une meilleure compréhension
-- Retourne une analyse structurée (JSON) :
+[Features](#features) •
+[Quick Start](#quick-start) •
+[Architecture](#architecture) •
+[Documentation](#documentation) •
+[Contributing](#contributing)
+
+</div>
+
+---
+
+## ✨ Features
+
+- 🤖 **Intelligent Agents**: Four specialized LLM agents handling different aspects of the game
+- 📚 **RAG-based Rules**: Semantic search and analysis of game rules using FAISS
+- 🎲 **Dynamic Dice System**: Context-aware dice rolling system for combat and chance events
+- 📊 **Character Stats**: Real-time character statistics tracking
+- 🔄 **Game State Management**: Robust state management with save/load capabilities
+- 📝 **Feedback System**: Integrated user feedback collection
+- 🐛 **Debug Mode**: Built-in debugging tools for development
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- pip
+- OpenAI API key
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Casys-AI/casys-rpg.git
+cd casys-rpg
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment
+cp .env.example .env
+# Edit .env with your OpenAI API key
+```
+
+### Running the Game
+
+```bash
+streamlit run app.py
+```
+
+## 🏗 Architecture
+
+The system utilizes four specialized LangChain agents:
+
+### 1. RulesAgent 📋
+- Implements RAG (Retrieval Augmented Generation) for rule analysis
+- FAISS indexing for semantic rule search
+- Determines dice roll requirements and types
+- Returns structured analysis:
   ```json
   {
     "needs_dice_roll": true|false,
     "dice_type": "chance"|"combat"|null,
     "conditions": ["condition1", "condition2"],
     "next_sections": [1, 2, 3],
-    "rules_summary": "Résumé des règles"
+    "rules_summary": "Rules summary"
   }
   ```
 
-### 2. DecisionAgent (Agent de Décision)
-- Interprète la réponse de l'utilisateur
-- Utilise l'analyse fournie par le RulesAgent
-- Vérifie que la section choisie est valide
-- Se concentre uniquement sur la logique de décision
+### 2. DecisionAgent 🤔
+- Interprets user responses
+- Processes RulesAgent analysis
+- Manages dice roll button display
+- Validates section choices
+- Focuses on decision logic
 
-### 3. NarratorAgent (Agent Narrateur)
-- Lit les sections du livre
-- Formate le texte pour l'affichage
-- Gère la présentation du contenu
+### 3. NarratorAgent 📖
+- Reads book sections
+- Formats text for display
+- Manages content presentation
 
-### 4. TraceAgent (Agent de Trace)
-- Enregistre chaque décision avec son contexte
-- Conserve l'historique des parties
-- Permet de reprendre une partie en cours
+### 4. TraceAgent 📝
+- Records decisions with context
+- Maintains game history
+- Enables game state recovery
+- Stores character statistics
 
-## Workflow
+## 🧩 Core Components
 
-1. **Initialisation**
-   - Construction de l'index FAISS des règles
-   - Création des agents avec leurs dépendances
+### 1. Application (app.py)
+- Streamlit UI interface
+- Session state management
+- Character statistics display
+- Interactive game controls:
+  - Dynamic dice roll button
+  - Feedback system
+  - Debug mode
+- Integrated feedback form
 
-2. **Boucle de jeu**
-   ```mermaid
-   graph TD
-      A[Section actuelle] --> B[RulesAgent analyse]
-      B --> C[Affichage section]
-      C --> D[Réponse utilisateur]
-      D --> E[DecisionAgent décide]
-      E --> F[TraceAgent enregistre]
-      F --> A
-   ```
+### 2. Game Logic (game_logic.py)
+- GameState class management
+- Agent coordination
+- Error handling and logging
+- StoryGraph interface
 
-3. **Analyse des règles**
-   - RulesAgent combine :
-     - Règles de la section actuelle
-     - Règles similaires trouvées par RAG
-   - Fournit un contexte enrichi pour la décision
+### 3. Utilities (utils/game_utils.py)
+- Dice rolling functions
+- Data manipulation tools
+- Common helper functions
 
-4. **Prise de décision**
-   - DecisionAgent utilise :
-     - Réponse de l'utilisateur
-     - Analyse des règles
-     - Sections possibles
+### 4. Agents (agents/)
+- story_graph.py: Agent coordination and flow management
+- trace_agent.py: History and statistics
+- rules_agent.py: Rule analysis
+- decision_agent.py: Decision logic
+- narrator_agent.py: Content presentation
 
-## Structure des fichiers
+## 🔄 Game Flow
+
+```mermaid
+graph TD
+    A[Current Section] --> B[RulesAgent Analysis]
+    B --> C[Display Section]
+    C --> D[User Response]
+    D --> E[DecisionAgent Processing]
+    E --> F[TraceAgent Recording]
+    F --> G[Stats Update]
+    G --> A
+```
+
+## 📁 Project Structure
 
 ```
 .
 ├── agents/
-│   ├── rules_agent.py    # RAG + Analyse des règles
-│   ├── decision_agent.py # Logique de décision
-│   ├── narrator_agent.py # Lecture des sections
-│   ├── trace_agent.py    # Historique
-│   └── story_graph.py    # Coordination
+│   ├── rules_agent.py     # RAG + Rule analysis
+│   ├── decision_agent.py  # Decision logic
+│   ├── narrator_agent.py  # Content reading
+│   ├── trace_agent.py     # History & stats
+│   └── story_graph.py     # Coordination
+├── utils/
+│   └── game_utils.py      # Common utilities
 ├── data/
-│   ├── sections/        # Texte du livre
-│   └── rules/          # Règles par section
-├── app.py              # Interface Streamlit
-└── requirements.txt    # Dépendances
+│   ├── sections/          # Book text
+│   ├── rules/            # Section rules
+│   ├── trace/            # Game history
+│   └── feedback/         # User feedback
+├── app.py                # Streamlit interface
+├── game_logic.py         # Core logic
+└── requirements.txt      # Dependencies
 ```
 
-## Installation
+## 📚 Documentation
 
-1. **Prérequis**
-   - Python 3.8+
-   - pip
+### LLM Models
+- Using `gpt-4o-mini` for all agents
+- Temperature settings:
+  - RulesAgent: 0 (deterministic)
+  - DecisionAgent: 0.7 (controlled creativity)
 
-2. **Installation**
-   ```bash
-   # Cloner le dépôt
-   git clone [url-du-repo]
-   cd [nom-du-repo]
+### Vector Index
+- FAISS with L2 metric
+- Dimension: 1536 (OpenAI embeddings)
+- Updates: On each launch
 
-   # Installer les dépendances
-   pip install -r requirements.txt
-   ```
-
-3. **Configuration**
-   - Créer un fichier `.env` :
-     ```
-     OPENAI_API_KEY=votre-clé-api
-     ```
-
-4. **Lancement**
-   ```bash
-   streamlit run app.py
-   ```
-
-## Dépendances principales
-
-- LangChain : Agents LLM
-- FAISS : Indexation vectorielle
-- OpenAI : Embeddings et LLM
-- Streamlit : Interface utilisateur
-
-## Documentation des spécifications
-
-### Modèles LLM
-- Utilisation de `gpt-4o-mini` pour tous les agents
-- Température :
-  - RulesAgent : 0 (déterministe)
-  - DecisionAgent : 0.7 (créativité contrôlée)
-
-### Index vectoriel
-- FAISS avec métrique L2
-- Dimension : 1536 (OpenAI embeddings)
-- Mise à jour : à chaque lancement
-
-### Format des règles
-- Fichiers Markdown
-- Un fichier par section : `section_X_rule.md`
-- Structure :
+### Rule Format
+- Markdown files
+- One file per section: `section_X_rule.md`
+- Structure:
   ```markdown
-  # Règles Section X
-  - Conditions : [...]
-  - Actions possibles : [...]
-  - Sections suivantes : [...]
+  # Section X Rules
+  - Conditions: [...]
+  - Possible actions: [...]
+  - Next sections: [...]
   ```
 
-Cette documentation est mise à jour régulièrement pour refléter les changements dans l'architecture et l'implémentation.
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- OpenAI for GPT models
+- Streamlit team for the amazing framework
+- LangChain community for the agent framework
+
+---
+
+<div align="center">
+Made with ❤️ by Casys AI Team
+</div>
