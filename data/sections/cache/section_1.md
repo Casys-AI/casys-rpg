@@ -1,0 +1,15 @@
+# Section 1
+
+Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vaisseau spatial. Après avoir vérifié le système de sécurité, vous examinez attentivement le tableau de bord. Celui-ci ne présente aucune complexité : une simple console d'ordinateur reliée à un terminal de liaison et quelques écrans. 
+
+Le circuit micro-électronique du système alpha ziridium est profondément enfoui dans les entrailles du vaisseau, et vous n'aurez jamais à vous en préoccuper. En cas de panne ou d'incident, votre ingénieur robot interviendra sur-le-champ. La préprogrammation de votre voyage a été établie pour vous mener en premier lieu sur Tropos. 
+
+Vous entamez les procédures de départ en interrogeant l'ordinateur sur tous les points vitaux du vaisseau. Une voix impersonnelle se fait entendre aussitôt : « Vérifications effectuées. Fonctionnement optimal. » Vous passez ensuite à la deuxième opération : le contact avec la tour de contrôle. 
+
+Paré au décollage ! Vous appuyez sur un bouton... et c'est le grand voyage. Au bout de quelques minutes, les malaises dus à l'accélération s'estompent. Vous quittez l'exosphère terrienne et pénétrez dans la nuit spatiale, aussi noire que de l'encre. Le générateur gravitationnel s'enclenche automatiquement, maintenant la pesanteur normale dans votre vaisseau, ce qui vous permet, ainsi qu'à vos robots, de vous déplacer librement.
+
+Vous allumez l'écran de vision rétrospective pour observer une dernière fois la Terre qui rétrécit et s'éloigne. Des bancs de nuages glissent paresseusement, et le soleil se réfléchit sur les glaces polaires du cercle arctique. Bien que vous ayez eu maintes fois l'occasion de contempler ce spectacle lors de vos voyages vers Vénus ou Mercure, vous ressentez toujours, à sa vue, un petit pincement au cœur et une émotion nostalgique. 
+
+Reverrez-vous jamais la Terre ? D'un haussement d'épaules, vous chassez ces pensées, car seule compte, désormais, votre mission. Des heures s'écoulent, uniformes et lentes. Puis, soudain, votre écran revient à la vie. L'ordinateur de bord vous avertit qu'un autre vaisseau spatial suit la même trajectoire que vous, maintenant soigneusement un écart constant. Cela ressemble à s'y méprendre à une filature.
+
+Allez-vous donner l'ordre à votre ordinateur d'engager la procédure d'évasion (rendez-vous au [[48]]) ou préférez-vous continuer votre route (rendez-vous au [[398]]) ?

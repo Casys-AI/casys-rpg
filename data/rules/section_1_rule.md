@@ -1,0 +1,2 @@
+- Choix 1: Engager la procédure d'évasion (rendez-vous au [[48]]).
+- Choix 2: Continuer votre route (rendez-vous au [[398]]).

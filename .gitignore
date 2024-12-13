@@ -1,2 +1,9 @@
 # Ignorer les fichiers .env
+__pycache__/
+*.pyc
+.venv/
 .env
+.vscode/
+*.pdf
+game.log
+.pytest_cache/

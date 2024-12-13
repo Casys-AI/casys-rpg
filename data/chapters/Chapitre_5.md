@@ -1,0 +1,11 @@
+```markdown
+## Votre mission
+
+A l'origine, le lancement du vaste projet terrien de colonisation planétaire a été pris en charge par le R.E.V.E. (Rêve — Exploration — Voyage — Espace), une organisation réunissant toutes les nations de la Terre. Sous la domination arcadienne, le R.E.V.E. a été contraint de changer radicalement ses objectifs. Mais bien que sa fonction officielle soit maintenant la recherche astronomique, il cache en réalité les activités de la Résistance terrienne dont le seul but est la libération de la planète.
+
+Il devint vite évident aux dirigeants de la Résistance, qu'une opération militaire de grande envergure était inenvisageable, et que le seul moyen de mettre un terme à la domination d'Arcadion était de détruire l'Ordinateur central. Un homme déterminé, et entraîné en conséquence pouvait réussir, là où le nombre et la force ne pouvaient qu'échouer. Les préparatifs de ce projet furent tout d'abord extrêmement difficiles, d'autant plus que les liaisons entre planètes étant interdites aux humains, les contacts entre les différents mouvements de Résistance étaient pratiquement inexistants.
+
+Mais deux éléments décisifs intervinrent, permettant d'envisager raisonnablement le succès d'une telle entreprise. Tout d'abord, c'est vous qui avez été choisi pour mener à bien cette délicate mission. Et, sans aucun doute, étiez-vous la personne la plus qualifiée pour cela : votre intelligence, votre courage, votre dévouement à la Résistance ne sont plus à démontrer. De plus, vous êtes surentraîné dans tous les arts martiaux, et le domaine scientifique n'a aucun secret pour vous. Enfin votre sens inné du commerce vous permettra de jouer sans problème le personnage qui sera le vôtre au cours de cette aventure : celui d'un négociant interplanétaire.
+
+Le second élément favorable — et qui explique en partie le rôle que vous avez choisi de tenir — est l'autorisation récente accordée par les Arcadiens aux Terriens de voyager dans l'espace, à la seule condition qu'ils aient une activité commerciale bénéficiant à Arcadion. Vous transporterez donc vers Tropos les céréales qu'elle ne produit pas. Vous convoierez du ziridium de Tropos à...
+```

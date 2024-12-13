@@ -1,0 +1,4 @@
+# Section 10
+
+- Si vous avez un bâton, rendez-vous au [[49]].
+- Sinon, rendez-vous au [[147]].

@@ -1,0 +1,2 @@
+- Choix 1: Répondre à la provocation mène à la section [[35]].
+- Choix 2: Lever votre verre en leur compagnie mène à la section [[322]].

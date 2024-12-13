@@ -1,0 +1,79 @@
+[
+    {
+        "title": "Titre original : Rebel Planet",
+        "file_name": "Chapitre_1.md",
+        "start_page": 20,
+        "start_index": 0,
+        "end_index": 266
+    },
+    {
+        "title": "Robin Waterfield",
+        "file_name": "Chapitre_2.md",
+        "start_page": 20,
+        "start_index": 267,
+        "end_index": 420
+    },
+    {
+        "title": "Un peu d'histoire",
+        "file_name": "Chapitre_3.md",
+        "start_page": 20,
+        "start_index": 421,
+        "end_index": 6870
+    },
+    {
+        "title": "Empire avec le maximum d'efficacité et la plus redoutable",
+        "file_name": "Chapitre_4.md",
+        "start_page": 20,
+        "start_index": 6871,
+        "end_index": 8406
+    },
+    {
+        "title": "Votre mission",
+        "file_name": "Chapitre_5.md",
+        "start_page": 20,
+        "start_index": 8407,
+        "end_index": 10596
+    },
+    {
+        "title": "Radix et, de Radix, vous acheminerez des produits de luxe vers",
+        "file_name": "Chapitre_6.md",
+        "start_page": 20,
+        "start_index": 10597,
+        "end_index": 12463
+    },
+    {
+        "title": "A propos des Arcadiens",
+        "file_name": "Chapitre_7.md",
+        "start_page": 20,
+        "start_index": 12464,
+        "end_index": 16176
+    },
+    {
+        "title": "Comment combattre les adversaires que vous",
+        "file_name": "Chapitre_8.md",
+        "start_page": 20,
+        "start_index": 16177,
+        "end_index": 17945
+    },
+    {
+        "title": "CHANCE, ce total n'excédera jamais vos points de départ,",
+        "file_name": "Chapitre_9.md",
+        "start_page": 20,
+        "start_index": 17946,
+        "end_index": 18662
+    },
+    {
+        "title": "Comment rétablir votre Habileté",
+        "file_name": "Chapitre_10.md",
+        "start_page": 20,
+        "start_index": 18663,
+        "end_index": 24399
+    },
+    {
+        "title": "Combat à mains nues",
+        "file_name": "Chapitre_11.md",
+        "start_page": 20,
+        "start_index": 24400,
+        "end_index": 30627
+    }
+]

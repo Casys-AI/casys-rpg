@@ -1,0 +1,40 @@
+{
+  "current_section": 1,
+  "history": [
+    {
+      "timestamp": "2024-12-14 01-26-36",
+      "section": 1,
+      "response": "continuer ma route",
+      "next_section": 398,
+      "dice_result": null
+    },
+    {
+      "timestamp": "2024-12-14 01-27-07",
+      "section": 398,
+      "response": "continuer ma route",
+      "next_section": 1,
+      "dice_result": null
+    },
+    {
+      "timestamp": "2024-12-14 01-27-30",
+      "section": 1,
+      "response": "299",
+      "next_section": 1,
+      "dice_result": null
+    },
+    {
+      "timestamp": "2024-12-14 01-27-35",
+      "section": 1,
+      "response": "299",
+      "next_section": 1,
+      "dice_result": null
+    },
+    {
+      "timestamp": "2024-12-14 01-28-17",
+      "section": 1,
+      "response": "299",
+      "next_section": 1,
+      "dice_result": null
+    }
+  ]
+}
