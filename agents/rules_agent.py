@@ -1,96 +1,121 @@
-from langchain_community.chat_models import ChatOpenAI
+from langchain.schema.runnable import RunnableSerializable
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Dict, Optional
+import logging
+from event_bus import EventBus, Event
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
-import os
-import json
+from langchain.chat_models.base import BaseChatModel
 
-class RulesAgent:
+class RulesAgent(RunnableSerializable[Dict, Dict]):
     """
-    Agent responsable de l'analyse des règles et de la préparation du contexte
-    pour l'agent de décision. Il analyse en parallèle de l'affichage du texte
-    et prépare les informations nécessaires pour la prise de décision.
+    Agent qui analyse les règles du jeu.
     """
-    
-    def __init__(self, rules_dir: str = "data/rules"):
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    rules_directory: str = Field(default="data/rules")
+    cache: Dict[int, str] = Field(default_factory=dict)
+    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
+    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(model="gpt-4o-mini", 
+        system_message="""Analyse les règles d'une section du livre-jeu.
+Retourne les choix possibles et si un jet de dés est nécessaire."""))
+    event_bus: EventBus = Field(..., description="Bus d'événements pour la communication")
+    system_prompt: str = Field(default="""Tu es un agent qui analyse les règles d'une section.
+Retourne les choix possibles et si un jet de dés est nécessaire.""")
+
+    async def invoke(self, input_data: Dict) -> Dict:
         """
-        Initialise l'agent avec le modèle de langage.
+        Analyse les règles d'une section et retourne les informations nécessaires.
         
         Args:
-            rules_dir: Chemin vers le dossier contenant les règles
-        """
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        self.rules_dir = rules_dir
-        
-    def get_rules_content(self, section_number: int) -> str:
-        """Lit le contenu des règles pour une section donnée."""
-        rules_file = os.path.join(self.rules_dir, f"section_{section_number}_rule.md")
-        if not os.path.exists(rules_file):
-            return ""
-            
-        with open(rules_file, "r", encoding="utf-8") as f:
-            return f.read()
-
-    def prepare_context(self, section_number: int) -> dict:
-        """
-        Analyse les règles d'une section et prépare le contexte pour l'agent de décision.
-        Cette méthode est appelée en parallèle de l'affichage du texte.
-        
-        Args:
-            section_number: Numéro de la section à analyser
+            input_data (Dict): Dictionnaire contenant section_number et optionnellement rules
             
         Returns:
-            dict: Contexte pour l'agent de décision avec :
-                - needs_dice_roll: bool
-                - dice_type: str ou None
-                - dice_rules: dict ou None
-                - possible_sections: list[int]
-                - conditions: list[str]
+            Dict: Résultat de l'analyse des règles
         """
-        current_rules = self.get_rules_content(section_number)
-        
-        if not current_rules:
+        try:
+            section_number = input_data.get("section_number")
+            if not section_number:
+                return {
+                    "error": "Section number required",
+                    "choices": [],
+                    "needs_dice": False,
+                    "dice_type": None
+                }
+            
+            if section_number < 0:
+                return {
+                    "error": "Invalid section number",
+                    "choices": [],
+                    "needs_dice": False,
+                    "dice_type": None
+                }
+
+            # Si les règles sont fournies directement
+            if "rules" in input_data:
+                rules = input_data["rules"]
+            # Sinon vérifier le cache
+            elif section_number in self.cache:
+                rules = self.cache[section_number]
+            # Sinon analyser les règles
+            else:
+                rules = await self._analyze_rules(section_number)
+                self.cache[section_number] = rules
+            
+            # Émettre l'événement
+            event_data = {
+                "section_number": section_number,
+                "rules": rules
+            }
+            event = Event(type="rules_generated", data=event_data)
+            await self.event_bus.emit(event)
+            
+            # Analyser si des dés sont nécessaires
+            rules_lower = rules.lower()
+            needs_dice = "dice" in rules_lower or "roll" in rules_lower or "dés" in rules_lower
+            dice_type = None
+            
+            if needs_dice:
+                if any(word in rules_lower for word in ["combat", "fight", "battle"]):
+                    dice_type = "combat"
+                elif any(word in rules_lower for word in ["chance", "luck", "fortune"]):
+                    dice_type = "chance"
+            
             return {
-                "needs_dice_roll": False,
-                "dice_type": None,
-                "dice_rules": None,
-                "possible_sections": [],
-                "conditions": [],
-                "error": "Aucune règle trouvée"
+                "choices": ["Continue"],
+                "needs_dice": needs_dice,
+                "dice_type": dice_type,
+                "rules": rules,
+                "awaiting_action": needs_dice
             }
 
+        except Exception as e:
+            self.logger.error(f"Erreur lors de l'analyse des règles : {str(e)}")
+            return {
+                "error": str(e),
+                "choices": [],
+                "needs_dice": False,
+                "dice_type": None
+            }
+
+    async def _analyze_rules(self, section_number: int) -> str:
+        """
+        Analyse les règles d'une section.
+        """
         try:
-            # Message système pour expliquer le rôle
-            system_message = SystemMessage(content="""Analyse le texte fourni pour préparer le contexte de décision.
-            Détermine :
-            1. Si un test est nécessaire
-            2. Les sections possibles
-            3. Les conditions pour chaque section
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=f"Section: {section_number}")
+            ]
             
-            Format JSON attendu :
-            {
-                "needs_dice_roll": false,
-                "dice_type": null,
-                "dice_rules": null,
-                "possible_sections": [X, Y],
-                "conditions": ["Condition pour X", "Condition pour Y"]
-            }""")
-
-            # Message humain avec le texte à analyser
-            human_message = HumanMessage(content=f"""Texte à analyser :
-{current_rules}
-
-Retourne uniquement le contexte au format JSON spécifié.""")
-
-            # Obtenir l'analyse
-            response = self.llm.invoke([system_message, human_message])
-            return json.loads(response.content)
+            response = await self.llm.agenerate([messages])
+            if not response.generations:
+                raise ValueError("No response generated")
+                
+            rules = response.generations[0][0].text.strip()
+            return rules
             
         except Exception as e:
-            print(f"Erreur lors de la préparation du contexte: {str(e)}")
-            return {
-                "needs_dice_roll": False,
-                "dice_type": None,
-                "dice_rules": None,
-                "possible_sections": [],
-                "conditions": [],
-                "error": str(e)
-            }
+            self.logger.warning(f"Rules file not found for section {section_number}")
+            return f"No rules found for section {section_number}"

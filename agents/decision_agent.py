@@ -1,88 +1,103 @@
-from langchain_community.chat_models import ChatOpenAI
+from langchain.schema.runnable import RunnableSerializable
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Dict, Optional
+import logging
+from event_bus import EventBus, Event
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
-from typing import Dict
-import json
+from langchain.chat_models.base import BaseChatModel
 
-class DecisionAgent:
+class DecisionAgent(RunnableSerializable[Dict, Dict]):
     """
-    Agent responsable de la prise de décision basée sur le contexte préparé 
-    par l'agent de règles et la réponse de l'utilisateur.
+    Agent responsable des décisions.
     """
     
-    def __init__(self):
-        """Initialise l'agent avec le modèle de langage."""
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        
-    def show_dice_roll_button(self) -> Dict:
+    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(model="gpt-4o-mini"))
+    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
+    system_prompt: str = Field(default="""Tu es un agent qui analyse les réponses de l'utilisateur.
+Détermine la prochaine section en fonction de la réponse.""")
+    event_bus: EventBus = Field(..., description="Bus d'événements pour la communication")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    async def invoke(self, input: Dict) -> Dict:
         """
-        Indique qu'un lancer de dés est nécessaire.
-        
-        Returns:
-            Dict avec:
-                needs_dice_roll: True
-                message: Message expliquant pourquoi un lancer est nécessaire
+        Méthode principale appelée par le graph.
         """
-        return {
-            "needs_dice_roll": True,
-            "message": "Un lancer de dés est nécessaire pour continuer."
-        }
-        
-    def decide_next_section(self, context: Dict, user_response: str, dice_result: int = None) -> Dict:
-        """
-        Détermine la prochaine section en fonction du contexte et de la réponse.
-        
-        Args:
-            context: Contexte préparé par le RulesAgent
-            user_response: Réponse de l'utilisateur
-            dice_result: Résultat du lancer de dés si déjà effectué
-            
-        Returns:
-            Dict contenant:
-                - next_section: numéro de la prochaine section
-                - needs_dice_roll: bool, indique si le bouton doit être affiché
-                - message: message explicatif si un lancer est nécessaire
-                - dice_result: résultat du lancer si fourni
-                - explanation: explication de la décision
-        """
-        # Si un lancer est nécessaire mais pas encore effectué
-        if context.get("needs_dice_roll", False) and dice_result is None:
-            return self.show_dice_roll_button()
-            
-        # Préparation du prompt pour le LLM
-        system_message = """Tu es un agent de décision qui détermine la prochaine section 
-        en fonction du contexte des règles et de la réponse de l'utilisateur. 
-        Temperature: 0 - Tu dois suivre strictement les règles."""
-        
-        # Inclure le résultat du dé dans le contexte si fourni
-        context_str = json.dumps(context)
-        if dice_result is not None:
-            context_str = f"Contexte: {context_str}\nRésultat du lancer de dés: {dice_result}"
-        
-        human_message = f"""
-        Contexte des règles: {context_str}
-        Réponse de l'utilisateur: {user_response}
-        
-        Détermine la prochaine section en suivant strictement les règles.
-        Réponds au format JSON avec:
-        - next_section: numéro de la section
-        - explanation: explication de ta décision
-        """
-        
-        messages = [
-            SystemMessage(content=system_message),
-            HumanMessage(content=human_message)
-        ]
-        
-        response = self.llm.invoke(messages)
         try:
-            decision = json.loads(response.content)
-            decision["dice_result"] = dice_result
-            decision["needs_dice_roll"] = False
-            return decision
-        except json.JSONDecodeError:
+            section_number = input.get("section_number")
+            user_response = input.get("user_response")
+            rules = input.get("rules", {})
+            
+            if not section_number:
+                raise ValueError("Section number required")
+
+            # Vérifier si un jet de dés est nécessaire
+            needs_dice = rules.get("needs_dice", False)
+            
+            # Si on attend un jet de dés
+            if needs_dice and not input.get("dice_result"):
+                return {
+                    "section_number": section_number,
+                    "awaiting_action": "dice_roll",
+                    "dice_type": rules.get("dice_type", "normal"),
+                    "analysis": "En attente du jet de dés"
+                }
+            
+            # Si on a une réponse utilisateur ou un résultat de dés
+            if user_response or input.get("dice_result"):
+                # Analyser la situation
+                analysis = await self._analyze_response(
+                    section_number, 
+                    user_response or f"Résultat du dé: {input.get('dice_result')}"
+                )
+                
+                # Émettre l'événement
+                event = Event(
+                    type="decision_made",
+                    data={
+                        "section_number": section_number,
+                        "analysis": analysis,
+                        "dice_result": input.get("dice_result")
+                    }
+                )
+                await self.event_bus.emit(event)
+                
+                return {
+                    "next_section": section_number + 1,
+                    "analysis": analysis,
+                    "awaiting_action": None
+                }
+            
+            # Si on n'a ni réponse ni dé
             return {
-                "error": "Erreur de format dans la réponse de l'agent",
-                "next_section": context.get("current_section", 1),
-                "needs_dice_roll": False,
-                "dice_result": dice_result
+                "section_number": section_number,
+                "awaiting_action": "user_input",
+                "analysis": "En attente de la réponse de l'utilisateur"
             }
+
+        except Exception as e:
+            self.logger.error(f"Error in DecisionAgent: {str(e)}")
+            return {"error": str(e)}
+
+    async def _analyze_response(self, section_number: int, user_response: str) -> str:
+        """
+        Analyse la réponse de l'utilisateur.
+        """
+        try:
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=f"Section: {section_number}\nRéponse: {user_response}")
+            ]
+            
+            response = await self.llm.agenerate([messages])
+            if not response.generations:
+                raise ValueError("No response generated")
+                
+            analysis = response.generations[0][0].text.strip()
+            return analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error analyzing response: {str(e)}")
+            return f"Error analyzing response: {str(e)}"
