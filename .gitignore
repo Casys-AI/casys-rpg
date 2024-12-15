@@ -7,3 +7,10 @@ __pycache__/
 *.pdf
 game.log
 .pytest_cache/
+extract_images.ipynb
+extract_metadata.ipynb
+extract_sections.ipynb
+prepare_lorem.ipynb
+1_process_feedback.ipynb
+12_update_rules_index_only_feeback_sections.ipynb
+2_process_rule_and_update_index.ipynb

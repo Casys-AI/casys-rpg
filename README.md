@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/streamlit-1.28.0-FF4B4B.svg)](https://streamlit.io)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-00A36C.svg)](https://openai.com/)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)](https://coverage.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Casys-AI/casys-rpg/graphs/commit-activity)
@@ -14,8 +15,7 @@
 [Features](#features) •
 [Quick Start](#quick-start) •
 [Architecture](#architecture) •
-[Documentation](#documentation) •
-[Contributing](#contributing)
+[Documentation](#documentation)
 
 </div>
 
@@ -23,13 +23,35 @@
 
 ## ✨ Features
 
-- 🤖 **Intelligent Agents**: Four specialized LLM agents handling different aspects of the game
-- 📚 **RAG-based Rules**: Semantic search and analysis of game rules using FAISS
-- 🎲 **Dynamic Dice System**: Context-aware dice rolling system for combat and chance events
-- 📊 **Character Stats**: Real-time character statistics tracking
-- 🔄 **Game State Management**: Robust state management with save/load capabilities
-- 📝 **Feedback System**: Integrated user feedback collection
-- 🐛 **Debug Mode**: Built-in debugging tools for development
+- 🤖 **Intelligent Agents**: 
+  - NarratorAgent: Content management and formatting
+  - RulesAgent: Rule analysis and conditions with RAG
+  - DecisionAgent: Choice validation and transition management
+  - TraceAgent: Complete history and player statistics
+
+- 🎲 **Dynamic Dice System**:
+  - Rule-based contextual rolls
+  - Specialized types: combat, chance, normal
+  - Result validation and impacts
+  - Intuitive interface with dynamic buttons
+
+- 📊 **Stats Management**:
+  - Characteristics: Skill, Luck, Endurance
+  - Resources: Gold, Gems
+  - Dynamic inventory with equipment
+  - Automatic progress saving
+
+- 🔄 **State Management**:
+  - EventBus for asynchronous communication
+  - Automatic save/load
+  - Detailed action history
+  - Complete game tracing
+
+- 🎨 **User Interface**:
+  - Current version: Modern Streamlit interface
+  - In development: Qwik Frontend for enhanced reactivity
+  - Adaptive dark/light theme
+  - Responsive design
 
 ## 🚀 Quick Start
 
@@ -38,265 +60,153 @@
 - Python 3.8+
 - pip
 - OpenAI API key
-- langgraph
-- faiss-cpu
+- Git
 
 ### Installation
 
+1. Clone the repository:
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+git clone https://github.com/your-repo/casys-rpg.git
+cd casys-rpg
+```
 
-# Set up environment
+2. Create a virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Configure environment:
+```bash
 cp .env.example .env
 # Edit .env with your OpenAI API key
 ```
 
-### Running the Game
-
+5. Run the application:
 ```bash
 streamlit run app.py
 ```
 
 ## 🏗 Architecture
 
-The system utilizes four specialized LangChain agents:
-
-### 1. RulesAgent 📋
-- Implements RAG for rule analysis
-- FAISS indexing for semantic search
-- Determines dice roll requirements
-- Returns structured analysis:
-  ```json
-  {
-    "needs_dice_roll": true|false,
-    "dice_type": "chance"|"combat"|null,
-    "conditions": ["condition1", "condition2"],
-    "next_sections": [1, 2, 3],
-    "rules_summary": "Rules summary"
-  }
-  ```
-
-### 2. DecisionAgent 🤔
-- Interprets user responses
-- Processes RulesAgent analysis
-- Manages dice roll button display
-- Validates section choices
-- Focuses on decision logic
-
-### 3. NarratorAgent 📖
-- Reads book sections
-- Formats text for display
-- Manages content presentation
-- Handles section transitions
-
-### 4. TraceAgent 📝
-- Records decisions with context
-- Maintains game history
-- Enables game state recovery
-- Stores character statistics
-
-## 🧩 Core Components
-
-### 1. Application (app.py)
-- Streamlit UI interface
-- Session state management
-- Character statistics display
-- Interactive game controls:
-  - Dynamic dice roll button
-  - Feedback system
-  - Debug mode
-- Integrated feedback form
-
-### 2. Game Logic (game_logic.py)
-- GameState class management
-- Agent coordination
-- Error handling and logging
-- StoryGraph interface
-
-### 3. Utilities (utils/game_utils.py)
-- Dice rolling functions
-- Data manipulation tools
-- Common helper functions
-
-## 🔄 Game Flow
+### Agent Workflow
 
 ```mermaid
 graph TD
-    A[Current Section] --> B[RulesAgent Analysis]
-    B --> C[Display Section]
-    C --> D[User Response]
-    D --> E[DecisionAgent Processing]
-    E --> F[TraceAgent Recording]
-    F --> G[Stats Update]
-    G --> A
+    A[Initial State] --> B[NarratorAgent]
+    B --> C[RulesAgent]
+    C --> D{Decision Required?}
+    D -->|Yes| E[DecisionAgent]
+    D -->|No| F[TraceAgent]
+    E --> F
+    F --> G{Player Action?}
+    G -->|Yes| A
+    G -->|No| H[End]
 ```
 
-## 📁 Project Structure
+### EventBus
+
+The system uses a central EventBus for:
+- Asynchronous agent communication
+- State update propagation
+- Game event management
+- Player action synchronization
+
+```python
+# EventBus usage example
+await event_bus.emit(Event(
+    type="state_updated",
+    data={"action": "dice_roll", "result": 6}
+))
+```
+
+### Core Components
+
+1. **StoryGraph** (`agents/story_graph.py`):
+   - Game flow orchestration
+   - Agent coordination via EventBus
+   - State transition management
+   - Action validation
+
+2. **Agents** (`agents/`):
+   - `narrator_agent.py`: Content and formatting
+   - `rules_agent.py`: RAG rule analysis
+   - `decision_agent.py`: Decision logic
+   - `trace_agent.py`: History and stats
+
+3. **EventBus** (`event_bus.py`):
+   - Inter-agent communication
+   - Event management
+   - State updates
+   - Synchronization
+
+### Data Structure
 
 ```
 .
-├── agents/
-│   ├── rules_agent.py     # RAG + Rule analysis
-│   ├── decision_agent.py  # Decision logic
-│   ├── narrator_agent.py  # Content reading
-│   ├── trace_agent.py     # History & stats
-│   └── story_graph.py     # Coordination
-├── utils/
-│   └── game_utils.py      # Common utilities
+├── agents/                 # Specialized agents
 ├── data/
-│   ├── sections/          # Book text
-│   ├── rules/            # Section rules
-│   ├── trace/            # Game history
-│   └── feedback/         # User feedback
-├── tests/
-│   ├── test_story_graph.py # StoryGraph tests
-│   ├── test_agents.py     # Agent tests
-│   └── TESTS.md          # Test documentation
-├── app.py                # Streamlit interface
-├── game_logic.py         # Core logic
-└── requirements.txt      # Dependencies
+│   ├── sections/          # Narrative content
+│   ├── rules/            # Game rules
+│   └── trace/            # Session data
+│       ├── history.json  # Action history
+│       └── stats.json    # Player stats
+├── frontend/             # Qwik UI (in dev)
+└── app.py               # Streamlit interface
 ```
 
 ## 📚 Documentation
 
 ### LLM Models
-- Using `gpt-4o-mini` for all agents
-- Temperature settings:
-  - RulesAgent: 0 (deterministic)
-  - DecisionAgent: 0.7 (controlled creativity)
-  - NarratorAgent: 0.3 (balanced)
-  - TraceAgent: 0 (deterministic)
-
-### Vector Index
-- FAISS with L2 metric
-- Dimension: 1536 (OpenAI embeddings)
-- Updates: On each launch
-- Cache mechanism for frequent queries
+- Using `gpt-4o-mini`
+- Agent configurations:
+  - NarratorAgent: temp=0.7
+  - RulesAgent: temp=0
+  - DecisionAgent: temp=0.7
 
 ### Rule Format
-- Markdown files
-- One file per section: `section_X_rule.md`
-- Structure:
-  ```markdown
-  # Section X Rules
-  - Conditions: [...]
-  - Possible actions: [...]
-  - Next sections: [...]
-  ```
-
-## 🧪 Testing
-
-### Test Architecture
-Each component has its own test suite focusing on specific functionalities:
-
-### 1. StoryGraph Tests
-- **Initial State**: Game loading and setup
-- **User Response**: Choice validation
-- **Dice System**: Roll mechanics
-- **Error Handling**: System robustness
-- **Event System**: Communication flow
-- **State Management**: Data consistency
-
-### 2. Agent Tests
-- **RulesAgent**:
-  - Rule parsing accuracy
-  - Cache effectiveness
-  - Search relevance
-  - Error handling
-  
-- **DecisionAgent**:
-  - Choice validation
-  - State transitions
-  - Action triggers
-  - Error recovery
-  
-- **NarratorAgent**:
-  - Content loading
-  - Format consistency
-  - Cache management
-  - Error states
-  
-- **TraceAgent**:
-  - History tracking
-  - State persistence
-  - Event logging
-  - Recovery mechanisms
-
-### Running Tests
-```bash
-# Run all tests
-pytest
-
-# Run specific test suite
-pytest tests/test_story_graph.py
-
-# Run with coverage
-pytest --cov=agents tests/
+```markdown
+# Section X
+- Conditions: [condition1, condition2]
+- Actions: [action1, action2]
+- Next sections: [Y, Z]
 ```
 
-### Test Categories
+### Game State
+```python
+{
+    "section_number": int,
+    "content": str,
+    "decision": {
+        "next_section": int,
+        "awaiting_action": bool,
+        "conditions": List[str]
+    },
+    "trace": {
+        "history": List[Dict],
+        "stats": Dict
+    }
+}
+```
 
-#### 1. Unit Tests
-- Individual agent testing
-- Function-level validation
-- Error case handling
-- State management
+## 🔄 Roadmap
 
-#### 2. Integration Tests
-- Agent interaction testing
-- Event system validation
-- State transitions
-- Error propagation
+- [x] Functional Streamlit version
+- [x] Dynamic dice system
+- [x] Stats management
+- [x] Action history
+- [-] Hybrid Agentic architecture
+- [ ] Fast API backend
+- [ ] Qwik Frontend
+- [ ] Image integration
+- [ ] Visual rule editor
 
-#### 3. End-to-End Tests
-- Complete game flow testing
-- User interaction simulation
-- State persistence
-- Performance metrics
-
-### Test Dependencies
-- pytest-asyncio: Async test execution
-- pytest-cov: Coverage reporting
-- pytest-mock: Mocking framework
-- pytest-benchmark: Performance testing
-
-For detailed test documentation, see [TESTS.md](tests/TESTS.md).
-
-## 🔄 Version History
-
-### v1.2.0 (15/12/2023)
-- Enhanced error handling
-- Test suite refactoring
-- Documentation updates
-- Performance improvements
-
-### v1.1.0 (15/12/2023)
-- MockEventBus introduction
-- Assertion improvements
-- Test robustness
-- Bug fixes
-
-### v1.0.0 (15/12/2023)
-- Initial release
-- Basic functionality
-- Core test suite
-- Documentation
-
-## 🤝 Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- OpenAI for GPT models
-- Streamlit team for the framework
-- LangChain community for agent framework
-- FAISS team for vector search
 
 ---
 
