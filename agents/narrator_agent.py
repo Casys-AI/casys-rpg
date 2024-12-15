@@ -1,138 +1,185 @@
 from langchain.schema.runnable import RunnableSerializable
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Optional
+from typing import Dict, Optional, List, AsyncGenerator, Any
 import logging
 from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models.base import BaseChatModel
+import os
+import json
 
-class NarratorAgent(RunnableSerializable[Dict, Dict]):
+class NarratorAgent(BaseModel):
     """
-    Agent qui lit et présente le contenu des sections.
+    Agent responsable de la lecture du contenu des sections.
     """
-    
-    sections_directory: str = Field(default="data/sections")
-    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(model="gpt-4o-mini"))
-    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
+    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(
+        model="gpt-4o-mini",
+        model_kwargs={
+            "system_message": """Tu es un narrateur de livre-jeu. 
+            Tu dois lire et formater le contenu des sections pour une présentation agréable."""
+        }
+    ))
+    event_bus: EventBus = Field(default_factory=EventBus)
+    content_directory: str = Field(default="data/sections")
     cache: Dict[int, str] = Field(default_factory=dict)
-    system_prompt: str = Field(default="""Tu es un narrateur qui présente le contenu d'une section.
-Retourne le texte formaté pour l'affichage.""")
-    event_bus: EventBus = Field(..., description="Bus d'événements pour la communication")
+    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def ainvoke(self, input: Dict) -> Dict:
+    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
         """
-        Version asynchrone de l'invocation.
+        Lit et formate le contenu d'une section.
+        
+        Args:
+            input_data (Dict): Les données d'entrée avec l'état du jeu
+            config (Optional[Dict]): Configuration optionnelle
+            
+        Returns:
+            Dict: Le contenu formaté de la section
         """
         try:
-            section_number = input.get("section_number")
+            state = input_data.get("state", {})
+            section_number = state.get("section_number")
+            use_cache = state.get("use_cache", False)
+            
             if not section_number:
-                raise ValueError("Section number required")
-
-            # Si un contenu est fourni, le formater
-            if "content" in input:
-                content = input["content"]
-                formatted = await self._format_content(content)
                 return {
-                    "content": content,
-                    "formatted_content": formatted
-                }
-
-            # Vérifier le cache
-            if section_number in self.cache:
-                content = self.cache[section_number]
-                event = Event(
-                    type="content_retrieved_from_cache",
-                    data={
-                        "section_number": section_number,
-                        "content": content
+                    "state": {
+                        "error": "Section number required",
+                        "content": "",
+                        "formatted_content": ""
                     }
-                )
-                await self.event_bus.emit(event)
+                }
+            
+            # Charger le contenu
+            content = self._load_section_content(section_number, use_cache)
+            if content is None:
                 return {
-                    "content": content,
-                    "formatted_content": content
+                    "state": {
+                        "error": f"Section {section_number} not found",
+                        "content": "",
+                        "formatted_content": ""
+                    }
                 }
-
-            # Récupérer le contenu
-            content = await self._get_content(section_number)
+                
+            # Formater le contenu si nécessaire
+            formatted_content = content if use_cache else self._format_content(content)
             
-            # Mettre en cache
-            self.cache[section_number] = content
-            
-            # Émettre l'événement
-            event = Event(
-                type="content_generated",
-                data={
-                    "section_number": section_number,
-                    "content": content
-                }
-            )
-            await self.event_bus.emit(event)
-            
+            # Retourner le résultat
             return {
-                "content": content,
-                "formatted_content": content
+                "state": {
+                    "section_number": section_number,
+                    "content": content,
+                    "formatted_content": formatted_content,
+                    "source": "cache" if use_cache else "loaded"
+                }
             }
 
         except Exception as e:
-            self.logger.error(f"Error in NarratorAgent: {str(e)}")
-            return {"error": str(e)}
+            self.logger.error(f"Error in invoke: {str(e)}")
+            return {
+                "state": {
+                    "error": str(e),
+                    "content": "",
+                    "formatted_content": ""
+                }
+            }
 
-    def invoke(self, input: Dict) -> Dict:
+    def _load_section_content(self, section_number: int, use_cache: bool = False) -> Optional[str]:
         """
-        Version synchrone de l'invocation (pour compatibilité).
-        Note: Cette méthode est dépréciée, utilisez ainvoke à la place.
-        """
-        import warnings
-        warnings.warn(
-            "NarratorAgent.invoke() is deprecated, use ainvoke() instead",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        return self.ainvoke(input)
-
-    async def _get_content(self, section_number: int) -> str:
-        """
-        Récupère le contenu d'une section.
+        Charge le contenu d'une section depuis le fichier.
+        
+        Args:
+            section_number (int): Numéro de la section à charger
+            use_cache (bool): Utiliser le cache si disponible
+            
+        Returns:
+            Optional[str]: Le contenu de la section ou None si non trouvé
         """
         try:
-            messages = [
-                SystemMessage(content=self.system_prompt),
-                HumanMessage(content=f"Section: {section_number}")
-            ]
-            
-            response = await self.llm.agenerate([messages])
-            if not response.generations:
-                raise ValueError("No response generated")
+            # Vérifier d'abord dans le cache si demandé
+            cache_path = os.path.join(self.content_directory, "cache", f"{section_number}_cached.md")
+            if use_cache and os.path.exists(cache_path):
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    return f.read()
+
+            # Si pas dans le cache ou cache non demandé, charger depuis le fichier principal
+            file_path = os.path.join(self.content_directory, f"section_{section_number}.md")
+            if not os.path.exists(file_path):
+                return None
                 
-            content = response.generations[0][0].text.strip()
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Formater et sauvegarder dans le cache
+            formatted_content = self._format_content(content)
+            os.makedirs(os.path.join(self.content_directory, "cache"), exist_ok=True)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                f.write(formatted_content)
+            
             return content
-            
-        except Exception as e:
-            self.logger.warning(f"Section file not found for section {section_number}")
-            return f"# Section {section_number}\nCette section n'est pas disponible."
 
-    async def _format_content(self, content: str) -> str:
+        except Exception as e:
+            self.logger.error(f"Error loading section {section_number}: {str(e)}")
+            return None
+
+    def _format_content(self, content: str) -> str:
         """
-        Formate le contenu pour l'affichage.
+        Formate le contenu d'une section en utilisant le LLM.
+        
+        Args:
+            content (str): Le contenu brut à formater
+            
+        Returns:
+            str: Le contenu formaté
         """
         try:
+            # Préserver le formatage markdown existant
+            formatted_content = content.strip()
+            
+            # Utiliser le LLM pour enrichir le contenu tout en préservant le formatage
             messages = [
-                SystemMessage(content="Tu es un formateur de texte. Formate le texte suivant pour l'affichage."),
-                HumanMessage(content=content)
+                SystemMessage(content="""Tu es un narrateur de livre-jeu qui enrichit le contenu tout en préservant le formatage markdown existant.
+                Règles importantes :
+                1. TOUJOURS conserver les marqueurs markdown (*italique*, **gras**, # titres, etc.)
+                2. TOUJOURS préserver la structure exacte du texte
+                3. Enrichir le contenu sans modifier le formatage existant
+                4. Ne pas ajouter de formatage supplémentaire aux parties non formatées
+                """),
+                HumanMessage(content=f"Voici le contenu à enrichir en préservant son formatage :\n\n{formatted_content}")
             ]
             
-            response = await self.llm.agenerate([messages])
-            if not response.generations:
-                raise ValueError("No response generated")
-                
-            formatted = response.generations[0][0].text.strip()
-            return formatted
+            response = self.llm.invoke(messages)
             
+            # Vérifier que le formatage est préservé
+            if "*" not in response.content and "*" in content:
+                self.logger.warning("Le formatage markdown a été perdu, retour au contenu original")
+                return content
+                
+            return response.content
+
         except Exception as e:
             self.logger.error(f"Error formatting content: {str(e)}")
-            return content
+            return content  # Retourner le contenu non formaté en cas d'erreur
+
+    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
+        """Invoke async."""
+        result = await self.invoke(input_data)
+        yield result
+
+    async def get_state(self) -> Dict:
+        """Récupère l'état actuel."""
+        return {
+            "section_number": 1,
+            "content": "",
+            "needs_content": True
+        }
+
+    async def update_state(self, state: Dict) -> None:
+        """Met à jour l'état."""
+        pass
+
+    async def emit_event(self, event_type: str, data: Dict) -> None:
+        """Émet un événement."""
+        await self.event_bus.emit(Event(type=event_type, data=data))

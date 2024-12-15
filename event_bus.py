@@ -1,69 +1,97 @@
-from typing import Dict, Callable, List, Any
-from pydantic import BaseModel, Field
+"""Event bus for managing game state and events."""
+from typing import Dict, Any, Callable, List, Awaitable
+from dataclasses import dataclass
 import asyncio
 import logging
 from contextlib import contextmanager
 from datetime import datetime
 
-class Event(BaseModel):
-    """Représente un événement dans le système"""
-    type: str = Field(..., description="Type de l'événement")
-    data: Any = Field(..., description="Données de l'événement")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Horodatage de l'événement")
-    source: str = Field(default=None, description="Source de l'événement")
-
-    @property
-    def name(self) -> str:
-        return self.type
+@dataclass
+class Event:
+    """Event class."""
+    type: str
+    data: Dict[str, Any]
 
 class EventBus:
-    """Bus d'événements pour la communication entre agents"""
+    """Event bus for managing game state and events."""
     
     def __init__(self):
-        self.listeners: Dict[str, List[Callable]] = {}
-        self.history: List[Event] = []
+        self._state: Dict[str, Any] = {}
+        self._subscribers: Dict[str, List[Callable[[Event], Awaitable[None]]]] = {}
+        self._lock = asyncio.Lock()
         self.logger = logging.getLogger("EventBus")
+        self._history: List[Event] = []
 
-    async def subscribe(self, event_type: str, listener: Callable[[Event], None]):
-        """Abonne un listener à un type d'événement"""
-        if event_type not in self.listeners:
-            self.listeners[event_type] = []
-        self.listeners[event_type].append(listener)
-        self.logger.debug(f"New subscriber for {event_type}")
+    async def get_state(self) -> Dict[str, Any]:
+        """Get current state."""
+        async with self._lock:
+            return self._state.copy()
+
+    async def update_state(self, updates: Dict[str, Any]):
+        """Update state with new values."""
+        async with self._lock:
+            self._state.update(updates)
+            await self.emit(Event(
+                type="state_updated",
+                data=self._state.copy()
+            ))
 
     async def emit(self, event: Event):
-        """Émet un événement aux listeners"""
-        self.history.append(event)
-        self.logger.debug(f"Event emitted: {event.type} from {event.source}")
+        """Emit an event to all subscribers."""
+        self._history.append(event)
+        self.logger.debug(f"Event emitted: {event.type}")
         
-        if event.type in self.listeners:
+        if event.type in self._subscribers:
             await asyncio.gather(
-                *[self._safe_execute(listener, event) for listener in self.listeners[event.type]]
+                *[self._safe_execute(callback, event) for callback in self._subscribers[event.type]]
             )
 
-    async def _safe_execute(self, listener: Callable[[Event], None], event: Event):
-        """Exécute un listener de manière sécurisée"""
+    async def _safe_execute(self, callback: Callable[[Event], Awaitable[None]], event: Event):
+        """Execute a callback safely."""
         try:
-            if asyncio.iscoroutinefunction(listener):
-                await listener(event)
-            else:
-                listener(event)
+            await callback(event)
         except Exception as e:
-            self.logger.error(f"Error in listener for {event.type}: {str(e)}")
+            self.logger.error(f"Error in callback for {event.type}: {str(e)}")
+
+    async def subscribe(self, event_type: str, callback: Callable[[Event], Awaitable[None]]):
+        """Subscribe to an event type."""
+        if event_type not in self._subscribers:
+            self._subscribers[event_type] = []
+        self._subscribers[event_type].append(callback)
+        self.logger.debug(f"New subscriber for {event_type}")
+
+    async def reset_state(self):
+        """Reset state."""
+        async with self._lock:
+            self._state = {}
+            await self.emit(Event(
+                type="state_reset",
+                data={}
+            ))
 
     @contextmanager
-    def event_context(self, event_type: str, source: str):
-        """Context manager pour tracer les événements"""
+    def event_context(self, event_type: str):
+        """Context manager for tracing events."""
         start_time = datetime.now()
         try:
             yield
         finally:
             duration = datetime.now() - start_time
-            self.logger.debug(f"Event {event_type} from {source} took {duration}")
+            self.logger.debug(f"Event {event_type} took {duration}")
+
+    @property
+    def history(self) -> List[Event]:
+        """Get event history."""
+        return self._history.copy()
 
     def get_history(self) -> List[Event]:
-        """Récupère l'historique des événements"""
-        return self.history.copy()
+        """
+        Récupère l'historique des événements.
+        
+        Returns:
+            List[Event]: Liste des événements émis
+        """
+        return self._history.copy()
 
 # Instance singleton
 event_bus = EventBus()

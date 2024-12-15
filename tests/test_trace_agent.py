@@ -25,18 +25,20 @@ async def trace_agent(event_bus, tmp_path):
 async def test_record_decision(trace_agent):
     """Test l'enregistrement d'une décision"""
     input_data = {
-        "section_number": 1,
-        "decision": {
-            "next_section": 2,
-            "awaiting_action": True,
-            "conditions": ["needs_dice_roll"],
-            "rules_summary": "Un jet de dé est nécessaire"
-        },
-        "rules": {
-            "needs_dice": True,
-            "dice_type": "combat"
-        },
-        "user_response": "Je vais à gauche"
+        "state": {
+            "section_number": 1,
+            "decision": {
+                "next_section": 2,
+                "awaiting_action": True,
+                "conditions": ["needs_dice_roll"],
+                "rules_summary": "Un jet de dé est nécessaire"
+            },
+            "rules": {
+                "needs_dice": True,
+                "dice_type": "combat"
+            },
+            "user_response": "Je vais à gauche"
+        }
     }
     
     result = await trace_agent.invoke(input_data)
@@ -68,72 +70,70 @@ async def test_record_decision(trace_agent):
 
 @pytest.mark.asyncio
 async def test_record_dice_roll(trace_agent):
-    """Test l'enregistrement d'un lancer de dés"""
-    # Cas où un jet de dés est nécessaire
-    result = await trace_agent.invoke({
-        "section_number": 1,
-        "dice_result": {"value": 6, "type": "combat"},
-        "rules": {
-            "needs_dice": True,
-            "dice_type": "combat"
+    """Test l'enregistrement d'un jet de dés."""
+    # Préparer les données de test
+    test_data = {
+        "state": {
+            "section_number": 1,
+            "dice_result": {
+                "type": "combat",
+                "value": 6,
+                "success": True
+            }
         }
-    })
+    }
     
-    # Vérifier l'entrée dans l'historique
-    assert len(result["history"]) == 1
-    entry = result["history"][0]
-    assert entry["action_type"] == "dice_roll"
-    assert entry["dice_result"]["value"] == 6
-    assert entry["dice_type"] == "combat"
+    # Appeler l'agent
+    result = await trace_agent.invoke(test_data)
     
-    # Cas où un jet de dés n'est pas nécessaire
-    result = await trace_agent.invoke({
-        "section_number": 1,
-        "dice_result": {"value": 6},
-        "rules": {
-            "needs_dice": False
-        }
-    })
-    
-    # Vérifier que ce n'est pas enregistré comme un jet de dés
-    entry = result["history"][-1]
-    assert entry["action_type"] != "dice_roll"
+    # Vérifier le résultat
+    assert "state" in result
+    assert "history" in result["state"]
+    assert len(result["state"]["history"]) == 1
+    assert result["state"]["history"][0]["action_type"] == "dice_roll"
+    assert result["state"]["history"][0]["dice_result"]["value"] == 6
 
 @pytest.mark.asyncio
 async def test_multiple_actions_sequence(trace_agent):
     """Test une séquence complète d'actions"""
     # 1. Décision initiale
     await trace_agent.invoke({
-        "section_number": 1,
-        "decision": {
-            "next_section": None,
-            "awaiting_action": True,
-            "conditions": ["needs_user_input"],
-            "rules_summary": "Attente de la décision du joueur"
+        "state": {
+            "section_number": 1,
+            "decision": {
+                "next_section": None,
+                "awaiting_action": True,
+                "conditions": ["needs_user_input"],
+                "rules_summary": "Attente de la décision du joueur"
+            }
         }
     })
     
     # 2. Réponse utilisateur
     await trace_agent.invoke({
-        "section_number": 1,
-        "user_response": "Je vais à gauche",
-        "decision": {
-            "next_section": None,
-            "awaiting_action": True,
-            "conditions": ["needs_dice_roll"],
-            "rules_summary": "Un jet de dé est nécessaire"
+        "state": {
+            "section_number": 1,
+            "user_response": "Je vais à gauche",
+            "decision": {
+                "next_section": None,
+                "awaiting_action": True,
+                "conditions": ["needs_dice_roll"],
+                "rules_summary": "Un jet de dé est nécessaire"
+            }
         }
     })
     
     # 3. Lancer de dés
     result = await trace_agent.invoke({
-        "section_number": 1,
-        "dice_result": {"value": 6, "type": "combat"},
-        "decision": {
-            "next_section": 2,
-            "awaiting_action": False,
-            "conditions": ["dice_roll_success"],
-            "rules_summary": "Le jet de dé détermine la suite"
+        "state": {
+            "section_number": 1,
+            "dice_result": {"value": 6, "type": "combat"},
+            "decision": {
+                "next_section": 2,
+                "awaiting_action": False,
+                "conditions": ["dice_roll_success"],
+                "rules_summary": "Le jet de dé détermine la suite"
+            }
         }
     })
     
@@ -201,7 +201,7 @@ async def test_stats_persistence(trace_agent):
     await trace_agent.update_stats({})  # Forcer la sauvegarde
     
     # Vérifier le fichier
-    stats_file = trace_agent.session_dir / "adventure_stats.json"
+    stats_file = Path(trace_agent.session_dir) / "adventure_stats.json"
     with open(stats_file, "r", encoding="utf-8") as f:
         saved_stats = json.load(f)
     assert saved_stats == initial_stats

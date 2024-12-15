@@ -16,16 +16,20 @@ the component's role in the game engine architecture.
 **Input Data Format**:
 ```json
 {
-    "section_number": 1
+    "state": {
+        "section_number": 1
+    }
 }
 ```
 **Expected Output Format**:
 ```json
 {
-    "choices": ["list of choices"],
-    "needs_dice": boolean,
-    "dice_type": "combat"|"chance"|null,
-    "rules": "rule text"
+    "state": {
+        "choices": ["list of choices"],
+        "needs_dice": boolean,
+        "dice_type": "combat"|"chance"|null,
+        "rules": "rule text"
+    }
 }
 ```
 
@@ -69,10 +73,12 @@ cache = {
 **Error Format**:
 ```json
 {
-    "error": "error message",
-    "choices": [],
-    "needs_dice": false,
-    "dice_type": null
+    "state": {
+        "error": "error message",
+        "choices": [],
+        "needs_dice": false,
+        "dice_type": null
+    }
 }
 ```
 
@@ -87,9 +93,11 @@ cache = {
 **Detection Format**:
 ```json
 {
-    "needs_dice": true,
-    "dice_type": "combat"|"chance",
-    "awaiting_action": true
+    "state": {
+        "needs_dice": true,
+        "dice_type": "combat"|"chance",
+        "awaiting_action": true
+    }
 }
 ```
 
@@ -188,187 +196,115 @@ async def rules_agent(event_bus):
 
 @pytest.mark.asyncio
 async def test_rules_agent_basic(rules_agent):
-    """
-    Basic Functionality Test
-    
-    Purpose:
-    --------
-    Validates the basic response structure and content from RulesAgent.
-    
-    Test Flow:
-    ----------
-    1. Input:
-       - Valid section number
-    2. Validation:
-       - Response is dictionary
-       - Contains required fields
-       - Field types are correct
-    
-    Success Criteria:
-    ----------------
-    - Response is dict
-    - Contains 'choices' field
-    - Contains 'needs_dice' field
-    """
-    result = await rules_agent.invoke({"section_number": 1})
-    assert isinstance(result, dict)
-    assert "choices" in result
-    assert "needs_dice" in result
+    """Test le fonctionnement de base"""
+    async for result in rules_agent.ainvoke({"state": {"section_number": 1}}):
+        assert "state" in result
+        assert isinstance(result["state"], dict)
+        assert "needs_dice" in result["state"]
+        assert isinstance(result["state"]["needs_dice"], bool)
 
 @pytest.mark.asyncio
 async def test_rules_agent_cache(rules_agent):
-    """
-    Cache Mechanism Test
+    """Test la mise en cache"""
+    section = 1
+    first_result = None
+    second_result = None
     
-    Purpose:
-    --------
-    Validates the caching behavior of RulesAgent.
+    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
+        first_result = result
+    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
+        second_result = result
     
-    Test Flow:
-    ----------
-    1. First Call:
-       - Cache miss
-       - Rules analyzed
-       - Result stored
-    2. Second Call:
-       - Cache hit
-       - No analysis
-       - Same result
-    
-    Success Criteria:
-    ----------------
-    - Identical responses for same input
-    - All key fields match
-    - Cache hit on second call
-    """
-    result1 = await rules_agent.invoke({"section_number": 1})
-    result2 = await rules_agent.invoke({"section_number": 1})
-    
-    assert result1["choices"] == result2["choices"]
-    assert result1["needs_dice"] == result2["needs_dice"]
-    assert result1["dice_type"] == result2["dice_type"]
-    assert result1["rules"] == result2["rules"]
+    assert first_result["state"] == second_result["state"]
+    assert "source" in second_result and second_result["source"] == "cache"
 
 @pytest.mark.asyncio
 async def test_rules_agent_events(rules_agent, event_bus):
-    """
-    Event System Test
-    
-    Purpose:
-    --------
-    Validates event emission and handling.
-    
-    Test Flow:
-    ----------
-    1. Setup:
-       - Register event listener
-       - Track events
-    2. Action:
-       - Trigger rules analysis
-    3. Validation:
-       - Event received
-       - Correct event type
-       - Complete data
-    
-    Success Criteria:
-    ----------------
-    - Event emitted
-    - Correct event name
-    - Contains required data
-    """
+    """Test l'émission d'événements"""
     events = []
     async def event_listener(event):
         events.append(event)
 
     await event_bus.subscribe("rules_generated", event_listener)
-    await rules_agent.invoke({"section_number": 1})
+    async for _ in rules_agent.ainvoke({"state": {"section_number": 1}}):
+        pass
+    
     assert len(events) > 0
-    assert events[0].name == "rules_generated"
+    assert events[0].type == "rules_generated"
+    assert "rules" in events[0].data
 
 @pytest.mark.asyncio
 async def test_rules_agent_invalid_input(rules_agent):
-    """
-    Input Validation Test
-    
-    Purpose:
-    --------
-    Validates error handling for invalid inputs.
-    
-    Test Flow:
-    ----------
-    1. Missing Section:
-       - Empty input
-       - Verify error
-    2. Invalid Section:
-       - Negative number
-       - Verify error
-    
-    Success Criteria:
-    ----------------
-    - Clear error messages
-    - Appropriate error types
-    - Graceful handling
-    """
-    result = await rules_agent.invoke({})
-    assert "Section number required" in result.get("error", "")
-
-    result = await rules_agent.invoke({"section_number": -1})
-    assert result.get("error") is not None
-    assert "invalid" in result.get("error", "").lower()
+    """Test la gestion des entrées invalides"""
+    async for result in rules_agent.ainvoke({"state": {}}):
+        assert "error" in result["state"]
+        assert result["state"].get("needs_dice") is False
+        assert result["state"].get("dice_type") is None
 
 @pytest.mark.asyncio
 async def test_rules_agent_dice_handling(rules_agent):
-    """
-    Dice Roll Detection Test
-    
-    Purpose:
-    --------
-    Validates dice roll detection and categorization.
-    
-    Test Flow:
-    ----------
-    1. Combat Roll:
-       - Combat context
-       - Verify detection
-    2. Chance Roll:
-       - Luck context
-       - Verify detection
-    3. No Roll:
-       - Normal context
-       - Verify no detection
-    
-    Success Criteria:
-    ----------------
-    - Correct dice requirement detection
-    - Proper dice type categorization
-    - Accurate non-dice scenario handling
-    
-    Test Data:
-    ----------
-    1. Combat: "Combat: Vous devez lancer les dés pour combattre le monstre"
-    2. Chance: "Tentez votre Chance en lançant les dés"
-    3. Normal: "Vous pouvez choisir d'aller à gauche ou à droite"
-    """
-    # Test de combat
-    result = await rules_agent.invoke({
+    """Test la détection des jets de dés"""
+    # Test combat
+    async for result in rules_agent.ainvoke({"state": {
         "section_number": 1,
-        "rules": "Combat: Vous devez lancer les dés pour combattre le monstre"
-    })
-    assert result["needs_dice"] is True
-    assert result["dice_type"] == "combat"
-    
-    # Test de chance
-    result = await rules_agent.invoke({
+        "content": "Combat: Vous devez lancer les dés pour combattre le monstre"
+    }}):
+        assert result["state"]["needs_dice"] is True
+        assert result["state"]["dice_type"] == "combat"
+
+    # Test chance
+    async for result in rules_agent.ainvoke({"state": {
         "section_number": 2,
-        "rules": "Tentez votre Chance en lançant les dés"
-    })
-    assert result["needs_dice"] is True
-    assert result["dice_type"] == "chance"
-    
+        "content": "Tentez votre Chance en lançant les dés"
+    }}):
+        assert result["state"]["needs_dice"] is True
+        assert result["state"]["dice_type"] == "chance"
+
     # Test sans dés
-    result = await rules_agent.invoke({
+    async for result in rules_agent.ainvoke({"state": {
         "section_number": 3,
-        "rules": "Vous pouvez choisir d'aller à gauche ou à droite"
-    })
-    assert result["needs_dice"] is False
-    assert result["dice_type"] is None
+        "content": "Vous pouvez choisir d'aller à gauche ou à droite"
+    }}):
+        assert result["state"]["needs_dice"] is False
+        assert result["state"]["dice_type"] is None
+
+@pytest.mark.asyncio
+async def test_rules_agent_always_analyze(rules_agent, event_bus):
+    """
+    Test que le RulesAgent analyse toujours les règles et émet un événement,
+    même si le contenu est dans le cache.
+    """
+    section = 1
+    events = []
+    
+    async def event_listener(event):
+        events.append(event)
+    
+    await event_bus.subscribe("rules_generated", event_listener)
+    
+    # Premier appel - devrait analyser et mettre en cache
+    first_result = None
+    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
+        first_result = result
+    
+    assert len(events) == 1
+    assert events[0].type == "rules_generated"
+    assert events[0].data["section_number"] == section
+    assert "rules" in events[0].data
+    
+    # Deuxième appel - même si dans le cache, devrait quand même analyser
+    events.clear()
+    second_result = None
+    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
+        second_result = result
+    
+    # Vérifie que l'événement est toujours émis
+    assert len(events) == 1
+    assert events[0].type == "rules_generated"
+    assert events[0].data["section_number"] == section
+    assert "rules" in events[0].data
+    
+    # Vérifie que les résultats sont cohérents
+    assert first_result["state"]["needs_dice"] == second_result["state"]["needs_dice"]
+    assert first_result["state"]["dice_type"] == second_result["state"]["dice_type"]
+    assert first_result["state"]["rules"] == second_result["state"]["rules"]

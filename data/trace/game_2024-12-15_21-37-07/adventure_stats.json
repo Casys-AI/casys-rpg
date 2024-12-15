@@ -1,0 +1,17 @@
+{
+  "Caractéristiques": {
+    "Habileté": 10,
+    "Chance": 5,
+    "Endurance": 8
+  },
+  "Ressources": {
+    "Or": 100,
+    "Gemme": 5
+  },
+  "Inventaire": {
+    "Objets": [
+      "Épée",
+      "Bouclier"
+    ]
+  }
+}

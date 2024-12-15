@@ -1,11 +1,20 @@
 # app.py
 import random
 import streamlit as st
-from game_logic import GameState
+from game_logic import GameState, StoryGraph
 from utils.game_utils import roll_dice
 import logging
 import os
 import asyncio
+from dotenv import load_dotenv
+load_dotenv()
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Configuration des chemins
 feedback_dir = os.path.join(os.path.dirname(__file__), "data", "feedback")
@@ -13,8 +22,33 @@ os.makedirs(feedback_dir, exist_ok=True)
 
 def init_session_state():
     """Initialise l'état de la session Streamlit."""
+    logger.debug("Initialisation de l'état de session")
     if "game_state" not in st.session_state:
-        st.session_state.game_state = GameState()
+        logger.debug("Création d'un nouveau GameState")
+        game_state = GameState()
+        game_state.current_section = 1  # Section de départ
+        st.session_state.game_state = game_state
+    if "story_graph" not in st.session_state:
+        logger.debug("Création d'un nouveau StoryGraph")
+        story_graph = StoryGraph()
+        st.session_state.story_graph = story_graph
+        # Initialiser les stats par défaut
+        logger.debug("Initialisation des stats par défaut")
+        story_graph.trace.stats = {
+            "Caractéristiques": {
+                "Habileté": 10,
+                "Chance": 5,
+                "Endurance": 8
+            },
+            "Ressources": {
+                "Or": 100,
+                "Gemme": 5
+            },
+            "Inventaire": {
+                "Objets": ["Épée", "Bouclier"]
+            }
+        }
+        logger.debug(f"Stats initialisées: {story_graph.trace.stats}")
     if "user_response" not in st.session_state:
         st.session_state.user_response = ""
     if "feedback_mode" not in st.session_state:
@@ -30,13 +64,23 @@ def init_session_state():
     if "previous_section" not in st.session_state:
         st.session_state.previous_section = None
 
-def render_character_stats(current_state: dict):
+async def render_character_stats(current_state: dict):
     """Affiche les statistiques du personnage."""
-    stats = st.session_state.game_state.get_character_stats()
-    if "error" in stats:
-        st.error(stats["error"])
+    logger.debug(f"État reçu dans render_character_stats: {current_state}")
+    
+    if "trace" not in current_state:
+        logger.error("'trace' manquant dans l'état")
+        st.error("Erreur: statistiques manquantes (trace)")
         return
         
+    if "stats" not in current_state["trace"]:
+        logger.error("'stats' manquant dans trace")
+        st.error("Erreur: statistiques manquantes (stats)")
+        return
+        
+    stats = current_state["trace"]["stats"]
+    logger.debug(f"Stats trouvées: {stats}")
+    
     with st.sidebar:
         st.markdown("### 📊 Statistiques du personnage")
         if "Caractéristiques" in stats:
@@ -95,11 +139,11 @@ def process_user_input():
             else:
                 # Nettoyer la saisie et remonter en haut
                 st.session_state.user_response = ""
-                st.experimental_rerun()
+                st.rerun()
     with col2:
         if st.button("Donner un feedback"):
             st.session_state.feedback_mode = True
-            st.experimental_rerun()
+            st.rerun()
 
 def save_feedback(feedback: str, previous_section: dict, user_response: str, current_section: int):
     """Sauvegarde le feedback dans un fichier."""
@@ -168,13 +212,13 @@ def render_feedback_form():
                 # Stocker le succès dans session_state pour l'afficher après le rerun
                 st.session_state.feedback_success = True
                 st.session_state.feedback_mode = False
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Veuillez entrer un feedback")
     with col2:
         if st.button("Annuler"):
             st.session_state.feedback_mode = False
-            st.experimental_rerun()
+            st.rerun()
     
     # Afficher le message de succès s'il existe
     if "feedback_success" in st.session_state and st.session_state.feedback_success:
@@ -189,7 +233,7 @@ def render_game_controls():
             st.session_state.game_state = GameState()
             st.session_state.user_response = ""
             st.session_state.dice_result = None
-            st.experimental_rerun()
+            st.rerun()
         
         st.session_state.show_stats = st.checkbox(
             "Afficher les statistiques",
@@ -258,43 +302,72 @@ def setup_page():
         </style>
     """, unsafe_allow_html=True)
 
-def main():
-    setup_page()
-    
-    # Script JavaScript pour remonter en haut de la page
-    st.markdown("""
-        <script>
-            window.scrollTo(0, 0);
-        </script>
-    """, unsafe_allow_html=True)
-    
-    init_session_state()
-    
-    # Obtenir l'état actuel une seule fois
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    current_state = loop.run_until_complete(st.session_state.game_state.get_current_section())
-    loop.close()
-    
-    # Afficher les contrôles et stats dans la barre latérale
-    render_game_controls()
-    if st.session_state.show_stats:
-        render_character_stats(current_state)
-    
-    # Afficher le contenu principal du jeu
-    display_game_content(current_state)
-    
-    # Déplacer les infos de debug à la fin
-    if st.session_state.get("show_debug", False):
-        st.markdown("---")
-        st.markdown("### Debug Info")
-        st.write("Section courante:", current_state.get("section_number", "N/A"))
-    
-    # Interface utilisateur
-    if st.session_state.feedback_mode:
-        render_feedback_form()
-    else:
-        process_user_input()
+async def process_game_state(game_state):
+    """
+    Traite l'état du jeu et retourne le premier état du générateur asynchrone.
+    """
+    try:
+        logger.debug("Début du traitement de l'état du jeu")
+        async for state in game_state:
+            logger.debug(f"État reçu du générateur: {state}")
+            return state
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement de l'état du jeu: {str(e)}")
+        return {"error": str(e)}
+
+async def main():
+    """Point d'entrée principal de l'application."""
+    try:
+        logger.debug("Démarrage de l'application")
+        init_session_state()
+        setup_page()
+        
+        # Obtenir l'état actuel
+        story_graph = st.session_state.story_graph
+        logger.debug("StoryGraph récupéré de la session")
+        
+        # Traiter l'entrée utilisateur si présente
+        if st.session_state.user_response:
+            logger.debug(f"Traitement de la réponse utilisateur: {st.session_state.user_response}")
+            current_state = {
+                "section_number": st.session_state.get("section_number", 1),
+                "user_response": st.session_state.user_response,
+                "dice_result": st.session_state.dice_result
+            }
+            logger.debug(f"État courant créé: {current_state}")
+            result = await process_game_state(story_graph.invoke(current_state))
+        else:
+            logger.debug("Démarrage d'une nouvelle partie")
+            # Démarrer une nouvelle partie avec la section 1
+            initial_state = {
+                "section_number": 1,
+                "content": None,
+                "rules": None,
+                "decision": None,
+                "error": None,
+                "needs_content": True
+            }
+            logger.debug(f"État initial créé: {initial_state}")
+            result = await process_game_state(story_graph.invoke(initial_state))
+            
+        logger.debug(f"Résultat final: {result}")
+        
+        # Afficher le contenu
+        display_game_content(result)
+        
+        # Afficher les contrôles
+        render_game_controls()
+        
+        # Afficher les stats du personnage
+        await render_character_stats(result)
+        
+        # Afficher le formulaire de feedback si nécessaire
+        if st.session_state.feedback_mode:
+            render_feedback_form()
+            
+    except Exception as e:
+        logger.error(f"Erreur dans main: {str(e)}", exc_info=True)
+        st.error(f"Une erreur s'est produite: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

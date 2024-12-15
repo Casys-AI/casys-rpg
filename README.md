@@ -38,14 +38,12 @@
 - Python 3.8+
 - pip
 - OpenAI API key
+- langgraph
+- faiss-cpu
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/Casys-AI/casys-rpg.git
-cd casys-rpg
-
 # Install dependencies
 pip install -r requirements.txt
 
@@ -65,9 +63,9 @@ streamlit run app.py
 The system utilizes four specialized LangChain agents:
 
 ### 1. RulesAgent 📋
-- Implements RAG (Retrieval Augmented Generation) for rule analysis
-- FAISS indexing for semantic rule search
-- Determines dice roll requirements and types
+- Implements RAG for rule analysis
+- FAISS indexing for semantic search
+- Determines dice roll requirements
 - Returns structured analysis:
   ```json
   {
@@ -90,6 +88,7 @@ The system utilizes four specialized LangChain agents:
 - Reads book sections
 - Formats text for display
 - Manages content presentation
+- Handles section transitions
 
 ### 4. TraceAgent 📝
 - Records decisions with context
@@ -119,13 +118,6 @@ The system utilizes four specialized LangChain agents:
 - Dice rolling functions
 - Data manipulation tools
 - Common helper functions
-
-### 4. Agents (agents/)
-- story_graph.py: Agent coordination and flow management
-- trace_agent.py: History and statistics
-- rules_agent.py: Rule analysis
-- decision_agent.py: Decision logic
-- narrator_agent.py: Content presentation
 
 ## 🔄 Game Flow
 
@@ -157,6 +149,10 @@ graph TD
 │   ├── rules/            # Section rules
 │   ├── trace/            # Game history
 │   └── feedback/         # User feedback
+├── tests/
+│   ├── test_story_graph.py # StoryGraph tests
+│   ├── test_agents.py     # Agent tests
+│   └── TESTS.md          # Test documentation
 ├── app.py                # Streamlit interface
 ├── game_logic.py         # Core logic
 └── requirements.txt      # Dependencies
@@ -169,11 +165,14 @@ graph TD
 - Temperature settings:
   - RulesAgent: 0 (deterministic)
   - DecisionAgent: 0.7 (controlled creativity)
+  - NarratorAgent: 0.3 (balanced)
+  - TraceAgent: 0 (deterministic)
 
 ### Vector Index
 - FAISS with L2 metric
 - Dimension: 1536 (OpenAI embeddings)
 - Updates: On each launch
+- Cache mechanism for frequent queries
 
 ### Rule Format
 - Markdown files
@@ -191,22 +190,49 @@ graph TD
 ### Test Architecture
 Each component has its own test suite focusing on specific functionalities:
 
-### 1. RulesAgent Tests
-- **Basic Functionality**: Response format and content validation
-- **Cache Mechanism**: Caching behavior and response consistency
-- **Event System**: Event emission and communication
-- **Input Validation**: Error handling and edge cases
-- **Dice Roll Detection**: Dice requirement analysis
+### 1. StoryGraph Tests
+- **Initial State**: Game loading and setup
+- **User Response**: Choice validation
+- **Dice System**: Roll mechanics
+- **Error Handling**: System robustness
+- **Event System**: Communication flow
+- **State Management**: Data consistency
 
-Example test output format:
-```json
-{
-    "choices": ["list of choices"],
-    "needs_dice": boolean,
-    "dice_type": "combat"|"chance"|null,
-    "rules": "rule text",
-    "awaiting_action": boolean
-}
+### 2. Agent Tests
+- **RulesAgent**:
+  - Rule parsing accuracy
+  - Cache effectiveness
+  - Search relevance
+  - Error handling
+  
+- **DecisionAgent**:
+  - Choice validation
+  - State transitions
+  - Action triggers
+  - Error recovery
+  
+- **NarratorAgent**:
+  - Content loading
+  - Format consistency
+  - Cache management
+  - Error states
+  
+- **TraceAgent**:
+  - History tracking
+  - State persistence
+  - Event logging
+  - Recovery mechanisms
+
+### Running Tests
+```bash
+# Run all tests
+pytest
+
+# Run specific test suite
+pytest tests/test_story_graph.py
+
+# Run with coverage
+pytest --cov=agents tests/
 ```
 
 ### Test Categories
@@ -215,66 +241,51 @@ Example test output format:
 - Individual agent testing
 - Function-level validation
 - Error case handling
+- State management
 
 #### 2. Integration Tests
 - Agent interaction testing
 - Event system validation
-- State management
+- State transitions
+- Error propagation
 
 #### 3. End-to-End Tests
 - Complete game flow testing
 - User interaction simulation
 - State persistence
-
-### Running Tests
-```bash
-# Run all tests
-pytest
-
-# Run specific test suite
-pytest tests/test_rules_agent.py
-
-# Run with coverage
-pytest --cov=agents tests/
-```
+- Performance metrics
 
 ### Test Dependencies
-- pytest-asyncio: For async test execution
-- pytest-cov: For coverage reporting
-- pytest: Test framework
+- pytest-asyncio: Async test execution
+- pytest-cov: Coverage reporting
+- pytest-mock: Mocking framework
+- pytest-benchmark: Performance testing
 
-### Writing Tests
-Follow these guidelines when writing tests:
-1. Use descriptive test names
-2. Document test purpose and flow
-3. Include success criteria
-4. Provide test data examples
+For detailed test documentation, see [TESTS.md](tests/TESTS.md).
 
-Example test structure:
-```python
-@pytest.mark.asyncio
-async def test_feature_name():
-    """
-    Purpose:
-    --------
-    Description of what is being tested
-    
-    Test Flow:
-    ----------
-    1. Step one
-    2. Step two
-    
-    Success Criteria:
-    ----------------
-    - Criterion one
-    - Criterion two
-    """
-    # Test implementation
-```
+## 🔄 Version History
+
+### v1.2.0 (15/12/2023)
+- Enhanced error handling
+- Test suite refactoring
+- Documentation updates
+- Performance improvements
+
+### v1.1.0 (15/12/2023)
+- MockEventBus introduction
+- Assertion improvements
+- Test robustness
+- Bug fixes
+
+### v1.0.0 (15/12/2023)
+- Initial release
+- Basic functionality
+- Core test suite
+- Documentation
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 License
 
@@ -283,8 +294,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - OpenAI for GPT models
-- Streamlit team for the amazing framework
-- LangChain community for the agent framework
+- Streamlit team for the framework
+- LangChain community for agent framework
+- FAISS team for vector search
 
 ---
 
