@@ -1,108 +1,120 @@
-# agents/trace_agent.py
-from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, List, Optional, AsyncGenerator
-import logging
+from typing import Dict, Optional, Any, List
+from pydantic import BaseModel, ConfigDict, Field
 from event_bus import EventBus, Event
+from agents.models import GameState
 from datetime import datetime
-import os
+import logging
 import json
 from pathlib import Path
 import shutil
 
-class TraceAgent(RunnableSerializable[Dict, Dict]):
-    """
-    Agent qui trace les actions et les statistiques du personnage.
-    """
-    
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
-    event_bus: EventBus = Field(..., description="Bus d'événements pour la communication")
-    history: List[Dict] = Field(default_factory=list)
-    stats: Dict = Field(default_factory=lambda: {
+class TraceConfig(BaseModel):
+    """Configuration pour TraceAgent."""
+    trace_directory: str = Field(default="data/trace")
+    initial_stats: Dict = Field(default_factory=lambda: {
         "Caractéristiques": {
             "Habileté": 10,
             "Chance": 5,
             "Endurance": 8
         },
         "Ressources": {
-            "Or": 100,
-            "Gemme": 5
+            "Or": 100
         },
         "Inventaire": {
             "Objets": ["Épée", "Bouclier"]
         }
     })
-    trace_dir: str = Field(default="data/trace")
-    session_dir: Path = Field(default_factory=lambda: Path("data/trace"))
-    
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.trace_dir = Path(self.trace_dir)  # Convertir en Path
-        self.session_dir = self.create_session_dir()
-        self.history = []  # Réinitialiser l'historique
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+class TraceAgent:
+    """Agent responsable du traçage."""
+
+    def __init__(self, event_bus: EventBus, config: Optional[TraceConfig] = None, **kwargs):
+        """
+        Initialise l'agent avec une configuration Pydantic.
+        
+        Args:
+            event_bus: Bus d'événements
+            config: Configuration Pydantic (optionnel)
+            **kwargs: Arguments supplémentaires pour la configuration
+        """
+        self.event_bus = event_bus
+        self.config = config or TraceConfig(**kwargs)
+        self.trace_directory = Path(self.config.trace_directory)
+        self._session_dir = self.create_session_dir()
+        self.history = []
+        self.stats = self.config.initial_stats.copy()
+        self._setup_logging()
         self.save_adventure_stats()
-        self.save_history()  # Sauvegarder l'historique initial
+        self.save_history()
+    
+    def _setup_logging(self):
+        """Configure logging without RLock"""
+        self._logger = logging.getLogger(__name__)
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.DEBUG)
     
     def create_session_dir(self) -> Path:
         """Crée le répertoire de session pour cette partie"""
         # Supprimer les anciens dossiers de session si nécessaire
-        if self.trace_dir.exists():
-            for old_dir in self.trace_dir.glob("game_*"):
+        if self.trace_directory.exists():
+            for old_dir in self.trace_directory.glob("game_*"):
                 if old_dir.is_dir():
                     shutil.rmtree(old_dir)
         
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        session_dir = self.trace_dir / f"game_{timestamp}"
+        session_dir = self.trace_directory / f"game_{timestamp}"
         session_dir.mkdir(parents=True, exist_ok=True)
         return session_dir
     
     def save_adventure_stats(self) -> None:
         """Sauvegarde les statistiques de l'aventure"""
-        stats_file = self.session_dir / "adventure_stats.json"
+        stats_file = self._session_dir / "adventure_stats.json"
         with open(stats_file, "w", encoding="utf-8") as f:
             json.dump(self.stats, f, ensure_ascii=False, indent=2)
     
     def save_history(self) -> None:
         """Sauvegarde l'historique des actions"""
-        history_file = self.session_dir / "history.json"
+        history_file = self._session_dir / "history.json"
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump(self.history, f, ensure_ascii=False, indent=2)
     
     def validate_state(self, state: Dict) -> Dict:
         """Valide et corrige l'état si nécessaire."""
-        self.logger.debug(f"Validating state: {state}")
+        self._logger.debug(f"Validating state: {state}")
         
         if not state:
             state = {}
         
-        # Ensure trace exists
+        # S'assurer que trace existe
         if 'trace' not in state:
             state['trace'] = {}
             
-        # Ensure stats exist in trace
+        # S'assurer que stats existe dans trace
         if 'stats' not in state['trace']:
-            self.logger.warning("Stats missing in trace, restoring from agent defaults")
+            self._logger.warning("Stats missing in trace, restoring from agent defaults")
             state['trace']['stats'] = self.stats.copy()
             
-        # Validate stats structure
+        # Valider la structure des stats
         stats = state['trace'].get('stats', {})
         if not isinstance(stats, dict):
-            self.logger.error(f"Invalid stats type: {type(stats)}")
+            self._logger.error(f"Invalid stats type: {type(stats)}")
             stats = self.stats.copy()
             
-        # Ensure all required stats categories exist
+        # S'assurer que toutes les catégories requises existent
         for category in ['Caractéristiques', 'Ressources', 'Inventaire']:
             if category not in stats:
-                self.logger.warning(f"Missing category {category} in stats")
+                self._logger.warning(f"Missing category {category} in stats")
                 stats[category] = self.stats[category].copy()
                 
         state['trace']['stats'] = stats
-        self.logger.debug(f"Validated state: {state}")
+        self._logger.debug(f"Validated state: {state}")
         return state
-        
-    async def invoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
+
+    async def invoke(self, input_data: Dict) -> Dict:
         """
         Enregistre une action dans l'historique et met à jour les stats si nécessaire.
         
@@ -113,13 +125,8 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
             Dict: État mis à jour avec historique et stats
         """
         try:
-            # Validate state first
-            state = self.validate_state(input_data)
-            
-            # Extraire l'état ou initialiser un nouveau
-            state = state.get("state", {}).copy()
-            if not state:
-                state = {}
+            # Valider l'état d'abord
+            state = self.validate_state(input_data.get("state", {}))
             
             # Déterminer le type d'action
             action_type = "unknown"
@@ -153,7 +160,7 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
                     "dice_type": state["dice_result"].get("type", "normal"),
                     "dice_value": state["dice_result"].get("value"),
                     "dice_result": state["dice_result"],  # Garder le résultat complet
-                    "next_section": state.get("decision", {}).get("next_section"),  # Ajout du next_section
+                    "next_section": state.get("decision", {}).get("next_section"),
                     "awaiting_action": state.get("decision", {}).get("awaiting_action", False),
                     "conditions": state.get("decision", {}).get("conditions", []),
                     "rules_summary": state.get("decision", {}).get("rules_summary", "")
@@ -174,23 +181,29 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
 
             # Ajouter à l'historique et sauvegarder
             self.history.append(entry)
-            self.save_history()
+            self.save_history()  # Plus d'await car la méthode n'est pas async
+            
+            # Émettre l'événement
+            event = Event(
+                type="state_traced",
+                data={
+                    "history_entry": entry,
+                    "history_length": len(self.history)
+                }
+            )
+            await self.event_bus.emit(event)
             
             # Mettre à jour l'état avec l'historique et les stats
-            state.update({
-                "trace": {
-                    "history": self.history,
-                    "stats": self.stats
-                },
-                "history": self.history,  # Pour compatibilité
-                "stats": self.stats  # Pour compatibilité
-            })
+            state["history"] = self.history
+            state["trace"] = {
+                "stats": self.stats,
+                "history": self.history
+            }
             
-            # Retourner la structure complète
-            yield {
-                "state": state,  # État avec trace inclus
-                "history": self.history,  # Pour compatibilité avec les tests
-                "stats": self.stats,      # Pour compatibilité avec les tests
+            return {
+                "state": state,
+                "history": self.history,  # Pour compatibilité
+                "stats": self.stats,      # Pour compatibilité
                 "trace": {
                     "history": self.history,
                     "stats": self.stats
@@ -198,19 +211,99 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
             }
             
         except Exception as e:
-            self.logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
-            yield {"error": str(e)}
-            
+            self._logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
+            return {
+                "state": {
+                    "error": str(e),
+                    "history": self.history,  # Ajout de la clé history
+                    "trace": {
+                        "history": self.history,
+                        "stats": self.stats
+                    }
+                }
+            }
+    
     async def ainvoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
         """
         Version asynchrone de invoke.
         """
         try:
-            async for result in self.invoke(input_data):
-                return result
+            state = input_data.get("state", input_data)
+            self._logger.debug(f"Validating state: {state}")
+            
+            # Valider et corriger l'état
+            state = self.validate_state(state)
+            self._logger.debug(f"Validated state: {state}")
+            
+            # Déterminer le type d'action
+            action_type = "unknown"
+            if "dice_result" in state:
+                action_type = "dice_roll"
+            elif "user_response" in state:
+                action_type = "user_input"
+            elif "decision" in state:
+                action_type = "decision"
+            
+            # Créer l'entrée de base
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "section": state.get("section_number", 1),
+                "action_type": action_type
+            }
+            
+            # Ajouter les détails spécifiques à l'action
+            if action_type == "dice_roll" and "dice_result" in state:
+                entry.update({
+                    "dice_type": state.get("rules", {}).get("dice_type", "normal"),
+                    "result": state["dice_result"]
+                })
+            elif action_type == "user_input" and "user_response" in state:
+                entry.update({
+                    "response": state["user_response"]
+                })
+            elif action_type == "decision" and "decision" in state:
+                decision = state["decision"]
+                entry.update({
+                    "next_section": decision.get("next_section"),
+                    "awaiting_action": decision.get("awaiting_action"),
+                    "conditions": decision.get("conditions", []),
+                    "rules_summary": decision.get("rules_summary", ""),
+                    "decision": decision  # Garder la décision complète pour compatibilité
+                })
+
+            # Ajouter à l'historique et sauvegarder
+            self.history.append(entry)
+            self.save_history()  # Plus d'await car la méthode n'est pas async
+            
+            # Émettre l'événement
+            event = Event(
+                type="state_traced",
+                data={
+                    "history_entry": entry,
+                    "history_length": len(self.history)
+                }
+            )
+            await self.event_bus.emit(event)
+            
+            # Mettre à jour l'état avec l'historique
+            state["history"] = self.history
+            state["trace"] = {
+                "stats": self.stats,
+                "history": self.history
+            }
+            
+            return state
+            
         except Exception as e:
-            self.logger.error(f"Erreur dans ainvoke: {str(e)}")
-            return {"error": str(e)}
+            self._logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
+            return {
+                "error": str(e),
+                "history": self.history,
+                "trace": {
+                    "stats": self.stats,
+                    "history": self.history
+                }
+            }
     
     async def get_character_stats(self) -> Dict:
         """
@@ -253,7 +346,7 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
         Returns:
             Dict: Statistiques du personnage
         """
-        stats_file = self.session_dir / "adventure_stats.json"
+        stats_file = self._session_dir / "adventure_stats.json"
         if stats_file.exists():
             with open(stats_file, "r", encoding="utf-8") as f:
                 return json.load(f)

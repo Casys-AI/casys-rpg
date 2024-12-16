@@ -1,193 +1,134 @@
 # tests/test_story_graph.py
-from dotenv import load_dotenv
-load_dotenv()
-
 import pytest
 import pytest_asyncio
-from typing import Optional, Dict, Any, List, AsyncGenerator
-from agents.story_graph import StoryGraph, GameState
-from event_bus import EventBus, Event
-import time
-from unittest.mock import AsyncMock
-from agents.narrator_agent import NarratorAgent
-from agents.decision_agent import DecisionAgent
+from unittest.mock import AsyncMock, MagicMock
+from agents.story_graph import StoryGraph
 from agents.rules_agent import RulesAgent
+from agents.decision_agent import DecisionAgent
+from agents.narrator_agent import NarratorAgent
 from agents.trace_agent import TraceAgent
+from event_bus import EventBus, Event
+import asyncio
 
 class MockEventBus:
-    """Bus d'événements mocké pour les tests."""
-    
-    def __init__(self, initial_state=None):
-        """
-        Initialise le MockEventBus.
-        
-        Args:
-            initial_state: État initial optionnel
-        """
-        self.state = initial_state or {}
-        self.listeners = {}
-        self.state_history = [self.state.copy()]  # Pour suivre l'évolution de l'état
-        self.max_states = 3  # Nombre maximum d'états à conserver
-        
-    async def update_state(self, update: Dict):
-        """Met à jour l'état et garde un historique."""
-        self.state.update(update)
-        self.state_history.append(self.state.copy())
-        if len(self.state_history) > self.max_states:
-            self.state_history.pop(0)
-        await self.emit("state_updated", self.state)
-        
-    async def get_state(self) -> Dict:
-        """Retourne l'état actuel."""
+    """Mock pour EventBus"""
+    def __init__(self):
+        self.state = {}
+        self.emit = AsyncMock()
+        self.get_state = AsyncMock(return_value=self.state)
+        self.update_state = AsyncMock()
+
+    async def emit(self, event: Event) -> None:
+        """Simule l'émission d'un événement"""
+        if isinstance(event, Event):
+            self.state.update(event.data)
+        else:
+            self.state.update(event)
+
+    async def get_state(self) -> dict:
+        """Retourne l'état actuel"""
         return self.state
-        
-    def add_listener(self, event_type: str, callback):
-        """Ajoute un écouteur d'événements."""
-        if event_type not in self.listeners:
-            self.listeners[event_type] = []
-        self.listeners[event_type].append(callback)
-        
-    async def emit(self, event_type: str, data: Dict):
-        """Émet un événement."""
-        if event_type in self.listeners:
-            for callback in self.listeners[event_type]:
-                await callback(Event(type=event_type, data=data))
-                
-    def get_state_history(self):
-        """Retourne l'historique des états."""
-        return self.state_history
 
-class MockAgent:
-    """Agent mocké pour les tests."""
-    
-    def __init__(self, result=None, event_bus=None):
-        self.result = result if result is not None else {}
-        self.event_bus = event_bus
-        
-    async def ainvoke(self, state):
-        """Simule l'invocation asynchrone."""
-        if isinstance(self.result, Exception):
-            raise self.result
-        yield {**state, **self.result}
-        
-    def invoke(self, state):
-        """Simule l'invocation synchrone."""
-        if isinstance(self.result, Exception):
-            raise self.result
-        return {**state, **self.result}
-
-class MockNarratorAgent(MockAgent):
-    """Simule le NarratorAgent."""
-    def __init__(self, result=None, event_bus=None):
-        super().__init__(result or {"content": "Test content for section 1"}, event_bus)
-
-class MockRulesAgent(MockAgent):
-    """Simule le RulesAgent."""
-    def __init__(self, result=None, event_bus=None):
-        super().__init__(result or {"rules": {
-            "needs_dice": True,
-            "dice_type": "normal",
-            "conditions": [],
-            "next_sections": [2],
-            "rules_summary": "Test rules for section 1"
-        }}, event_bus)
-
-class MockDecisionAgent(MockAgent):
-    """Simule le DecisionAgent."""
-    def __init__(self, result=None, event_bus=None):
-        result = result or {}
-        result.setdefault("decision", {}).setdefault("awaiting_action", "choice")
-        super().__init__(result, event_bus)
-
-class MockTraceAgent(MockAgent):
-    """Simule le TraceAgent."""
-    def __init__(self, result=None, event_bus=None):
-        super().__init__(result or {"trace": {"last_action": "choice"}}, event_bus)
-
-class MockErrorAgent(MockAgent):
-    """Agent qui simule une erreur."""
-    def __init__(self, event_bus=None):
-        super().__init__(Exception("Test error"), event_bus)
-
-@pytest.fixture
-def event_bus():
-    """Fixture pour EventBus mocké."""
-    initial_state = {
-        "section_number": 1,
-        "content": None,
-        "rules": None,
-        "decision": None,
-        "error": None
-    }
-    return MockEventBus(initial_state)
-
-@pytest.fixture
-def mock_agents(event_bus):
-    """Fixture pour créer des agents mockés."""
-    narrator = MockNarratorAgent({"content": "Test content for section 1"}, event_bus)
-    rules = MockRulesAgent({"rules": {
-        "needs_dice": True,
-        "dice_type": "normal",
-        "conditions": [],
-        "next_sections": [2],
-        "rules_summary": "Test rules for section 1"
-    }}, event_bus)
-    decision = MockDecisionAgent({"decision": {"awaiting_action": "choice"}}, event_bus)
-    trace = MockTraceAgent({}, event_bus)
-    return narrator, rules, decision, trace
+    async def update_state(self, new_state: dict) -> None:
+        """Met à jour l'état"""
+        self.state.update(new_state)
 
 @pytest_asyncio.fixture
-async def story_graph(event_bus, mock_agents):
-    """Fixture pour créer un StoryGraph avec des agents mockés."""
-    narrator, rules, decision, trace = mock_agents
+async def event_bus():
+    return MockEventBus()
+
+@pytest_asyncio.fixture
+async def rules_agent(event_bus):
+    # Create a mock RulesAgent that doesn't need serialization
+    mock_agent = MagicMock()
+    async def mock_ainvoke(state):
+        yield {
+            "rules": {
+                "needs_dice": True,
+                "dice_type": "normal",
+                "conditions": [],
+                "next_sections": [2],
+                "rules_summary": "Test rules for section 1"
+            }
+        }
+    mock_agent.ainvoke = mock_ainvoke
+    return mock_agent
+
+@pytest_asyncio.fixture
+async def narrator_agent(event_bus):
+    # Create a mock NarratorAgent that doesn't need serialization
+    mock_agent = MagicMock()
+    async def mock_ainvoke(state):
+        yield {
+            "content": "Test content for section 1",
+            "section_number": 1
+        }
+    mock_agent.ainvoke = mock_ainvoke
+    return mock_agent
+
+@pytest_asyncio.fixture
+async def decision_agent(event_bus):
+    # Create a mock DecisionAgent that doesn't need serialization
+    mock_agent = MagicMock()
+    mock_agent.invoke = AsyncMock(return_value={
+        "decision": {
+            "awaiting_action": "user_input",
+            "section_number": 2
+        }
+    })
+    return mock_agent
+
+@pytest_asyncio.fixture
+async def trace_agent(event_bus):
+    # Create a mock TraceAgent that doesn't need serialization
+    mock_agent = MagicMock()
+    mock_agent.invoke = AsyncMock(return_value={
+        "trace": {
+            "stats": {
+                "Caractéristiques": {
+                    "Habileté": 10,
+                    "Chance": 5,
+                    "Endurance": 8
+                },
+                "Ressources": {
+                    "Or": 100
+                },
+                "Inventaire": {
+                    "Objets": ["Épée", "Bouclier"]
+                }
+            },
+            "history": []
+        }
+    })
+    return mock_agent
+
+@pytest_asyncio.fixture
+async def story_graph(event_bus, rules_agent, decision_agent, narrator_agent, trace_agent):
     return StoryGraph(
         event_bus=event_bus,
-        narrator_agent=narrator,
-        rules_agent=rules,
-        decision_agent=decision,
-        trace_agent=trace
+        rules_agent=rules_agent,
+        decision_agent=decision_agent,
+        narrator_agent=narrator_agent,
+        trace_agent=trace_agent
     )
 
 @pytest.mark.asyncio
-async def test_story_graph_initial_state(event_bus, mock_agents):
-    """Test de l'état initial du StoryGraph."""
-    narrator, rules, decision, trace = mock_agents
-    story_graph = StoryGraph(
-        event_bus=event_bus,
-        narrator_agent=narrator,
-        rules_agent=rules,
-        decision_agent=decision,
-        trace_agent=trace
-    )
+async def test_story_graph_initial_state(story_graph):
+    """Test l'état initial du StoryGraph"""
+    state = None
+    async for s in story_graph.invoke(state):
+        state = s
+        break
     
-    initial_state = {
-        "section_number": 1,
-        "content": None,
-        "rules": None,
-        "decision": None,
-        "error": None,
-        "needs_content": True
-    }
-    
-    async for state in story_graph.invoke(initial_state):
-        assert state["section_number"] == 1
-        assert "content" in state
-        assert "rules" in state
-        assert state["content"] == "Test content for section 1"
-        break  # On ne teste que le premier état
+    assert state is not None
+    assert state.get("section_number") == 1
+    assert state.get("content") == "Test content for section 1"
+    assert state.get("rules", {}).get("needs_dice") is True
+    assert state.get("rules", {}).get("dice_type") == "normal"
 
 @pytest.mark.asyncio
-async def test_story_graph_user_response_with_dice(event_bus, mock_agents):
+async def test_story_graph_user_response_with_dice(story_graph):
     """Test du StoryGraph avec une réponse utilisateur nécessitant un lancer de dés."""
-    narrator, rules, decision, trace = mock_agents
-    story_graph = StoryGraph(
-        event_bus=event_bus,
-        narrator_agent=narrator,
-        rules_agent=rules,
-        decision_agent=decision,
-        trace_agent=trace
-    )
-    
     state = {
         "section_number": 1,
         "user_response": "test response",
@@ -195,45 +136,41 @@ async def test_story_graph_user_response_with_dice(event_bus, mock_agents):
     }
     
     async for result in story_graph.invoke(state):
-        assert result["section_number"] == 1
-        assert result["user_response"] == "test response"
-        assert result["dice_result"]["value"] == 6
+        assert result.get("section_number") == 1
+        assert result.get("user_response") == "test response"
+        assert result.get("dice_result", {}).get("value") == 6
         break
 
 @pytest.mark.asyncio
-async def test_story_graph_user_response_without_dice(event_bus, mock_agents):
+async def test_story_graph_user_response_without_dice(story_graph):
     """Test du StoryGraph avec une réponse utilisateur sans lancer de dés."""
-    narrator, rules, decision, trace = mock_agents
-    story_graph = StoryGraph(
-        event_bus=event_bus,
-        narrator_agent=narrator,
-        rules_agent=rules,
-        decision_agent=decision,
-        trace_agent=trace
-    )
-    
     state = {
         "section_number": 1,
         "user_response": "test response"
     }
     
     async for result in story_graph.invoke(state):
-        assert result["section_number"] == 1
-        assert result["user_response"] == "test response"
+        assert result.get("section_number") == 1
+        assert result.get("user_response") == "test response"
         assert "dice_result" not in result
         break
 
 @pytest.mark.asyncio
-async def test_story_graph_error_handling(event_bus):
+async def test_story_graph_error_handling(story_graph):
     """Test de la gestion des erreurs dans le StoryGraph."""
-    error_agent = MockErrorAgent(event_bus)
-    story_graph = StoryGraph(
-        event_bus=event_bus,
-        narrator_agent=error_agent,
-        rules_agent=error_agent,
-        decision_agent=error_agent,
-        trace_agent=error_agent
-    )
+    error_agent = MagicMock()
+    
+    async def mock_ainvoke(state):
+        raise Exception("Test error")
+        yield  # Cette ligne ne sera jamais atteinte
+        
+    error_agent.ainvoke = mock_ainvoke
+    
+    # Remplacer tous les agents par notre mock qui lève une exception
+    story_graph.narrator = error_agent
+    story_graph.rules = error_agent
+    story_graph.decision = error_agent
+    story_graph.trace = error_agent
     
     state = {
         "section_number": 1,
@@ -242,7 +179,6 @@ async def test_story_graph_error_handling(event_bus):
     }
     
     async for result in story_graph.invoke(state):
-        assert "error" in result
-        assert isinstance(result["error"], str)
-        assert "Test error" in result["error"]
+        assert isinstance(result.get("error"), str)
+        assert "Test error" in result.get("error")
         break

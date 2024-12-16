@@ -11,14 +11,21 @@ from langchain_openai import ChatOpenAI
 async def event_bus():
     return EventBus()
 
+@pytest.fixture
+def trace_directory(tmp_path):
+    """Crée un répertoire temporaire pour les traces."""
+    trace_dir = tmp_path / "trace"
+    trace_dir.mkdir(exist_ok=True)
+    return trace_dir
+
 @pytest_asyncio.fixture
-async def trace_agent(event_bus, tmp_path):
-    """Fixture qui crée un TraceAgent avec un répertoire temporaire"""
+async def trace_agent(trace_directory, event_bus):
+    """Crée une instance de TraceAgent pour les tests."""
     agent = TraceAgent(
         llm=ChatOpenAI(model="gpt-4o-mini"),
-        event_bus=event_bus
+        event_bus=event_bus,
+        trace_directory=str(trace_directory)
     )
-    agent.trace_dir = str(tmp_path / "trace")
     return agent
 
 @pytest.mark.asyncio
@@ -60,7 +67,7 @@ async def test_record_decision(trace_agent):
     assert entry["user_response"] == "Je vais à gauche"
     
     # Vérifier que le fichier history.json existe et contient les bonnes données
-    history_file = Path(trace_agent.session_dir) / "history.json"
+    history_file = Path(trace_agent._session_dir) / "history.json"
     assert history_file.exists()
     with open(history_file, "r", encoding="utf-8") as f:
         saved_history = json.load(f)
@@ -151,7 +158,7 @@ async def test_multiple_actions_sequence(trace_agent):
     assert history[2]["next_section"] == 2
     
     # Vérifier le fichier
-    history_file = Path(trace_agent.session_dir) / "history.json"
+    history_file = Path(trace_agent._session_dir) / "history.json"
     with open(history_file, "r", encoding="utf-8") as f:
         saved_history = json.load(f)
     assert len(saved_history) == 3
@@ -181,7 +188,7 @@ async def test_update_stats(trace_agent):
     assert trace_agent.stats["Caractéristiques"]["Endurance"] == 20  # Inchangé
     
     # Vérifier la sauvegarde
-    stats_file = trace_agent.session_dir / "adventure_stats.json"
+    stats_file = Path(trace_agent._session_dir) / "adventure_stats.json"
     assert stats_file.exists()
     with open(stats_file, "r", encoding="utf-8") as f:
         saved_stats = json.load(f)
@@ -201,7 +208,7 @@ async def test_stats_persistence(trace_agent):
     await trace_agent.update_stats({})  # Forcer la sauvegarde
     
     # Vérifier le fichier
-    stats_file = Path(trace_agent.session_dir) / "adventure_stats.json"
+    stats_file = Path(trace_agent._session_dir) / "adventure_stats.json"
     with open(stats_file, "r", encoding="utf-8") as f:
         saved_stats = json.load(f)
     assert saved_stats == initial_stats
@@ -210,7 +217,7 @@ async def test_stats_persistence(trace_agent):
 async def test_adventure_stats_initialization(trace_agent):
     """Test l'initialisation des stats de l'aventure"""
     # Vérifier que le fichier adventure_stats.json est créé
-    stats_file = Path(trace_agent.session_dir) / "adventure_stats.json"
+    stats_file = Path(trace_agent._session_dir) / "adventure_stats.json"
     assert stats_file.exists()
     
     # Vérifier le contenu initial
@@ -251,7 +258,7 @@ async def test_update_stats_recursive(trace_agent):
     assert len(trace_agent.stats["Équipement"]["Armes"]) == 2
     
     # Vérifier la sauvegarde
-    stats_file = Path(trace_agent.session_dir) / "adventure_stats.json"
+    stats_file = Path(trace_agent._session_dir) / "adventure_stats.json"
     with open(stats_file, "r", encoding="utf-8") as f:
         saved_stats = json.load(f)
     assert saved_stats == trace_agent.stats

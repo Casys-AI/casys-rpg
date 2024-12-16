@@ -1,15 +1,16 @@
 import pytest
 import pytest_asyncio
-from agents.decision_agent import DecisionAgent
+from agents.decision_agent import DecisionAgent, DecisionConfig
 from agents.rules_agent import RulesAgent
 from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 
-class MockRulesAgent(RulesAgent):
+class MockRulesAgent:
     """Mock pour RulesAgent"""
     
     def __init__(self, event_bus):
-        super().__init__(event_bus=event_bus)
+        self.event_bus = event_bus
         self.cache = {}
 
     async def invoke(self, input_data):
@@ -24,6 +25,29 @@ class MockRulesAgent(RulesAgent):
             "rules": rules
         }))
         return {"state": {**state, **rules}}
+        
+    async def ainvoke(self, input_data, config=None):
+        state = input_data.get("state", {})
+        section = state.get("section_number", 1)
+        rules = self.cache.get(section, {
+            "choices": ["Option 1", "Option 2"],
+            "needs_dice": False
+        })
+        
+        # Mettre à jour l'état
+        state["rules"] = rules
+        
+        # Émettre l'événement
+        await self.event_bus.emit(Event(
+            type="rules_analyzed",
+            data={
+                "section_number": section,
+                "rules": rules
+            }
+        ))
+        
+        # Retourner l'état mis à jour
+        yield {"state": state}
 
 @pytest_asyncio.fixture
 async def event_bus():
@@ -35,11 +59,11 @@ async def rules_agent(event_bus):
 
 @pytest_asyncio.fixture
 async def decision_agent(rules_agent, event_bus):
-    return DecisionAgent(
-        rules_agent=rules_agent,
+    config = DecisionConfig(
         llm=ChatOpenAI(model="gpt-4o-mini"),
-        event_bus=event_bus
+        rules_agent=rules_agent
     )
+    return DecisionAgent(event_bus=event_bus, config=config)
 
 @pytest.mark.asyncio
 async def test_decision_agent_basic(decision_agent):
@@ -83,6 +107,13 @@ async def test_decision_agent_events(decision_agent, event_bus):
     async def event_listener(event):
         events.append(event)
 
+    # Ajouter des règles pour que _analyze_decision puisse fonctionner
+    decision_agent.current_rules = {
+        "choices": ["Option 1", "Option 2"],
+        "next_sections": [2, 3],
+        "needs_dice": False
+    }
+
     await event_bus.subscribe("decision_made", event_listener)
 
     await decision_agent.invoke({
@@ -91,6 +122,8 @@ async def test_decision_agent_events(decision_agent, event_bus):
             "user_response": "Option 1"
         }
     })
+
+    # Vérifier qu'on a reçu l'événement
     assert len(events) > 0
     assert events[0].type == "decision_made"
 
@@ -179,7 +212,9 @@ async def test_decision_agent_full_sequence(decision_agent, rules_agent, event_b
     section = 1
     rules = {
         "choices": ["Option 1", "Option 2"],
+        "needs_user_response": True,
         "needs_dice": True,
+        "next_action": "user_first",  # On veut d'abord la réponse, puis le dé
         "dice_type": "combat"
     }
     rules_agent.cache[section] = rules
@@ -214,7 +249,7 @@ async def test_decision_agent_full_sequence(decision_agent, rules_agent, event_b
     assert result["state"]["awaiting_action"] == "dice_roll"
     assert result["state"]["dice_type"] == "combat"
     
-    # 4. Envoyer le résultat des dés, vérifier la décision finale
+    # 4. Envoyer le résultat des dés, vérifier la fin de séquence
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
@@ -223,8 +258,8 @@ async def test_decision_agent_full_sequence(decision_agent, rules_agent, event_b
             "rules": rules
         }
     })
-    assert "next_section" in result["state"]
     assert result["state"]["awaiting_action"] is None
+    assert result["state"]["next_section"] == section + 1
 
 @pytest.mark.asyncio
 async def test_decision_agent_uses_rules(decision_agent, rules_agent, event_bus):

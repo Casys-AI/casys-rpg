@@ -114,9 +114,10 @@ cache = {
 
 import pytest
 import pytest_asyncio
-from agents.rules_agent import RulesAgent
+from agents.rules_agent import RulesAgent, RulesConfig
 from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 import asyncio
 
 @pytest_asyncio.fixture(scope="function")
@@ -187,21 +188,35 @@ async def rules_agent(event_bus):
     - Fresh LLM instance
     - Isolated event bus
     """
-    agent = RulesAgent(
+    config = RulesConfig(
         llm=ChatOpenAI(model="gpt-4o-mini"),
-        event_bus=event_bus,
-        rules_dir="data/rules"
+        rules_directory="data/rules"
     )
+    agent = RulesAgent(event_bus=event_bus, config=config)
     return agent
 
 @pytest.mark.asyncio
 async def test_rules_agent_basic(rules_agent):
-    """Test le fonctionnement de base"""
-    async for result in rules_agent.ainvoke({"state": {"section_number": 1}}):
-        assert "state" in result
-        assert isinstance(result["state"], dict)
-        assert "needs_dice" in result["state"]
-        assert isinstance(result["state"]["needs_dice"], bool)
+    """Test de base pour RulesAgent"""
+    input_data = {
+        "state": {
+            "section_number": 1
+        }
+    }
+    
+    result = await rules_agent.invoke(input_data)
+    
+    # Vérification de la structure de base
+    assert "state" in result
+    assert "rules" in result["state"]
+    assert "needs_dice" in result["state"]["rules"]
+    
+    # Vérification des champs attendus dans rules
+    rules = result["state"]["rules"]
+    assert "choices" in rules
+    assert isinstance(rules["choices"], list)
+    assert "dice_type" in rules
+    assert "content" in rules
 
 @pytest.mark.asyncio
 async def test_rules_agent_cache(rules_agent):
@@ -249,24 +264,24 @@ async def test_rules_agent_dice_handling(rules_agent):
         "section_number": 1,
         "content": "Combat: Vous devez lancer les dés pour combattre le monstre"
     }}):
-        assert result["state"]["needs_dice"] is True
-        assert result["state"]["dice_type"] == "combat"
+        assert result["state"]["rules"]["needs_dice"] is True
+        assert result["state"]["rules"]["dice_type"] == "combat"
 
     # Test chance
     async for result in rules_agent.ainvoke({"state": {
         "section_number": 2,
         "content": "Tentez votre Chance en lançant les dés"
     }}):
-        assert result["state"]["needs_dice"] is True
-        assert result["state"]["dice_type"] == "chance"
+        assert result["state"]["rules"]["needs_dice"] is True
+        assert result["state"]["rules"]["dice_type"] == "chance"
 
     # Test sans dés
     async for result in rules_agent.ainvoke({"state": {
         "section_number": 3,
         "content": "Vous pouvez choisir d'aller à gauche ou à droite"
     }}):
-        assert result["state"]["needs_dice"] is False
-        assert result["state"]["dice_type"] is None
+        assert result["state"]["rules"]["needs_dice"] is False
+        assert result["state"]["rules"]["dice_type"] is None
 
 @pytest.mark.asyncio
 async def test_rules_agent_always_analyze(rules_agent, event_bus):
@@ -305,6 +320,6 @@ async def test_rules_agent_always_analyze(rules_agent, event_bus):
     assert "rules" in events[0].data
     
     # Vérifie que les résultats sont cohérents
-    assert first_result["state"]["needs_dice"] == second_result["state"]["needs_dice"]
-    assert first_result["state"]["dice_type"] == second_result["state"]["dice_type"]
-    assert first_result["state"]["rules"] == second_result["state"]["rules"]
+    assert first_result["state"]["rules"]["needs_dice"] == second_result["state"]["rules"]["needs_dice"]
+    assert first_result["state"]["rules"]["dice_type"] == second_result["state"]["rules"]["dice_type"]
+    assert first_result["state"]["rules"]["content"] == second_result["state"]["rules"]["content"]

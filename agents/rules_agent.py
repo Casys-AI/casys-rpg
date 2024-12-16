@@ -1,38 +1,63 @@
+from typing import Dict, Optional, Any, List, AsyncGenerator
 from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Optional, List, AsyncGenerator
-import logging
+from pydantic import BaseModel, ConfigDict, Field
 from event_bus import EventBus, Event
+from agents.models import GameState
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models.base import BaseChatModel
+from langchain.schema import HumanMessage, SystemMessage
+import logging
+import json
 import os
+import re
 
-class RulesAgent(BaseModel):
-    """
-    Agent qui analyse les règles du jeu.
-    """
-    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(
+class RulesConfig(BaseModel):
+    """Configuration pour RulesAgent."""
+    llm: Optional[BaseChatModel] = Field(default_factory=lambda: ChatOpenAI(
         model="gpt-4o-mini",
+        temperature=0,
         model_kwargs={
-            "system_message": """Tu es un expert en règles de livre-jeu.
-            Tu dois analyser les règles et déterminer les actions possibles."""
+            "system_message": """Tu es un agent d'analyse de règles pour un livre-jeu.
+            Tu dois déterminer les règles applicables et les conditions à vérifier."""
         }
     ))
-    event_bus: EventBus = Field(default_factory=EventBus)
     rules_directory: str = Field(default="data/rules")
-    cache: Dict[int, Dict] = Field(default_factory=dict)
-    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
+class RulesAgent:
+    """Agent responsable de l'analyse des règles."""
+
+    def __init__(self, event_bus: EventBus, config: Optional[RulesConfig] = None, **kwargs):
+        """
+        Initialise l'agent avec une configuration Pydantic.
+        
+        Args:
+            event_bus: Bus d'événements
+            config: Configuration Pydantic (optionnel)
+            **kwargs: Arguments supplémentaires pour la configuration
+        """
+        self.event_bus = event_bus
+        self.config = config or RulesConfig(**kwargs)
+        self.llm = self.config.llm
+        self.rules_directory = self.config.rules_directory
+        self.cache = {}
+        self._setup_logging()
+
+    def _setup_logging(self):
+        """Configure logging without RLock"""
+        self._logger = logging.getLogger(__name__)
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.ERROR)
+
+    async def invoke(self, input_data: Dict) -> Dict:
         """
         Analyse les règles d'une section.
         
         Args:
             input_data (Dict): Les données d'entrée avec l'état du jeu
-            config (Optional[Dict]): Configuration optionnelle
             
         Returns:
             Dict: Les règles analysées et les actions possibles
@@ -81,7 +106,7 @@ class RulesAgent(BaseModel):
                 rules = await self._analyze_rules(section_number)
                 self.cache[section_number] = dict(rules)  # Copie profonde
             
-            # Émettre l'événement (toujours, même si depuis le cache)
+            # Émettre l'événement
             event_data = {
                 "section_number": section_number,
                 "rules": rules
@@ -92,87 +117,223 @@ class RulesAgent(BaseModel):
                 )
             
             # Mettre à jour l'état
-            return {
-                "state": {
-                    **state,
-                    "rules": rules,
-                    "needs_dice": rules.get("needs_dice", False),
-                    "dice_type": rules.get("dice_type"),
-                    "choices": rules.get("choices", ["Continue"]),
-                    "awaiting_action": rules.get("needs_dice", False)
-                },
-                "source": "cache" if section_number in self.cache else "loaded"
-            }
+            new_state = state.copy()
+            new_state["rules"] = rules
+            
+            return {"state": new_state}
             
         except Exception as e:
-            self.logger.error(f"Error in RulesAgent: {str(e)}")
+            self._logger.error(f"Error in RulesAgent: {str(e)}")
             raise
 
-    async def _analyze_rules(self, section_number: int) -> Dict:
+    async def _analyze_rules(self, section_number: int, content: Optional[str] = None) -> Dict:
         """
         Analyse les règles d'une section spécifique.
         
         Args:
             section_number (int): Numéro de la section
+            content (Optional[str]): Contenu des règles si fourni directement
             
         Returns:
             Dict: Les règles analysées avec leur structure
         """
         try:
+            # Si le contenu n'est pas fourni, charger le fichier de règles
+            if content is None:
+                content = await self._load_rules_file(section_number)
+                if not content:
+                    self._logger.warning(f"No rules file found for section {section_number}")
+                    return {
+                        "content": "",
+                        "choices": [],
+                        "next_sections": [],
+                        "needs_dice": False,
+                        "dice_type": None,
+                        "conditions": []
+                    }
+            
+            # Analyser avec le LLM
             messages = [
-                SystemMessage(content="""Tu es un agent qui analyse les règles d'une section.
-Retourne les choix possibles et si un jet de dés est nécessaire."""),
-                HumanMessage(content=f"Section: {section_number}")
+                SystemMessage(content="""Tu es un agent qui analyse les règles d'une section de livre-jeu.
+Tu dois retourner une structure JSON avec:
+- choices: liste des choix possibles (texte)
+- next_sections: liste des numéros de sections correspondants aux choix
+- needs_dice: booléen indiquant si un jet de dés est nécessaire
+- dice_type: type de jet ("combat", "chance" ou null)
+- conditions: liste des conditions à vérifier
+
+Retourne uniquement la structure JSON, sans aucun texte avant ou après.
+
+Exemples:
+- Si le texte parle de "Combat" ou "monstre" avec des dés: needs_dice = true, dice_type = "combat"
+- Si le texte parle de "Chance" ou "Fortune" avec des dés: needs_dice = true, dice_type = "chance"
+- Sinon: needs_dice = false, dice_type = null"""),
+                HumanMessage(content=f"""Règles de la section {section_number}:
+{content}""")
             ]
             
             response = await self.llm.ainvoke(messages)
-            content = response.content
             
-            # Analyser si des dés sont nécessaires
-            rules_lower = content.lower()
-            needs_dice = "dice" in rules_lower or "roll" in rules_lower or "dés" in rules_lower
-            dice_type = None
-            
-            if needs_dice:
-                if any(word in rules_lower for word in ["combat", "fight", "battle"]):
-                    dice_type = "combat"
-                elif any(word in rules_lower for word in ["chance", "luck", "fortune"]):
-                    dice_type = "chance"
-            
-            # Structurer les règles
-            rules = {
-                "content": content,
-                "needs_dice": needs_dice,
-                "dice_type": dice_type,
-                "choices": ["Continue"]  # Par défaut
-            }
-            
-            return rules
+            try:
+                # Parser la réponse JSON
+                rules = json.loads(response.content)
+                # Ajouter le contenu original
+                rules["content"] = content
+                return rules
+                
+            except json.JSONDecodeError as e:
+                self._logger.error(f"Failed to parse LLM response as JSON: {response.content}")
+                # Analyser manuellement si le LLM échoue
+                rules_lower = content.lower()
+                needs_dice = "dés" in rules_lower or "dice" in rules_lower or "roll" in rules_lower
+                dice_type = None
+                
+                if needs_dice:
+                    if any(word in rules_lower for word in ["combat", "fight", "battle", "monstre", "monster"]):
+                        dice_type = "combat"
+                    elif any(word in rules_lower for word in ["chance", "luck", "fortune"]):
+                        dice_type = "chance"
+                
+                return {
+                    "content": content,
+                    "choices": ["Continue"],
+                    "next_sections": [],
+                    "needs_dice": needs_dice,
+                    "dice_type": dice_type,
+                    "conditions": []
+                }
             
         except Exception as e:
-            self.logger.error(f"Error analyzing rules: {str(e)}")
+            self._logger.error(f"Error analyzing rules: {str(e)}")
             raise
 
-    async def stream(
+    async def _load_rules_file(self, section_number: int) -> Optional[str]:
+        """
+        Charge le fichier de règles de manière asynchrone.
+        
+        Args:
+            section_number: Numéro de la section
+            
+        Returns:
+            Optional[str]: Contenu du fichier ou None si non trouvé
+        """
+        try:
+            file_path = os.path.join(self.rules_directory, f"section_{section_number}_rule.md")
+            if not os.path.exists(file_path):
+                self._logger.warning(f"Rules file not found for section {section_number}")
+                return None
+                
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            self._logger.error(f"Error loading rules file for section {section_number}: {str(e)}")
+            return None
+
+    async def ainvoke(
         self, input_data: Dict, config: Optional[Dict] = None
     ) -> AsyncGenerator[Dict, None]:
         """
-        Stream les résultats de l'analyse des règles.
+        Version asynchrone de invoke.
         
         Args:
-            input_data (Dict): Les données d'entrée
+            input_data (Dict): Les données d'entrée avec l'état du jeu
             config (Optional[Dict]): Configuration optionnelle
             
-        Yields:
-            Dict: Les résultats de l'analyse
+        Returns:
+            AsyncGenerator[Dict, None]: Générateur asynchrone de résultats
         """
         try:
-            result = await self.invoke(input_data, config)
-            yield result
+            state = input_data.get("state", input_data)
+            
+            # Vérifier que section_number est présent et valide
+            if "section_number" not in state:
+                self._logger.error("No section number provided")
+                yield {
+                    "state": {
+                        "error": "No section number provided",
+                        "needs_dice": False,
+                        "dice_type": None,
+                        "choices": []
+                    },
+                    "source": "error"
+                }
+                return
+                
+            section_number = state.get("section_number")
+            if not isinstance(section_number, int) or section_number < 1:
+                self._logger.error(f"Invalid section number: {section_number}")
+                yield {
+                    "state": {
+                        "error": f"Invalid section number: {section_number}",
+                        "needs_dice": False,
+                        "dice_type": None,
+                        "choices": []
+                    },
+                    "source": "error"
+                }
+                return
+            
+            # Utiliser le contenu fourni s'il existe
+            content = state.get("content")
+            
+            # Vérifier le cache seulement si pas de contenu direct
+            if content is None and section_number in self.cache:
+                self._logger.debug(f"Cache hit for section {section_number}")
+                rules = dict(self.cache[section_number])
+                state["rules"] = rules
+                
+                # Émettre l'événement même pour le cache
+                event = Event(
+                    type="rules_generated",
+                    data={
+                        "section_number": section_number,
+                        "rules": rules,
+                        "source": "cache"
+                    }
+                )
+                await self.event_bus.emit(event)
+                
+                yield {
+                    "state": state,
+                    "source": "cache"
+                }
+                return
+                
+            # Analyser les règles
+            rules = await self._analyze_rules(section_number, content)
+            
+            # Mettre en cache seulement si pas de contenu direct
+            if content is None:
+                self.cache[section_number] = dict(rules)
+            
+            # Mettre à jour l'état
+            state["rules"] = rules
+            
+            # Émettre l'événement
+            event = Event(
+                type="rules_generated",
+                data={
+                    "section_number": section_number,
+                    "rules": rules,
+                    "source": "analysis"
+                }
+            )
+            await self.event_bus.emit(event)
+            
+            # Retourner l'état mis à jour avec la source
+            yield {
+                "state": state,
+                "source": "analysis"
+            }
             
         except Exception as e:
-            self.logger.error(f"Error in stream: {str(e)}")
-            raise
-
-    # Alias pour la compatibilité avec les tests
-    ainvoke = stream
+            self._logger.error(f"Error in RulesAgent.ainvoke: {str(e)}")
+            yield {
+                "state": {
+                    "error": str(e),
+                    "needs_dice": False,
+                    "dice_type": None,
+                    "choices": []
+                },
+                "source": "error"
+            }

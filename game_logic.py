@@ -1,5 +1,5 @@
 # game_logic.py
-from agents.story_graph import StoryGraph
+from agents.story_graph import StoryGraph, GameState
 from agents.narrator_agent import NarratorAgent
 from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
@@ -7,7 +7,7 @@ from agents.trace_agent import TraceAgent
 from event_bus import EventBus  # Import correct du EventBus
 import logging
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 # Désactiver les logs des appels API
 logging.getLogger("openai").setLevel(logging.WARNING)
@@ -17,7 +17,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
 logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
 
-class GameState:
+class GameLogic:
     """
     Gère l'état du jeu et coordonne les interactions entre les agents.
     """
@@ -45,7 +45,7 @@ class GameState:
         )
         
         self.current_section = 1
-        self.logger.info("GameState initialisé")
+        self.logger.info("GameLogic initialisé")
         self.last_error = None
         
     def truncate_for_log(self, content: str, max_length: int = 100) -> str:
@@ -80,27 +80,27 @@ class GameState:
         try:
             # Vérifier si c'est la première section
             if self.current_section == 1:
-                self.logger.info(f"GameState - Chargement section initiale {self.current_section}")
+                self.logger.info(f"GameLogic - Chargement section initiale {self.current_section}")
                 
                 # Vérifier si la section 1 est en cache
                 if self.check_section_cache(1):
-                    self.logger.info("GameState - Section 1 trouvée en cache")
+                    self.logger.info("GameLogic - Section 1 trouvée en cache")
                 else:
-                    self.logger.info("GameState - Section 1 non trouvée en cache, traitement requis")
+                    self.logger.info("GameLogic - Section 1 non trouvée en cache, traitement requis")
             else:
-                self.logger.info(f"GameState - Chargement section {self.current_section} (décidé par l'agent)")
+                self.logger.info(f"GameLogic - Chargement section {self.current_section} (décidé par l'agent)")
                 
             # Invoquer le workflow
             result = await self.story_graph.invoke({
                 "section_number": self.current_section
             })
             
-            self.logger.info(f"GameState - Contenu: {self.truncate_for_log(result)}")
+            self.logger.info(f"GameLogic - Contenu: {self.truncate_for_log(result)}")
             return result
             
         except Exception as e:
             self.last_error = str(e)
-            self.logger.error(f"GameState - Erreur dans get_current_section: {str(e)}")
+            self.logger.error(f"GameLogic - Erreur dans get_current_section: {str(e)}")
             return {"error": str(e)}
         
     async def process_response(self, user_response: str) -> Dict:
@@ -108,7 +108,7 @@ class GameState:
         Traite la réponse de l'utilisateur et détermine la prochaine section.
         """
         try:
-            self.logger.info(f"GameState - Traitement réponse: {self.truncate_for_log(user_response)}")
+            self.logger.info(f"GameLogic - Traitement réponse: {self.truncate_for_log(user_response)}")
             
             result = await self.story_graph.invoke({
                 "section_number": self.current_section,
@@ -122,21 +122,21 @@ class GameState:
                     # Vérifier si la prochaine section est en cache
                     if next_section != self.current_section:
                         if self.check_section_cache(next_section):
-                            self.logger.info(f"GameState - Section {next_section} trouvée en cache")
+                            self.logger.info(f"GameLogic - Section {next_section} trouvée en cache")
                         else:
-                            self.logger.info(f"GameState - Section {next_section} non trouvée en cache, traitement requis")
+                            self.logger.info(f"GameLogic - Section {next_section} non trouvée en cache, traitement requis")
                     
                     self.current_section = next_section
-                    self.logger.info(f"GameState - Nouvelle section: {next_section}")
+                    self.logger.info(f"GameLogic - Nouvelle section: {next_section}")
                 else:
-                    self.logger.warning("GameState - Pas de décision ou de section suivante dans la réponse")
+                    self.logger.warning("GameLogic - Pas de décision ou de section suivante dans la réponse")
                 
-            self.logger.info(f"GameState - Réponse traitée: {self.truncate_for_log(str(result))}")
+            self.logger.info(f"GameLogic - Réponse traitée: {self.truncate_for_log(str(result))}")
             return result
             
         except Exception as e:
             self.last_error = str(e)
-            self.logger.error(f"GameState - Erreur dans process_response: {str(e)}")
+            self.logger.error(f"GameLogic - Erreur dans process_response: {str(e)}")
             return {"error": str(e)}
     
     async def process_dice_result(self, dice_result: int) -> Dict:
@@ -155,11 +155,11 @@ class GameState:
                 "dice_result": dice_result
             })
             
-            self.logger.info(f"GameState - Résultat dés traité: {self.truncate_for_log(result)}")
+            self.logger.info(f"GameLogic - Résultat dés traité: {self.truncate_for_log(result)}")
             return result
         except Exception as e:
             self.last_error = str(e)
-            self.logger.error(f"GameState - Erreur dans process_dice_result: {str(e)}")
+            self.logger.error(f"GameLogic - Erreur dans process_dice_result: {str(e)}")
             return {"error": str(e)}
         
     def get_character_stats(self) -> Dict:
@@ -173,5 +173,5 @@ class GameState:
             return self.trace.get_character_stats()  # Assurez-vous que TraceAgent a cette méthode
         except Exception as e:
             self.last_error = str(e)
-            self.logger.error(f"GameState - Erreur dans get_character_stats: {str(e)}")
+            self.logger.error(f"GameLogic - Erreur dans get_character_stats: {str(e)}")
             return {"error": str(e)}

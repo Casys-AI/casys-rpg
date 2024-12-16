@@ -119,6 +119,7 @@ async def test_narrator_agent_content_format(narrator_agent):
         assert "content" in result["state"]
         assert "formatted_content" in result["state"]
         assert isinstance(result["state"]["formatted_content"], str)
+        assert "<h1>Test content for section 1</h1>" in result["state"]["formatted_content"]
 
 @pytest.mark.asyncio
 async def test_narrator_agent_content_formatting(narrator_agent, content_dir):
@@ -131,8 +132,8 @@ async def test_narrator_agent_content_formatting(narrator_agent, content_dir):
     async for result in narrator_agent.ainvoke({"state": {"section_number": 2, "use_cache": False}}):
         assert result["state"]["content"] == test_content
         assert isinstance(result["state"]["formatted_content"], str)
-        assert "# Section Title" in result["state"]["formatted_content"]
-        assert "*formatting*" in result["state"]["formatted_content"]
+        assert "<h1>Section Title</h1>" in result["state"]["formatted_content"]
+        assert "<p>This is a test content with <em>formatting</em></p>" in result["state"]["formatted_content"]
 
 @pytest.mark.asyncio
 async def test_narrator_section_selection(narrator_agent, event_bus):

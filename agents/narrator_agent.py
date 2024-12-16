@@ -1,31 +1,57 @@
+from typing import Dict, Optional, Any, List, AsyncGenerator
 from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Optional, List, AsyncGenerator, Any
-import logging
+from pydantic import BaseModel, ConfigDict, Field
 from event_bus import EventBus, Event
+from agents.models import GameState
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
 from langchain.chat_models.base import BaseChatModel
+from langchain.schema import SystemMessage, HumanMessage
+import logging
 import os
 import json
 
-class NarratorAgent(BaseModel):
-    """
-    Agent responsable de la lecture du contenu des sections.
-    """
-    llm: BaseChatModel = Field(default_factory=lambda: ChatOpenAI(
+class NarratorConfig(BaseModel):
+    """Configuration pour NarratorAgent."""
+    llm: Optional[BaseChatModel] = Field(default_factory=lambda: ChatOpenAI(
         model="gpt-4o-mini",
-        model_kwargs={
-            "system_message": """Tu es un narrateur de livre-jeu. 
-            Tu dois lire et formater le contenu des sections pour une présentation agréable."""
-        }
+        temperature=0,
     ))
-    event_bus: EventBus = Field(default_factory=EventBus)
+    system_message: SystemMessage = Field(default_factory=lambda: SystemMessage(
+        content="""Tu es un narrateur de livre-jeu. 
+        Tu doit lire et formater le contenu des sections en md pour une présentation agréable."""
+    ))
     content_directory: str = Field(default="data/sections")
-    cache: Dict[int, str] = Field(default_factory=dict)
-    logger: logging.Logger = Field(default_factory=lambda: logging.getLogger(__name__))
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+class NarratorAgent:
+    """Agent responsable de la narration."""
+
+    def __init__(self, event_bus: EventBus, config: Optional[NarratorConfig] = None):
+        """
+        Initialise l'agent avec une configuration Pydantic.
+        
+        Args:
+            event_bus: Bus d'événements
+            config: Configuration Pydantic (optionnel)
+        """
+        self.event_bus = event_bus
+        self.config = config or NarratorConfig()
+        self.llm = self.config.llm
+        self.system_prompt = """Tu es un narrateur de livre-jeu.
+            Tu dois présenter le contenu des sections de manière engageante."""
+        self.content_directory = self.config.content_directory
+        self.cache = {}
+        self._logger: logging.Logger
+        self._setup_logging()
+
+    def _setup_logging(self):
+        """Configure logging without RLock"""
+        self._logger = logging.getLogger(__name__)
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.ERROR)
 
     async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
         """
@@ -47,27 +73,31 @@ class NarratorAgent(BaseModel):
                 return {
                     "state": {
                         "error": "Section number required",
-                        "content": "",
-                        "formatted_content": "",
+                        "content": "Section number required",
+                        "formatted_content": "Section number required",
                         "section_number": section_number
                     }
                 }
             
             # Charger le contenu
-            content = self._load_section_content(section_number, use_cache)
+            content = await self._load_section_content(section_number, use_cache)
             if content is None:
+                error_message = f"Section {section_number} not found"
                 return {
                     "state": {
-                        "error": f"Section {section_number} not found",
-                        "content": f"Section {section_number} not found",
-                        "formatted_content": f"Section {section_number} not found",
+                        "error": error_message,
+                        "content": error_message,
+                        "formatted_content": error_message,
                         "source": "not_found",
                         "section_number": section_number
                     }
                 }
                 
             # Formater le contenu si nécessaire
-            formatted_content = content if use_cache else self._format_content(content)
+            if not use_cache:
+                formatted_content = await self._format_content(content)
+            else:
+                formatted_content = content
             
             # Retourner le résultat
             return {
@@ -80,16 +110,16 @@ class NarratorAgent(BaseModel):
             }
 
         except Exception as e:
-            self.logger.error(f"Error in invoke: {str(e)}")
+            self._logger.error(f"Error in invoke: {str(e)}")
             return {
                 "state": {
                     "error": str(e),
-                    "content": "",
+                    "content": str(e),
                     "formatted_content": ""
                 }
             }
 
-    def _load_section_content(self, section_number: int, use_cache: bool = False) -> Optional[str]:
+    async def _load_section_content(self, section_number: int, use_cache: bool = False) -> Optional[str]:
         """
         Charge le contenu d'une section depuis le fichier.
         
@@ -116,18 +146,18 @@ class NarratorAgent(BaseModel):
                 content = f.read()
             
             # Formater et sauvegarder dans le cache
-            formatted_content = self._format_content(content)
+            formatted_content = await self._format_content(content)
             os.makedirs(os.path.join(self.content_directory, "cache"), exist_ok=True)
             with open(cache_path, "w", encoding="utf-8") as f:
                 f.write(formatted_content)
             
-            return content
+            return formatted_content if use_cache else content
 
         except Exception as e:
-            self.logger.error(f"Error loading section {section_number}: {str(e)}")
+            self._logger.error(f"Error loading section {section_number}: {str(e)}")
             return None
 
-    def _format_content(self, content: str) -> str:
+    async def _format_content(self, content: str) -> str:
         """
         Formate le contenu d'une section en utilisant le LLM.
         
@@ -135,59 +165,158 @@ class NarratorAgent(BaseModel):
             content (str): Le contenu brut à formater
             
         Returns:
-            str: Le contenu formaté
+            str: Le contenu formaté en HTML
         """
         try:
             # Préserver le formatage markdown existant
             formatted_content = content.strip()
             
-            # Utiliser le LLM pour enrichir le contenu tout en préservant le formatage
+            # Utiliser le LLM pour enrichir le contenu et le convertir en HTML
             messages = [
-                SystemMessage(content="""Tu es un narrateur de livre-jeu qui enrichit le contenu tout en préservant le formatage markdown existant.
-                Règles importantes :
-                1. TOUJOURS conserver les marqueurs markdown (*italique*, **gras**, # titres, etc.)
-                2. TOUJOURS préserver la structure exacte du texte
-                3. Enrichir le contenu sans modifier le formatage existant
-                4. Ne pas ajouter de formatage supplémentaire aux parties non formatées
-                """),
-                HumanMessage(content=f"Voici le contenu à enrichir en préservant son formatage :\n\n{formatted_content}")
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=f"""Voici le contenu à enrichir et convertir en HTML tout en préservant le sens :
+
+Contenu markdown :
+{formatted_content}
+
+Instructions :
+1. Convertir les titres markdown (# et ##) en balises <h1> et <h2>
+2. Convertir l'italique (*texte*) en balises <em>
+3. Convertir les paragraphes en balises <p>
+4. Préserver le sens et le style du texte
+""")
             ]
             
-            response = self.llm.invoke(messages)
+            response = await self.llm.ainvoke(messages)
             
-            # Vérifier que le formatage est préservé
-            if "*" not in response.content and "*" in content:
-                self.logger.warning("Le formatage markdown a été perdu, retour au contenu original")
-                return content
+            # Vérifier que le formatage HTML est présent
+            if "<h1>" not in response.content and "# " in content:
+                self._logger.warning("Le formatage HTML est manquant, formatage manuel")
+                # Formatage manuel basique
+                formatted = content.replace("# ", "<h1>").replace("\n", "</h1>\n")
+                formatted = formatted.replace("*", "<em>")
+                return f"<p>{formatted}</p>"
                 
             return response.content
 
         except Exception as e:
-            self.logger.error(f"Error formatting content: {str(e)}")
-            return content  # Retourner le contenu non formaté en cas d'erreur
+            self._logger.error(f"Error formatting content: {str(e)}")
+            # En cas d'erreur, faire un formatage HTML basique
+            return f"<p>{content}</p>"
 
-    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
-        """Invoke async."""
-        result = await self.invoke(input_data)
+    async def ainvoke(
+            self, input_data: Dict, config: Optional[Dict] = None
+        ) -> AsyncGenerator[Dict, None]:
+        """
+        Version asynchrone de invoke.
         
-        # Émettre l'événement de contenu généré si le contenu est présent et qu'il n'y a pas d'erreur
-        if "content" in result["state"] and result["state"]["content"] and "error" not in result["state"]:
-            await self.event_bus.emit(Event(
+        Args:
+            input_data (Dict): Les données d'entrée avec l'état du jeu
+            config (Optional[Dict]): Configuration optionnelle
+            
+        Returns:
+            AsyncGenerator[Dict, None]: Générateur asynchrone de résultats
+        """
+        try:
+            state = input_data.get("state", input_data)
+            
+            # Vérifier si l'état est vide
+            if isinstance(state, dict) and not state:
+                yield {
+                    "state": {
+                        "error": "Section number required",
+                        "content": "Section number required",
+                        "formatted_content": "Section number required",
+                        "source": "error"
+                    }
+                }
+                return
+                
+            section_number = state.get("section_number", 1)
+            use_cache = state.get("use_cache", False)
+            
+            # Charger le contenu avec gestion du cache
+            content = await self._load_section_content(section_number, use_cache)
+            if content is None:
+                error_message = f"Section {section_number} not found"
+                yield {
+                    "state": {
+                        "error": error_message,
+                        "content": error_message,
+                        "formatted_content": error_message,
+                        "source": "not_found"
+                    }
+                }
+                return
+            
+            # Formater le contenu
+            if not use_cache:
+                formatted_content = await self._format_content(content)
+            else:
+                formatted_content = content
+            
+            # Mettre à jour l'état
+            state["content"] = content
+            state["formatted_content"] = formatted_content
+            state["source"] = "cache" if use_cache else "loaded"
+            
+            # Émettre l'événement
+            event = Event(
                 type="content_generated",
                 data={
-                    "content": result["state"]["formatted_content"],
-                    "section_number": result["state"]["section_number"],
-                    "source": result["state"]["source"]
+                    "section_number": section_number,
+                    "content": content,
+                    "formatted_content": formatted_content,
+                    "source": state["source"]
                 }
-            ))
+            )
+            await self.event_bus.emit(event)
             
-        yield result
+            # Retourner l'état mis à jour
+            yield {"state": state}
+            
+        except Exception as e:
+            self._logger.error(f"Error in NarratorAgent.ainvoke: {str(e)}")
+            yield {
+                "state": {
+                    "error": str(e),
+                    "content": str(e),
+                    "formatted_content": str(e),
+                    "source": "error"
+                }
+            }
+
+    async def _get_section_content(self, section_number: int) -> str:
+        """
+        Charge le contenu d'une section depuis le fichier.
+        
+        Args:
+            section_number (int): Numéro de la section à charger
+            
+        Returns:
+            str: Le contenu de la section
+        """
+        try:
+            # Charger depuis le fichier principal
+            file_path = os.path.join(self.content_directory, f"{section_number}.md")
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Section {section_number} not found")
+                
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            return content
+
+        except Exception as e:
+            self._logger.error(f"Error loading section {section_number}: {str(e)}")
+            raise
 
     async def get_state(self) -> Dict:
         """Récupère l'état actuel."""
         return {
             "section_number": 1,
             "content": "",
+            "formatted_content": "",
             "needs_content": True
         }
 
