@@ -2,7 +2,7 @@ import logging.config
 
 LOGGING_CONFIG = {
     'version': 1,
-    'disable_existing_loggers': False,
+    'disable_existing_loggers': True,
     'formatters': {
         'standard': {
             'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -14,13 +14,6 @@ LOGGING_CONFIG = {
             'level': 'ERROR',
             'formatter': 'standard',
             'stream': 'ext://sys.stdout'
-        },
-        'file': {
-            'class': 'logging.FileHandler',
-            'level': 'DEBUG',
-            'formatter': 'standard',
-            'filename': 'debug.log',
-            'mode': 'a',
         }
     },
     'loggers': {
@@ -29,19 +22,34 @@ LOGGING_CONFIG = {
             'level': 'ERROR',
             'propagate': True
         },
-        'agents': {
+        'app': {  # logger spécifique pour app.py
             'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False
         },
-        'EventBus': {
+        'agents': {  # logger pour tous les agents
             'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False
         },
-        '__main__': {
+        'story_graph': {  # logger pour story_graph.py
             'handlers': ['console'],
             'level': 'ERROR',
+            'propagate': False
+        },
+        'openai': {  # logger pour les appels OpenAI
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False
+        },
+        'httpx': {  # logger pour les requêtes HTTP
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False
+        },
+        'httpcore': {  # logger pour HTTP core
+            'handlers': ['console'],
+            'level': 'WARNING',
             'propagate': False
         }
     }

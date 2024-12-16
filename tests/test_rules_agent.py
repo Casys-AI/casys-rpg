@@ -119,6 +119,9 @@ from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 import asyncio
+import tempfile
+import os
+import shutil
 
 @pytest_asyncio.fixture(scope="function")
 async def event_loop():
@@ -168,7 +171,33 @@ async def event_bus(event_loop):
     return EventBus()
 
 @pytest_asyncio.fixture
-async def rules_agent(event_bus):
+async def rules_dir():
+    """Crée un répertoire temporaire pour les règles de test."""
+    # Créer un répertoire temporaire
+    temp_dir = tempfile.mkdtemp()
+    
+    # Créer un fichier de règles de test
+    rules_content = """
+    {
+        "needs_dice": true,
+        "dice_type": "combat",
+        "choices": ["Attaquer", "Fuir"],
+        "formatted_content": "Test rules content"
+    }
+    """
+    
+    # Créer le fichier de règles pour la section 1
+    os.makedirs(os.path.join(temp_dir, "1"), exist_ok=True)
+    with open(os.path.join(temp_dir, "1", "rules.json"), "w") as f:
+        f.write(rules_content)
+    
+    yield temp_dir
+    
+    # Nettoyer après les tests
+    shutil.rmtree(temp_dir)
+
+@pytest_asyncio.fixture
+async def rules_agent(event_bus, rules_dir):
     """
     RulesAgent Fixture
     
@@ -190,10 +219,12 @@ async def rules_agent(event_bus):
     """
     config = RulesConfig(
         llm=ChatOpenAI(model="gpt-4o-mini"),
-        rules_directory="data/rules"
+        rules_directory=rules_dir
     )
-    agent = RulesAgent(event_bus=event_bus, config=config)
-    return agent
+    return RulesAgent(
+        event_bus=event_bus,
+        config=config
+    )
 
 @pytest.mark.asyncio
 async def test_rules_agent_basic(rules_agent):
@@ -216,7 +247,7 @@ async def test_rules_agent_basic(rules_agent):
     assert "choices" in rules
     assert isinstance(rules["choices"], list)
     assert "dice_type" in rules
-    assert "content" in rules
+    assert "formatted_content" in rules
 
 @pytest.mark.asyncio
 async def test_rules_agent_cache(rules_agent):
@@ -322,4 +353,4 @@ async def test_rules_agent_always_analyze(rules_agent, event_bus):
     # Vérifie que les résultats sont cohérents
     assert first_result["state"]["rules"]["needs_dice"] == second_result["state"]["rules"]["needs_dice"]
     assert first_result["state"]["rules"]["dice_type"] == second_result["state"]["rules"]["dice_type"]
-    assert first_result["state"]["rules"]["content"] == second_result["state"]["rules"]["content"]
+    assert first_result["state"]["rules"]["formatted_content"] == second_result["state"]["rules"]["formatted_content"]

@@ -10,6 +10,7 @@ import logging
 import json
 import os
 import re
+from agents.base_agent import BaseAgent
 
 class RulesConfig(BaseModel):
     """Configuration pour RulesAgent."""
@@ -24,7 +25,7 @@ class RulesConfig(BaseModel):
     rules_directory: str = Field(default="data/rules")
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class RulesAgent:
+class RulesAgent(BaseAgent):
     """Agent responsable de l'analyse des règles."""
 
     def __init__(self, event_bus: EventBus, config: Optional[RulesConfig] = None, **kwargs):
@@ -36,21 +37,12 @@ class RulesAgent:
             config: Configuration Pydantic (optionnel)
             **kwargs: Arguments supplémentaires pour la configuration
         """
-        self.event_bus = event_bus
+        super().__init__(event_bus)  # Appel au constructeur parent
         self.config = config or RulesConfig(**kwargs)
         self.llm = self.config.llm
         self.rules_directory = self.config.rules_directory
         self.cache = {}
-        self._setup_logging()
-
-    def _setup_logging(self):
-        """Configure logging without RLock"""
-        self._logger = logging.getLogger(__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.ERROR)
+        # self._setup_logging()
 
     async def invoke(self, input_data: Dict) -> Dict:
         """
@@ -80,8 +72,8 @@ class RulesAgent:
             if "rules" in state:
                 rules = state["rules"]
             # Vérifier si le contenu est fourni directement
-            elif "content" in state:
-                content = state["content"]
+            elif "formatted_content" in state:
+                content = state["formatted_content"]
                 rules_lower = content.lower()
                 needs_dice = "dice" in rules_lower or "roll" in rules_lower or "dés" in rules_lower
                 dice_type = None
@@ -93,7 +85,7 @@ class RulesAgent:
                         dice_type = "chance"
                 
                 rules = {
-                    "content": content,
+                    "formatted_content": content,
                     "needs_dice": needs_dice,
                     "dice_type": dice_type,
                     "choices": ["Continue"]
@@ -123,7 +115,7 @@ class RulesAgent:
             return {"state": new_state}
             
         except Exception as e:
-            self._logger.error(f"Error in RulesAgent: {str(e)}")
+            # self._logger.error(f"Error in RulesAgent: {str(e)}")
             raise
 
     async def _analyze_rules(self, section_number: int, content: Optional[str] = None) -> Dict:
@@ -142,9 +134,9 @@ class RulesAgent:
             if content is None:
                 content = await self._load_rules_file(section_number)
                 if not content:
-                    self._logger.warning(f"No rules file found for section {section_number}")
+                    # self._logger.warning(f"No rules file found for section {section_number}")
                     return {
-                        "content": "",
+                        "formatted_content": "",
                         "choices": [],
                         "next_sections": [],
                         "needs_dice": False,
@@ -178,11 +170,11 @@ Exemples:
                 # Parser la réponse JSON
                 rules = json.loads(response.content)
                 # Ajouter le contenu original
-                rules["content"] = content
+                rules["formatted_content"] = content
                 return rules
                 
             except json.JSONDecodeError as e:
-                self._logger.error(f"Failed to parse LLM response as JSON: {response.content}")
+                # self._logger.error(f"Failed to parse LLM response as JSON: {response.content}")
                 # Analyser manuellement si le LLM échoue
                 rules_lower = content.lower()
                 needs_dice = "dés" in rules_lower or "dice" in rules_lower or "roll" in rules_lower
@@ -195,7 +187,7 @@ Exemples:
                         dice_type = "chance"
                 
                 return {
-                    "content": content,
+                    "formatted_content": content,
                     "choices": ["Continue"],
                     "next_sections": [],
                     "needs_dice": needs_dice,
@@ -204,7 +196,7 @@ Exemples:
                 }
             
         except Exception as e:
-            self._logger.error(f"Error analyzing rules: {str(e)}")
+            # self._logger.error(f"Error analyzing rules: {str(e)}")
             raise
 
     async def _load_rules_file(self, section_number: int) -> Optional[str]:
@@ -220,13 +212,13 @@ Exemples:
         try:
             file_path = os.path.join(self.rules_directory, f"section_{section_number}_rule.md")
             if not os.path.exists(file_path):
-                self._logger.warning(f"Rules file not found for section {section_number}")
+                # self._logger.warning(f"Rules file not found for section {section_number}")
                 return None
                 
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
-            self._logger.error(f"Error loading rules file for section {section_number}: {str(e)}")
+            # self._logger.error(f"Error loading rules file for section {section_number}: {str(e)}")
             return None
 
     async def ainvoke(
@@ -247,7 +239,7 @@ Exemples:
             
             # Vérifier que section_number est présent et valide
             if "section_number" not in state:
-                self._logger.error("No section number provided")
+                # self._logger.error("No section number provided")
                 yield {
                     "state": {
                         "error": "No section number provided",
@@ -261,7 +253,7 @@ Exemples:
                 
             section_number = state.get("section_number")
             if not isinstance(section_number, int) or section_number < 1:
-                self._logger.error(f"Invalid section number: {section_number}")
+                # self._logger.error(f"Invalid section number: {section_number}")
                 yield {
                     "state": {
                         "error": f"Invalid section number: {section_number}",
@@ -274,11 +266,11 @@ Exemples:
                 return
             
             # Utiliser le contenu fourni s'il existe
-            content = state.get("content")
+            content = state.get("formatted_content")
             
             # Vérifier le cache seulement si pas de contenu direct
             if content is None and section_number in self.cache:
-                self._logger.debug(f"Cache hit for section {section_number}")
+                # self._logger.debug(f"Cache hit for section {section_number}")
                 rules = dict(self.cache[section_number])
                 state["rules"] = rules
                 
@@ -327,7 +319,7 @@ Exemples:
             }
             
         except Exception as e:
-            self._logger.error(f"Error in RulesAgent.ainvoke: {str(e)}")
+            # self._logger.error(f"Error in RulesAgent.ainvoke: {str(e)}")
             yield {
                 "state": {
                     "error": str(e),

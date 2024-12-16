@@ -4,12 +4,21 @@ from event_bus import EventBus, Event
 import logging
 
 class BaseAgent:
-    """Agent de base avec gestion d'état via EventBus."""
+    """Classe de base pour tous les agents."""
     
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self._setup_logging()
 
+    def _setup_logging(self):
+        """Configure le logging de manière centralisée pour tous les agents."""
+        self._logger = logging.getLogger(self.__class__.__name__)
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.ERROR)  # Niveau ERROR par défaut
+            
     async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
         """Invoke async."""
         state = await self.event_bus.get_state()

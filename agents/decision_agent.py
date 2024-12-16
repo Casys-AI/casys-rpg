@@ -9,6 +9,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from agents.rules_agent import RulesAgent
 import logging
 import json
+from agents.base_agent import BaseAgent
 
 # Type pour les agents de règles (réel ou mock)
 RulesAgentType = Union[RulesAgent, Any]
@@ -28,7 +29,7 @@ class DecisionConfig(BaseModel):
 Détermine la prochaine section en fonction de la réponse.""")
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class DecisionAgent:
+class DecisionAgent(BaseAgent):
     """
     Agent responsable des décisions.
     """
@@ -42,14 +43,13 @@ class DecisionAgent:
             config: Configuration Pydantic (optionnel)
             **kwargs: Arguments supplémentaires pour la configuration
         """
-        self.event_bus = event_bus
+        super().__init__(event_bus)  # Appel au constructeur parent
         self.config = config or DecisionConfig(**kwargs)
         self.llm = self.config.llm
         self.rules_agent = self.config.rules_agent
         self.system_prompt = self.config.system_prompt
         self.cache = {}
         self._logger: logging.Logger
-        self._setup_logging()
         self.current_rules = None
         
         # Initialiser les événements de manière asynchrone
@@ -59,15 +59,6 @@ class DecisionAgent:
     async def _setup_events(self):
         """Configure les abonnements aux événements"""
         await self.event_bus.subscribe("rules_generated", self._on_rules_analyzed)
-
-    def _setup_logging(self):
-        """Configure logging without RLock"""
-        self._logger = logging.getLogger(__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.ERROR)
 
     async def invoke(self, input_data: Dict) -> Dict:
         """

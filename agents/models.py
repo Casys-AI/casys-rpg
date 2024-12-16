@@ -5,7 +5,7 @@ class GameState(BaseModel):
     """État du jeu pour le StateGraph."""
     section_number: int = 1
     current_section: Optional[Dict] = None
-    content: Optional[str] = None
+    formatted_content: Optional[str] = None
     rules: Dict = {
         "needs_dice": False,
         "dice_type": "normal",
@@ -57,5 +57,25 @@ class GameState(BaseModel):
                 "content": None,
                 "choices": [],
                 "stats": {}
+            }
+        return v
+
+    @field_validator('trace', mode='before')
+    def validate_trace(cls, v):
+        if v is None:
+            return {
+                "stats": {
+                    "Caractéristiques": {
+                        "Habileté": 10,
+                        "Chance": 5,
+                        "Endurance": 8
+                    },
+                    "Ressources": {
+                        "Or": 100
+                    },
+                    "Inventaire": {
+                        "Objets": ["Épée", "Bouclier"]
+                    }
+                }
             }
         return v

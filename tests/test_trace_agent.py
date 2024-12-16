@@ -1,6 +1,6 @@
 import pytest
 import pytest_asyncio
-from agents.trace_agent import TraceAgent
+from agents.trace_agent import TraceAgent, TraceConfig
 from event_bus import Event, EventBus
 from pathlib import Path
 import json
@@ -19,12 +19,15 @@ def trace_directory(tmp_path):
     return trace_dir
 
 @pytest_asyncio.fixture
-async def trace_agent(trace_directory, event_bus):
+async def trace_agent(event_bus, trace_directory):
     """Crée une instance de TraceAgent pour les tests."""
+    config = TraceConfig(
+        trace_directory=str(trace_directory)  # Convertir Path en str
+    )
     agent = TraceAgent(
         llm=ChatOpenAI(model="gpt-4o-mini"),
         event_bus=event_bus,
-        trace_directory=str(trace_directory)
+        config=config
     )
     return agent
 
