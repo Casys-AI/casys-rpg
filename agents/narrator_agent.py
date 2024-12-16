@@ -6,6 +6,7 @@ from agents.models import GameState
 from langchain_openai import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema import SystemMessage, HumanMessage
+from agents.base_agent import BaseAgent
 import logging
 import os
 import json
@@ -23,7 +24,7 @@ class NarratorConfig(BaseModel):
     content_directory: str = Field(default="data/sections")
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class NarratorAgent:
+class NarratorAgent(BaseAgent):
     """Agent responsable de la narration."""
 
     def __init__(self, event_bus: EventBus, config: Optional[NarratorConfig] = None):
@@ -34,90 +35,65 @@ class NarratorAgent:
             event_bus: Bus d'événements
             config: Configuration Pydantic (optionnel)
         """
-        self.event_bus = event_bus
+        super().__init__(event_bus)  # Appel au constructeur parent
         self.config = config or NarratorConfig()
         self.llm = self.config.llm
         self.system_prompt = """Tu es un narrateur de livre-jeu.
             Tu dois présenter le contenu des sections de manière engageante."""
         self.content_directory = self.config.content_directory
         self.cache = {}
-        self._logger: logging.Logger
-        self._setup_logging()
-
-    def _setup_logging(self):
-        """Configure logging without RLock"""
         self._logger = logging.getLogger(__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.ERROR)
+        
+        # Créer les répertoires nécessaires
+        os.makedirs(self.content_directory, exist_ok=True)
+        os.makedirs(os.path.join(self.content_directory, "cache"), exist_ok=True)
 
-    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
+    async def invoke(self, state: Dict) -> Dict:
         """
-        Lit et formate le contenu d'une section.
+        Charge et formate le contenu d'une section.
         
         Args:
-            input_data (Dict): Les données d'entrée avec l'état du jeu
-            config (Optional[Dict]): Configuration optionnelle
+            state: État du jeu actuel
             
         Returns:
-            Dict: Le contenu formaté de la section
+            Dict: Nouvel état avec le contenu formaté
         """
         try:
-            state = input_data.get("state", {})
-            section_number = state.get("next_section", state.get("section_number"))
-            use_cache = state.get("use_cache", False)
+            # Initialiser le GameState
+            game_state = GameState(**state)
             
-            if not section_number:
-                return {
-                    "state": {
-                        "error": "Section number required",
-                        "content": "Section number required",
-                        "formatted_content": "Section number required",
-                        "section_number": section_number
-                    }
-                }
-            
-            # Charger le contenu
-            content = await self._load_section_content(section_number, use_cache)
-            if content is None:
-                error_message = f"Section {section_number} not found"
-                return {
-                    "state": {
-                        "error": error_message,
-                        "content": error_message,
-                        "formatted_content": error_message,
-                        "source": "not_found",
-                        "section_number": section_number
-                    }
-                }
-                
-            # Formater le contenu si nécessaire
-            if not use_cache:
-                formatted_content = await self._format_content(content)
+            # Vérifier d'abord le cache
+            cache_path = os.path.join(self.content_directory, "cache", f"{game_state.section_number}_cached.md")
+            if os.path.exists(cache_path):
+                self._logger.debug(f"Utilisation du contenu en cache pour la section {game_state.section_number}")
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    formatted_content = f.read()
             else:
-                formatted_content = content
+                # Si pas dans le cache, charger et formater
+                content = await self._load_section_content(game_state.section_number)
+                if content is None:
+                    raise ValueError(f"Section {game_state.section_number} not found")
+                    
+                # Formater le contenu
+                formatted_content = await self._format_content(content)
+                
+                # Sauvegarder dans le cache
+                try:
+                    with open(cache_path, "w", encoding="utf-8") as f:
+                        f.write(formatted_content)
+                    self._logger.debug(f"Contenu formaté sauvegardé dans le cache: {cache_path}")
+                except Exception as e:
+                    self._logger.error(f"Erreur lors de la sauvegarde dans le cache: {str(e)}")
             
-            # Retourner le résultat
-            return {
-                "state": {
-                    "section_number": section_number,
-                    "content": content,
-                    "formatted_content": formatted_content,
-                    "source": "cache" if use_cache else "loaded"
-                }
-            }
-
+            # Mettre à jour l'état
+            game_state.formatted_content = formatted_content
+            game_state.needs_content = False
+            
+            return {"state": game_state.model_dump()}
+            
         except Exception as e:
-            self._logger.error(f"Error in invoke: {str(e)}")
-            return {
-                "state": {
-                    "error": str(e),
-                    "content": str(e),
-                    "formatted_content": ""
-                }
-            }
+            self._logger.error(f"Error in NarratorAgent.invoke: {str(e)}")
+            raise
 
     async def _load_section_content(self, section_number: int, use_cache: bool = False) -> Optional[str]:
         """
@@ -133,9 +109,11 @@ class NarratorAgent:
         try:
             # Vérifier d'abord dans le cache si demandé
             cache_path = os.path.join(self.content_directory, "cache", f"{section_number}_cached.md")
-            if use_cache and os.path.exists(cache_path):
+            if os.path.exists(cache_path):
                 with open(cache_path, "r", encoding="utf-8") as f:
-                    return f.read()
+                    cached_content = f.read()
+                    if use_cache:
+                        return cached_content
 
             # Si pas dans le cache ou cache non demandé, charger depuis le fichier principal
             file_path = os.path.join(self.content_directory, f"{section_number}.md")
@@ -145,13 +123,8 @@ class NarratorAgent:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
             
-            # Formater et sauvegarder dans le cache
-            formatted_content = await self._format_content(content)
-            os.makedirs(os.path.join(self.content_directory, "cache"), exist_ok=True)
-            with open(cache_path, "w", encoding="utf-8") as f:
-                f.write(formatted_content)
-            
-            return formatted_content if use_cache else content
+            # Retourner le contenu brut
+            return content
 
         except Exception as e:
             self._logger.error(f"Error loading section {section_number}: {str(e)}")
@@ -168,22 +141,20 @@ class NarratorAgent:
             str: Le contenu formaté en HTML
         """
         try:
-            # Préserver le formatage markdown existant
-            formatted_content = content.strip()
-            
             # Utiliser le LLM pour enrichir le contenu et le convertir en HTML
             messages = [
                 SystemMessage(content=self.system_prompt),
                 HumanMessage(content=f"""Voici le contenu à enrichir et convertir en HTML tout en préservant le sens :
 
 Contenu markdown :
-{formatted_content}
+{content}
 
 Instructions :
 1. Convertir les titres markdown (# et ##) en balises <h1> et <h2>
 2. Convertir l'italique (*texte*) en balises <em>
 3. Convertir les paragraphes en balises <p>
 4. Préserver le sens et le style du texte
+5. Ne donner que le contenu HTML, pas de wrapping
 """)
             ]
             
@@ -225,7 +196,6 @@ Instructions :
                 yield {
                     "state": {
                         "error": "Section number required",
-                        "content": "Section number required",
                         "formatted_content": "Section number required",
                         "source": "error"
                     }
@@ -242,22 +212,14 @@ Instructions :
                 yield {
                     "state": {
                         "error": error_message,
-                        "content": error_message,
                         "formatted_content": error_message,
                         "source": "not_found"
                     }
                 }
                 return
             
-            # Formater le contenu
-            if not use_cache:
-                formatted_content = await self._format_content(content)
-            else:
-                formatted_content = content
-            
-            # Mettre à jour l'état
-            state["content"] = content
-            state["formatted_content"] = formatted_content
+            # Mettre à jour l'état avec uniquement le contenu formaté
+            state["formatted_content"] = await self._format_content(content)
             state["source"] = "cache" if use_cache else "loaded"
             
             # Émettre l'événement
@@ -265,8 +227,7 @@ Instructions :
                 type="content_generated",
                 data={
                     "section_number": section_number,
-                    "content": content,
-                    "formatted_content": formatted_content,
+                    "formatted_content": state["formatted_content"],
                     "source": state["source"]
                 }
             )
@@ -280,7 +241,6 @@ Instructions :
             yield {
                 "state": {
                     "error": str(e),
-                    "content": str(e),
                     "formatted_content": str(e),
                     "source": "error"
                 }
@@ -315,7 +275,6 @@ Instructions :
         """Récupère l'état actuel."""
         return {
             "section_number": 1,
-            "content": "",
             "formatted_content": "",
             "needs_content": True
         }
