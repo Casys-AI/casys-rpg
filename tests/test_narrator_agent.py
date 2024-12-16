@@ -21,7 +21,7 @@ async def content_dir():
     os.makedirs(cache_dir)
     
     # Créer quelques fichiers de test
-    with open(os.path.join(temp_dir, "section_1.md"), "w") as f:
+    with open(os.path.join(temp_dir, "1.md"), "w") as f:
         f.write("Test content for section 1")
     
     with open(os.path.join(cache_dir, "1_cached.md"), "w") as f:
@@ -125,7 +125,7 @@ async def test_narrator_agent_content_formatting(narrator_agent, content_dir):
     """Test le formatage du contenu"""
     # Créer un fichier de test avec du markdown
     test_content = "# Section Title\nThis is a test content with *formatting*"
-    with open(os.path.join(content_dir, "section_2.md"), "w") as f:
+    with open(os.path.join(content_dir, "2.md"), "w") as f:
         f.write(test_content)
         
     async for result in narrator_agent.ainvoke({"state": {"section_number": 2, "use_cache": False}}):

@@ -181,51 +181,62 @@ class StoryGraph:
 
     async def _process_state(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """Nœud de départ qui combine NarratorAgent et RulesAgent."""
+        self.logger.debug(f"Processing state with content: {state.get('content')}")
+        self.logger.debug(f"Current trace content: {state.get('trace', {})}")
+        
         try:
-            self.logger.debug("Entrée dans _process_state")
-            current_state = await self.event_bus.get_state()
+            # Log state before processing
+            self.logger.debug(f"Pre-processing state: {state}")
             
-            # Assurer que l'état a les champs requis
-            if not current_state:
-                current_state = state
-            
-            section_number = current_state.get("section_number", 1)
+            # Ensure section number is set
+            section_number = state.get("section_number", 1)
+            self.logger.debug(f"Processing section number: {section_number}")
             
             # Pour les sections > 1, vérifier la décision préalable
-            if section_number > 1 and not current_state.get("decision"):
-                yield current_state
+            if section_number > 1 and not state.get("decision"):
+                yield state
                 return
+            
+            # Préparer l'état pour le NarratorAgent
+            narrator_input = {
+                "state": {
+                    "section_number": section_number,
+                    "use_cache": state.get("use_cache", False)
+                }
+            }
             
             # Exécuter le NarratorAgent
             try:
-                async for result in self.narrator.ainvoke({"section": section_number}):
-                    if result:
-                        # Fusionner avec l'état actuel pour préserver trace
-                        result.update({"trace": current_state.get("trace", {})})
-                        await self.event_bus.update_state(result)
-                        yield await self.event_bus.get_state()
+                async for narrator_state in self.narrator.ainvoke(narrator_input):
+                    # Mettre à jour l'état avec le résultat du NarratorAgent
+                    state.update(narrator_state)
+                    await self.emit_event("state_updated", state)
+                    yield state
             except Exception as e:
-                self.logger.error(f"Erreur dans _process_state (NarratorAgent): {str(e)}")
+                self.logger.error(f"Error in NarratorAgent: {str(e)}", exc_info=True)
                 await self.event_bus.update_state({"error": str(e)})
                 yield await self.event_bus.get_state()
                 return
                 
             # Exécuter le RulesAgent
             try:
-                async for rules in self.rules.ainvoke({"section": current_state["section_number"]}):
+                async for rules in self.rules.ainvoke({"section": section_number}):
                     if rules and "rules" in rules:
                         await self.event_bus.update_state(rules)
                         yield await self.event_bus.get_state()
             except Exception as e:
-                self.logger.error(f"Erreur dans _process_state (RulesAgent): {str(e)}")
+                self.logger.error(f"Error in RulesAgent: {str(e)}", exc_info=True)
                 await self.event_bus.update_state({"error": str(e)})
                 yield await self.event_bus.get_state()
                 return
             
+            # Log state after processing
+            self.logger.debug(f"Post-processing state: {state}")
+            
         except Exception as e:
-            self.logger.error(f"Erreur dans _process_state: {str(e)}")
-            await self.event_bus.update_state({"error": str(e)})
-            yield await self.event_bus.get_state()
+            self.logger.error(f"Error in _process_state: {str(e)}", exc_info=True)
+            state['error'] = str(e)
+            yield state
 
     async def _decision_node(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """Nœud de décision qui utilise le DecisionAgent."""

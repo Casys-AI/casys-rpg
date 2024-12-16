@@ -108,7 +108,7 @@ class NarratorAgent(BaseModel):
                     return f.read()
 
             # Si pas dans le cache ou cache non demandé, charger depuis le fichier principal
-            file_path = os.path.join(self.content_directory, f"section_{section_number}.md")
+            file_path = os.path.join(self.content_directory, f"{section_number}.md")
             if not os.path.exists(file_path):
                 return None
                 

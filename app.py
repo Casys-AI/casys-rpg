@@ -11,7 +11,7 @@ load_dotenv()
 
 # Configuration du logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -57,8 +57,6 @@ def init_session_state():
         st.session_state.dice_result = None
     if "show_debug" not in st.session_state:
         st.session_state.show_debug = False
-    if "show_stats" not in st.session_state:
-        st.session_state.show_stats = False
     if "feedback_success" not in st.session_state:
         st.session_state.feedback_success = False
     if "previous_section" not in st.session_state:
@@ -110,18 +108,27 @@ def display_game_content(result):
         st.error(f"Erreur: {result['error']}")
         return
         
-    if "content" not in result:
-        st.error("Erreur: contenu de section manquant")
+    if "state" not in result or "formatted_content" not in result["state"]:
+        st.error("Erreur: contenu formaté manquant")
         st.write("Contenu du résultat :", result)  # Debug
         return
     
-    # Afficher le texte narratif avec le style personnalisé
-    st.markdown(f'<div class="story-content">{result["content"]}</div>', unsafe_allow_html=True)
+    # Style simple pour justifier le texte
+    st.markdown("""
+    <style>
+    .stMarkdown p {
+        text-align: justify;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Afficher le contenu avec le formatage markdown
+    st.markdown(result["state"]["formatted_content"])
     
     # Afficher les choix dans une section distincte
     st.markdown("### Que souhaitez-vous faire ?")
 
-def process_user_input():
+async def process_user_input():
     """Traite la saisie de l'utilisateur."""
     st.session_state.user_response = st.text_input("Votre action :", key=f"user_input_{st.session_state.game_state.current_section}")
     
@@ -129,11 +136,11 @@ def process_user_input():
     with col1:
         if st.button("Valider") and st.session_state.user_response:
             # Sauvegarder la section actuelle avant de passer à la suivante
-            current = asyncio.run(st.session_state.game_state.get_current_section())
+            current = await st.session_state.game_state.get_current_section()
             if "content" in current:
                 st.session_state.previous_section = current
             
-            result = asyncio.run(st.session_state.game_state.process_response(st.session_state.user_response))
+            result = await st.session_state.game_state.process_response(st.session_state.user_response)
             if "error" in result:
                 st.error(result["error"])
             else:
@@ -235,10 +242,6 @@ def render_game_controls():
             st.session_state.dice_result = None
             st.rerun()
         
-        st.session_state.show_stats = st.checkbox(
-            "Afficher les statistiques",
-            value=st.session_state.show_stats
-        )
         st.session_state.show_debug = st.checkbox(
             "Afficher les informations de debug",
             value=st.session_state.show_debug
@@ -354,6 +357,9 @@ async def main():
         
         # Afficher le contenu
         display_game_content(result)
+        
+        # Traiter la saisie utilisateur
+        await process_user_input()
         
         # Afficher les contrôles
         render_game_controls()

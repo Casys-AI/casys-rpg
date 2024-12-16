@@ -70,7 +70,39 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump(self.history, f, ensure_ascii=False, indent=2)
     
-    async def invoke(self, input_data: Dict) -> Dict:
+    def validate_state(self, state: Dict) -> Dict:
+        """Valide et corrige l'état si nécessaire."""
+        self.logger.debug(f"Validating state: {state}")
+        
+        if not state:
+            state = {}
+        
+        # Ensure trace exists
+        if 'trace' not in state:
+            state['trace'] = {}
+            
+        # Ensure stats exist in trace
+        if 'stats' not in state['trace']:
+            self.logger.warning("Stats missing in trace, restoring from agent defaults")
+            state['trace']['stats'] = self.stats.copy()
+            
+        # Validate stats structure
+        stats = state['trace'].get('stats', {})
+        if not isinstance(stats, dict):
+            self.logger.error(f"Invalid stats type: {type(stats)}")
+            stats = self.stats.copy()
+            
+        # Ensure all required stats categories exist
+        for category in ['Caractéristiques', 'Ressources', 'Inventaire']:
+            if category not in stats:
+                self.logger.warning(f"Missing category {category} in stats")
+                stats[category] = self.stats[category].copy()
+                
+        state['trace']['stats'] = stats
+        self.logger.debug(f"Validated state: {state}")
+        return state
+        
+    async def invoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
         """
         Enregistre une action dans l'historique et met à jour les stats si nécessaire.
         
@@ -81,8 +113,11 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
             Dict: État mis à jour avec historique et stats
         """
         try:
+            # Validate state first
+            state = self.validate_state(input_data)
+            
             # Extraire l'état ou initialiser un nouveau
-            state = input_data.get("state", {}).copy()
+            state = state.get("state", {}).copy()
             if not state:
                 state = {}
             
@@ -152,7 +187,7 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
             })
             
             # Retourner la structure complète
-            return {
+            yield {
                 "state": state,  # État avec trace inclus
                 "history": self.history,  # Pour compatibilité avec les tests
                 "stats": self.stats,      # Pour compatibilité avec les tests
@@ -163,15 +198,16 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
             }
             
         except Exception as e:
-            self.logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}")
-            return {"error": str(e)}
+            self.logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
+            yield {"error": str(e)}
             
     async def ainvoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
         """
         Version asynchrone de invoke.
         """
         try:
-            return await self.invoke(input_data)
+            async for result in self.invoke(input_data):
+                return result
         except Exception as e:
             self.logger.error(f"Erreur dans ainvoke: {str(e)}")
             return {"error": str(e)}

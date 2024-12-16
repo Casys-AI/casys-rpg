@@ -59,12 +59,13 @@ Détermine la prochaine section en fonction de la réponse.""")
 
             # Si on a besoin d'un jet de dés initial et qu'on n'en a pas
             if rules.get("needs_dice", False) and not state.get("dice_result") and not state.get("user_response"):
+                # On demande d'abord la réponse de l'utilisateur avant les dés
                 updated_state = {
                     **state,
                     "section_number": section_number,
-                    "awaiting_action": "dice_roll",
-                    "dice_type": rules.get("dice_type", "normal"),
-                    "analysis": "En attente du jet de dés initial"
+                    "awaiting_action": "user_response",
+                    "choices": rules.get("choices", []),
+                    "analysis": "En attente de la réponse de l'utilisateur"
                 }
                 return {"state": updated_state}
 
