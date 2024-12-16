@@ -40,7 +40,7 @@ class NarratorAgent(BaseModel):
         """
         try:
             state = input_data.get("state", {})
-            section_number = state.get("section_number")
+            section_number = state.get("next_section", state.get("section_number"))
             use_cache = state.get("use_cache", False)
             
             if not section_number:
@@ -48,7 +48,8 @@ class NarratorAgent(BaseModel):
                     "state": {
                         "error": "Section number required",
                         "content": "",
-                        "formatted_content": ""
+                        "formatted_content": "",
+                        "section_number": section_number
                     }
                 }
             
@@ -58,8 +59,10 @@ class NarratorAgent(BaseModel):
                 return {
                     "state": {
                         "error": f"Section {section_number} not found",
-                        "content": "",
-                        "formatted_content": ""
+                        "content": f"Section {section_number} not found",
+                        "formatted_content": f"Section {section_number} not found",
+                        "source": "not_found",
+                        "section_number": section_number
                     }
                 }
                 
@@ -166,6 +169,18 @@ class NarratorAgent(BaseModel):
     async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
         """Invoke async."""
         result = await self.invoke(input_data)
+        
+        # Émettre l'événement de contenu généré si le contenu est présent et qu'il n'y a pas d'erreur
+        if "content" in result["state"] and result["state"]["content"] and "error" not in result["state"]:
+            await self.event_bus.emit(Event(
+                type="content_generated",
+                data={
+                    "content": result["state"]["formatted_content"],
+                    "section_number": result["state"]["section_number"],
+                    "source": result["state"]["source"]
+                }
+            ))
+            
         yield result
 
     async def get_state(self) -> Dict:

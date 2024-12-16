@@ -57,14 +57,14 @@ Détermine la prochaine section en fonction de la réponse.""")
                     }
                 }
 
-            # Si on a besoin d'un jet de dés et qu'on n'en a pas
-            if rules.get("needs_dice", False) and not state.get("dice_result"):
+            # Si on a besoin d'un jet de dés initial et qu'on n'en a pas
+            if rules.get("needs_dice", False) and not state.get("dice_result") and not state.get("user_response"):
                 updated_state = {
                     **state,
                     "section_number": section_number,
                     "awaiting_action": "dice_roll",
                     "dice_type": rules.get("dice_type", "normal"),
-                    "analysis": "En attente du jet de dés"
+                    "analysis": "En attente du jet de dés initial"
                 }
                 return {"state": updated_state}
 
@@ -78,7 +78,18 @@ Détermine la prochaine section en fonction de la réponse.""")
                     "analysis": "En attente de la réponse de l'utilisateur"
                 }
                 return {"state": updated_state}
-            
+
+            # Si on a besoin d'un jet de dés après la réponse et qu'on n'en a pas
+            if rules.get("needs_dice", False) and not state.get("dice_result"):
+                updated_state = {
+                    **state,
+                    "section_number": section_number,
+                    "awaiting_action": "dice_roll",
+                    "dice_type": rules.get("dice_type", "normal"),
+                    "analysis": "En attente du jet de dés"
+                }
+                return {"state": updated_state}
+
             # Si on a une réponse et un résultat de dés si nécessaire
             analysis = await self._analyze_response(
                 section_number, 
@@ -122,39 +133,8 @@ Détermine la prochaine section en fonction de la réponse.""")
     async def ainvoke(self, input: Dict[str, Any], *args, **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
         """Prend une décision basée sur l'état actuel."""
         try:
-            # Récupérer l'état actuel
-            state = await self.get_state()
-            section_number = state.get("section_number", 1)
-            rules = state.get("rules", {})
-            
-            # Vérifier si on a besoin d'un lancer de dés
-            if rules.get("needs_dice", False):
-                decision = {
-                    "awaiting_action": "dice_roll",
-                    "section_number": section_number,
-                    "dice_type": rules.get("dice_type", "normal")
-                }
-            else:
-                # Par défaut, on attend une réponse de l'utilisateur
-                decision = {
-                    "awaiting_action": "user_input",
-                    "section_number": section_number
-                }
-            
-            # Mettre à jour l'état avec la décision
-            await self.update_state({
-                "decision": decision
-            })
-            
-            # Émettre un événement de décision prise
-            await self.emit_event("decision_made", {
-                "section": section_number,
-                "decision": decision
-            })
-            
-            # Retourner l'état mis à jour
-            yield {"state": await self.get_state()}
-            
+            result = await self.invoke(input)
+            yield result
         except Exception as e:
             self.logger.error(f"Erreur dans DecisionAgent: {str(e)}")
             yield {"state": {"error": str(e)}}

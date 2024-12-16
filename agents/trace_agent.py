@@ -146,7 +146,9 @@ class TraceAgent(RunnableSerializable[Dict, Dict]):
                 "trace": {
                     "history": self.history,
                     "stats": self.stats
-                }
+                },
+                "history": self.history,  # Pour compatibilité
+                "stats": self.stats  # Pour compatibilité
             })
             
             # Retourner la structure complète

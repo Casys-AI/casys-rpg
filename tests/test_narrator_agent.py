@@ -62,7 +62,7 @@ async def test_narrator_agent_cache(narrator_agent):
         second_result = result
     
     assert first_result["state"]["content"] == second_result["state"]["content"]
-    assert second_result["source"] == "cache"
+    assert second_result["state"]["source"] == "cache"
 
 @pytest.mark.asyncio
 async def test_narrator_agent_cache_directory(narrator_agent):
@@ -72,7 +72,7 @@ async def test_narrator_agent_cache_directory(narrator_agent):
     # Premier appel - devrait utiliser le fichier du cache
     async for result in narrator_agent.ainvoke({"state": {"section_number": section, "use_cache": True}}):
         assert "Cached content for section 1" in result["state"]["content"]
-        assert result["source"] == "cache"
+        assert result["state"]["source"] == "cache"
     
     # Supprimer le fichier du cache
     os.remove(os.path.join(narrator_agent.content_directory, "cache", "1_cached.md"))
@@ -80,7 +80,7 @@ async def test_narrator_agent_cache_directory(narrator_agent):
     # Deuxième appel - devrait utiliser le fichier normal
     async for result in narrator_agent.ainvoke({"state": {"section_number": section, "use_cache": False}}):
         assert "Test content for section 1" in result["state"]["content"]
-        assert result["source"] == "loaded"
+        assert result["state"]["source"] == "loaded"
 
 @pytest.mark.asyncio
 async def test_narrator_agent_events(narrator_agent, event_bus):
@@ -110,7 +110,7 @@ async def test_narrator_agent_section_not_found(narrator_agent):
     async for result in narrator_agent.ainvoke({"state": {"section_number": 999, "use_cache": False}}):
         assert "content" in result["state"]
         assert "Section 999 not found" in result["state"]["content"]
-        assert result["source"] == "not_found"
+        assert result["state"]["source"] == "not_found"
 
 @pytest.mark.asyncio
 async def test_narrator_agent_content_format(narrator_agent):
