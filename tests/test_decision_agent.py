@@ -58,12 +58,15 @@ async def rules_agent(event_bus):
     return MockRulesAgent(event_bus=event_bus)
 
 @pytest_asyncio.fixture
-async def decision_agent(rules_agent, event_bus):
+async def decision_agent(event_bus, rules_agent):
     config = DecisionConfig(
         llm=ChatOpenAI(model="gpt-4o-mini"),
         rules_agent=rules_agent
     )
-    return DecisionAgent(event_bus=event_bus, config=config)
+    return DecisionAgent(
+        event_bus=event_bus,
+        config=config
+    )
 
 @pytest.mark.asyncio
 async def test_decision_agent_basic(decision_agent):

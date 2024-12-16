@@ -7,6 +7,7 @@ import logging
 import json
 from pathlib import Path
 import shutil
+from agents.base_agent import BaseAgent
 
 class TraceConfig(BaseModel):
     """Configuration pour TraceAgent."""
@@ -26,7 +27,7 @@ class TraceConfig(BaseModel):
     })
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class TraceAgent:
+class TraceAgent(BaseAgent):
     """Agent responsable du traçage."""
 
     def __init__(self, event_bus: EventBus, config: Optional[TraceConfig] = None, **kwargs):
@@ -38,24 +39,14 @@ class TraceAgent:
             config: Configuration Pydantic (optionnel)
             **kwargs: Arguments supplémentaires pour la configuration
         """
-        self.event_bus = event_bus
+        super().__init__(event_bus)  # Appel au constructeur parent
         self.config = config or TraceConfig(**kwargs)
         self.trace_directory = Path(self.config.trace_directory)
         self._session_dir = self.create_session_dir()
         self.history = []
         self.stats = self.config.initial_stats.copy()
-        self._setup_logging()
         self.save_adventure_stats()
         self.save_history()
-    
-    def _setup_logging(self):
-        """Configure logging without RLock"""
-        self._logger = logging.getLogger(__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.DEBUG)
     
     def create_session_dir(self) -> Path:
         """Crée le répertoire de session pour cette partie"""
@@ -84,34 +75,34 @@ class TraceAgent:
     
     def validate_state(self, state: Dict) -> Dict:
         """Valide et corrige l'état si nécessaire."""
-        self._logger.debug(f"Validating state: {state}")
+        logging.getLogger(__name__).debug(f"Validating state: {state}")
         
         if not state:
             state = {}
         
         # S'assurer que trace existe
-        if 'trace' not in state:
+        if 'trace' not in state or state['trace'] is None:
             state['trace'] = {}
             
         # S'assurer que stats existe dans trace
         if 'stats' not in state['trace']:
-            self._logger.warning("Stats missing in trace, restoring from agent defaults")
+            logging.getLogger(__name__).warning("Stats missing in trace, restoring from agent defaults")
             state['trace']['stats'] = self.stats.copy()
             
         # Valider la structure des stats
         stats = state['trace'].get('stats', {})
         if not isinstance(stats, dict):
-            self._logger.error(f"Invalid stats type: {type(stats)}")
+            logging.getLogger(__name__).error(f"Invalid stats type: {type(stats)}")
             stats = self.stats.copy()
             
         # S'assurer que toutes les catégories requises existent
         for category in ['Caractéristiques', 'Ressources', 'Inventaire']:
             if category not in stats:
-                self._logger.warning(f"Missing category {category} in stats")
+                logging.getLogger(__name__).warning(f"Missing category {category} in stats")
                 stats[category] = self.stats[category].copy()
                 
         state['trace']['stats'] = stats
-        self._logger.debug(f"Validated state: {state}")
+        logging.getLogger(__name__).debug(f"Validated state: {state}")
         return state
 
     async def invoke(self, input_data: Dict) -> Dict:
@@ -155,16 +146,18 @@ class TraceAgent:
                 entry["user_response"] = state["user_response"]
 
             # Ajouter les détails spécifiques selon le type d'action
-            if action_type == "dice_roll" and "dice_result" in state:
-                entry.update({
-                    "dice_type": state["dice_result"].get("type", "normal"),
-                    "dice_value": state["dice_result"].get("value"),
-                    "dice_result": state["dice_result"],  # Garder le résultat complet
-                    "next_section": state.get("decision", {}).get("next_section"),
-                    "awaiting_action": state.get("decision", {}).get("awaiting_action", False),
-                    "conditions": state.get("decision", {}).get("conditions", []),
-                    "rules_summary": state.get("decision", {}).get("rules_summary", "")
-                })
+            if action_type == "dice_roll":
+                dice_result = state.get("dice_result", {})
+                if dice_result is not None:
+                    entry.update({
+                        "dice_type": dice_result.get("type", "normal"),
+                        "dice_value": dice_result.get("value"),
+                        "dice_result": dice_result,  # Garder le résultat complet
+                        "next_section": state.get("decision", {}).get("next_section"),
+                        "awaiting_action": state.get("decision", {}).get("awaiting_action", False),
+                        "conditions": state.get("decision", {}).get("conditions", []),
+                        "rules_summary": state.get("decision", {}).get("rules_summary", "")
+                    })
             elif action_type == "user_input" and "user_response" in state:
                 entry.update({
                     "response": state["user_response"]
@@ -211,7 +204,7 @@ class TraceAgent:
             }
             
         except Exception as e:
-            self._logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
+            logging.getLogger(__name__).error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
             return {
                 "state": {
                     "error": str(e),
@@ -229,11 +222,11 @@ class TraceAgent:
         """
         try:
             state = input_data.get("state", input_data)
-            self._logger.debug(f"Validating state: {state}")
+            logging.getLogger(__name__).debug(f"Validating state: {state}")
             
             # Valider et corriger l'état
             state = self.validate_state(state)
-            self._logger.debug(f"Validated state: {state}")
+            logging.getLogger(__name__).debug(f"Validated state: {state}")
             
             # Déterminer le type d'action
             action_type = "unknown"
@@ -295,7 +288,7 @@ class TraceAgent:
             return state
             
         except Exception as e:
-            self._logger.error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
+            logging.getLogger(__name__).error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
             return {
                 "error": str(e),
                 "history": self.history,

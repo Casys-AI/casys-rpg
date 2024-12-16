@@ -40,66 +40,79 @@ async def event_bus():
 @pytest_asyncio.fixture
 async def rules_agent(event_bus):
     # Create a mock RulesAgent that doesn't need serialization
-    mock_agent = MagicMock()
+    mock_agent = AsyncMock()
     async def mock_ainvoke(state):
-        yield {
-            "rules": {
-                "needs_dice": True,
-                "dice_type": "normal",
-                "conditions": [],
-                "next_sections": [2],
-                "rules_summary": "Test rules for section 1"
+        return {
+            "state": {
+                "rules": {
+                    "needs_dice": True,
+                    "dice_type": "normal",
+                    "conditions": [],
+                    "next_sections": [2],
+                    "rules_summary": "Test rules for section 1"
+                }
             }
         }
-    mock_agent.ainvoke = mock_ainvoke
+    mock_agent.invoke = mock_ainvoke
     return mock_agent
 
 @pytest_asyncio.fixture
 async def narrator_agent(event_bus):
     # Create a mock NarratorAgent that doesn't need serialization
-    mock_agent = MagicMock()
+    mock_agent = AsyncMock()
     async def mock_ainvoke(state):
-        yield {
-            "content": "Test content for section 1",
-            "section_number": 1
+        return {
+            "state": {
+                "formatted_content": "Test content for section 1",
+                "section_number": 1,
+                "needs_content": False
+            }
         }
-    mock_agent.ainvoke = mock_ainvoke
+    mock_agent.invoke = mock_ainvoke
     return mock_agent
 
 @pytest_asyncio.fixture
 async def decision_agent(event_bus):
     # Create a mock DecisionAgent that doesn't need serialization
-    mock_agent = MagicMock()
-    mock_agent.invoke = AsyncMock(return_value={
-        "decision": {
-            "awaiting_action": "user_input",
-            "section_number": 2
+    mock_agent = AsyncMock()
+    async def mock_ainvoke(state):
+        return {
+            "state": {
+                "decision": {
+                    "awaiting_action": "user_input",
+                    "section_number": 2
+                }
+            }
         }
-    })
+    mock_agent.invoke = mock_ainvoke
     return mock_agent
 
 @pytest_asyncio.fixture
 async def trace_agent(event_bus):
     # Create a mock TraceAgent that doesn't need serialization
-    mock_agent = MagicMock()
-    mock_agent.invoke = AsyncMock(return_value={
-        "trace": {
-            "stats": {
-                "Caractéristiques": {
-                    "Habileté": 10,
-                    "Chance": 5,
-                    "Endurance": 8
-                },
-                "Ressources": {
-                    "Or": 100
-                },
-                "Inventaire": {
-                    "Objets": ["Épée", "Bouclier"]
+    mock_agent = AsyncMock()
+    async def mock_ainvoke(state):
+        return {
+            "state": {
+                "trace": {
+                    "stats": {
+                        "Caractéristiques": {
+                            "Habileté": 10,
+                            "Chance": 5,
+                            "Endurance": 8
+                        },
+                        "Ressources": {
+                            "Or": 100
+                        },
+                        "Inventaire": {
+                            "Objets": ["Épée", "Bouclier"]
+                        }
+                    },
+                    "history": []
                 }
-            },
-            "history": []
+            }
         }
-    })
+    mock_agent.invoke = mock_ainvoke
     return mock_agent
 
 @pytest_asyncio.fixture
@@ -117,12 +130,12 @@ async def test_story_graph_initial_state(story_graph):
     """Test l'état initial du StoryGraph"""
     state = None
     async for s in story_graph.invoke(state):
-        state = s
+        state = s.get("state", {})
         break
     
     assert state is not None
     assert state.get("section_number") == 1
-    assert state.get("content") == "Test content for section 1"
+    assert state.get("formatted_content") == "Test content for section 1"
     assert state.get("rules", {}).get("needs_dice") is True
     assert state.get("rules", {}).get("dice_type") == "normal"
 
@@ -132,13 +145,15 @@ async def test_story_graph_user_response_with_dice(story_graph):
     state = {
         "section_number": 1,
         "user_response": "test response",
-        "dice_result": {"value": 6, "type": "normal"}
+        "dice_result": {"value": 6, "type": "normal"},
+        "needs_content": True
     }
     
     async for result in story_graph.invoke(state):
-        assert result.get("section_number") == 1
-        assert result.get("user_response") == "test response"
-        assert result.get("dice_result", {}).get("value") == 6
+        result_state = result.get("state", {})
+        assert result_state.get("section_number") == 1
+        assert result_state.get("user_response") == "test response"
+        assert result_state.get("dice_result", {}).get("value") == 6
         break
 
 @pytest.mark.asyncio
@@ -146,25 +161,26 @@ async def test_story_graph_user_response_without_dice(story_graph):
     """Test du StoryGraph avec une réponse utilisateur sans lancer de dés."""
     state = {
         "section_number": 1,
-        "user_response": "test response"
+        "user_response": "test response",
+        "needs_content": True
     }
     
     async for result in story_graph.invoke(state):
-        assert result.get("section_number") == 1
-        assert result.get("user_response") == "test response"
-        assert "dice_result" not in result
+        result_state = result.get("state", {})
+        assert result_state.get("section_number") == 1
+        assert result_state.get("user_response") == "test response"
+        assert result_state.get("dice_result") is None
         break
 
 @pytest.mark.asyncio
 async def test_story_graph_error_handling(story_graph):
     """Test de la gestion des erreurs dans le StoryGraph."""
-    error_agent = MagicMock()
+    error_agent = AsyncMock()
     
-    async def mock_ainvoke(state):
+    async def mock_invoke(state):
         raise Exception("Test error")
-        yield  # Cette ligne ne sera jamais atteinte
-        
-    error_agent.ainvoke = mock_ainvoke
+    
+    error_agent.invoke = mock_invoke
     
     # Remplacer tous les agents par notre mock qui lève une exception
     story_graph.narrator = error_agent

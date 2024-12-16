@@ -10,18 +10,18 @@ from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
 from agents.trace_agent import TraceAgent
 from agents.models import GameState
+from agents.base_agent import BaseAgent
 import asyncio
 import logging
 import json
+from logging_config import setup_logging
+import os
 
-# Configuration globale du logger sans RLock
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    force=True
-)
+# Configuration du logging
+setup_logging()
+logger = logging.getLogger('story_graph')
 
-class StoryGraph:
+class StoryGraph(BaseAgent):
     """
     Gestion hybride du flux de jeu utilisant StateGraph pour le workflow principal
     et EventBus pour les événements asynchrones.
@@ -45,7 +45,9 @@ class StoryGraph:
             decision_agent: Agent pour les décisions, si None un nouveau sera créé
             trace_agent: Agent pour le traçage, si None un nouveau sera créé
         """
-        self.event_bus = event_bus or EventBus()
+        # Initialiser le bus d'événements
+        event_bus = event_bus or EventBus()
+        super().__init__(event_bus)  # Appel au constructeur parent avec le bus
         
         # Initialiser les agents avec l'EventBus
         self.narrator = narrator_agent or NarratorAgent(event_bus=self.event_bus)
@@ -82,111 +84,197 @@ class StoryGraph:
 
         # Compiler le graphe
         self.graph = self.graph.compile()
+        
+        # État interne
+        self.last_error = None
+
+    def truncate_for_log(self, content: str, max_length: int = 100) -> str:
+        """Tronque une chaîne pour les logs."""
+        if not content or len(str(content)) <= max_length:
+            return str(content)
+        return str(content)[:max_length] + "..."
+        
+    def check_section_cache(self, section_number: int) -> bool:
+        """
+        Vérifie si une section est en cache.
+        
+        Args:
+            section_number: Numéro de la section à vérifier
+            
+        Returns:
+            bool: True si la section est en cache
+        """
+        cache_file = os.path.join("data/sections/cache", f"{section_number}_cached.md")
+        return os.path.exists(cache_file)
+        
+    def get_character_stats(self) -> Dict:
+        """
+        Retourne les statistiques actuelles du personnage.
+        
+        Returns:
+            Dict avec les stats du personnage depuis le fichier de trace
+        """
+        try:
+            return self.trace.get_character_stats()
+        except Exception as e:
+            self.last_error = str(e)
+            logger.error(f"Erreur dans get_character_stats: {str(e)}")
+            return {"error": str(e)}
 
     async def emit_event(self, event_type: str, data: Dict):
         """Centralise l'émission des événements."""
         try:
             await self.event_bus.emit(Event(type=event_type, data=data))
-            logging.debug(f"Événement émis : {event_type} avec données {data}")
+            logger.debug(f"Événement émis : {event_type} avec données {data}")
         except Exception as e:
-            logging.error(f"Erreur lors de l'émission de l'événement {event_type}: {str(e)}")
+            logger.error(f"Erreur lors de l'émission de l'événement {event_type}: {str(e)}")
 
-    async def invoke(self, state: Union[GameState, Dict], *args, **kwargs) -> AsyncGenerator[Dict, None]:
+    async def invoke(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """
-        Point d'entrée principal du StoryGraph.
-        Retourne un générateur asynchrone des états successifs.
-        """
-        logging.debug("Démarrage du StoryGraph")
+        Traite l'état du jeu à travers les différents agents.
         
+        Args:
+            state: État du jeu actuel
+            
+        Returns:
+            AsyncGenerator[Dict, None]: Générateur d'états de jeu
+        """
         try:
-            # Initialiser l'état si nécessaire
-            initial_state = GameState(
-                section_number=1,
-                content=None,
-                rules={
-                    "needs_dice": False,
-                    "dice_type": "normal",
-                    "conditions": [],
-                    "next_sections": [],
-                    "rules_summary": ""
-                },
-                decision={
-                    "awaiting_action": "user_input",
-                    "section_number": 1
-                },
-                stats=None,
-                history=[],
-                error=None,
-                needs_content=True,
-                user_response=None,
-                dice_result=None,
-                trace={
-                    "stats": {
-                        "Caractéristiques": {
-                            "Habileté": 10,
-                            "Chance": 5,
-                            "Endurance": 8
+            # Initialiser le GameState
+            if state is None:
+                state = {
+                    "section_number": 1,
+                    "formatted_content": None,
+                    "current_section": {
+                        "number": 1,
+                        "content": None,
+                        "choices": [],
+                        "stats": {}
+                    },
+                    "rules": {
+                        "needs_dice": True,
+                        "dice_type": "normal",
+                        "conditions": [],
+                        "next_sections": [],
+                        "rules_summary": ""
+                    },
+                    "decision": {
+                        "awaiting_action": "user_input",
+                        "section_number": 1
+                    },
+                    "stats": None,
+                    "history": [],
+                    "error": None,
+                    "needs_content": True,
+                    "user_response": None,
+                    "dice_result": None,
+                    "trace": {
+                        "stats": {
+                            "Caractéristiques": {
+                                "Habileté": 10,
+                                "Chance": 5,
+                                "Endurance": 8
+                            },
+                            "Ressources": {
+                                "Or": 100,
+                                "Gemme": 5
+                            },
+                            "Inventaire": {
+                                "Objets": ["Épée", "Bouclier"]
+                            }
                         },
-                        "Ressources": {
-                            "Or": 100,
-                            "Gemme": 5
-                        },
-                        "Inventaire": {
-                            "Objets": ["Épée", "Bouclier"]
-                        }
+                        "history": []
                     }
                 }
-            )
-
-            # Convertir l'état d'entrée si nécessaire
-            if isinstance(state, GameState):
-                current_state = state.model_dump()
-            elif isinstance(state, dict):
-                current_state = state
-            else:
-                current_state = initial_state.model_dump()
             
-            # S'assurer que 'trace' existe et a les stats par défaut
-            if not current_state.get('trace'):
-                current_state['trace'] = initial_state.model_dump()['trace']
-            elif "stats" not in current_state['trace']:
-                current_state['trace']['stats'] = initial_state.model_dump()['trace']['stats']
+            game_state = GameState(**state)
             
-            # Initialiser l'EventBus avec l'état initial
-            await self.event_bus.update_state(current_state)
-            
-            # Utiliser le graph compilé
-            async for state in self.graph.astream(current_state):
-                logging.debug(f"État généré: {state}")
-                # Extraire l'état réel du wrapper du StateGraph
-                if isinstance(state, dict):
-                    if "start_node" in state:
-                        # Si c'est un wrapper du StateGraph, utiliser l'état courant
-                        yield current_state
-                    else:
-                        # Si c'est un état normal, le retourner tel quel
-                        yield state
-                else:
-                    # Si ce n'est pas un dict, le convertir
-                    yield state if isinstance(state, dict) else state.model_dump()
+            # Si on a besoin de contenu
+            if game_state.needs_content:
+                # Obtenir le contenu via NarratorAgent
+                narrator_result = await self.narrator.invoke({"state": game_state.model_dump()})
+                if "error" in narrator_result:
+                    yield narrator_result
+                    return
+                    
+                # Mettre à jour l'état avec le contenu formaté
+                game_state.formatted_content = narrator_result["state"]["formatted_content"]
+                game_state.needs_content = False
                 
+            # Obtenir les règles via RulesAgent
+            if not game_state.rules:
+                rules_result = await self.rules.invoke({"state": game_state.model_dump()})
+                if "error" in rules_result:
+                    yield rules_result
+                    return
+                    
+                # Mettre à jour l'état avec les règles
+                game_state.rules = rules_result["state"]["rules"]
+                
+            # Obtenir la décision via DecisionAgent
+            if game_state.user_response:
+                decision_result = await self.decision.invoke({"state": game_state.model_dump()})
+                if "error" in decision_result:
+                    yield decision_result
+                    return
+                    
+                # Mettre à jour l'état avec la décision
+                game_state.decision = decision_result["state"]["decision"]
+                
+            # Obtenir la trace via TraceAgent si nécessaire
+            if not game_state.trace or "stats" not in game_state.trace:
+                trace_result = await self.trace.invoke({"state": game_state.model_dump()})
+                if "error" in trace_result:
+                    yield trace_result
+                    return
+                
+                # Mettre à jour l'état avec la trace
+                game_state.trace = trace_result.get("state", {}).get("trace", {})
+                if not game_state.trace or "stats" not in game_state.trace:
+                    game_state.trace = {
+                        "stats": {
+                            "Caractéristiques": {
+                                "Habileté": 10,
+                                "Chance": 5,
+                                "Endurance": 8
+                            },
+                            "Ressources": {
+                                "Or": 100
+                            },
+                            "Inventaire": {
+                                "Objets": ["Épée", "Bouclier"]
+                            }
+                        }
+                    }
+                
+            # Mettre à jour la trace
+            await self.trace.invoke({"state": game_state.model_dump()})
+            
+            # Retourner l'état final
+            yield {"state": game_state.model_dump()}
+            
         except Exception as e:
-            logging.error(f"Erreur dans invoke: {str(e)}")
-            await self.event_bus.update_state({"error": str(e)})
-            yield await self.event_bus.get_state()
+            logger.error(f"Error in StoryGraph.invoke: {str(e)}")
+            yield {"error": str(e)}
 
     async def _start_node(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """Point d'entrée du graphe."""
-        logging.debug("Entrée dans _start_node")
+        logger.debug("Entrée dans _start_node")
         
         try:
             # Initialisation de l'état avec GameState
             if not state:
                 initial_state = GameState(
                     section_number=1,
-                    content=None,
+                    formatted_content=None,
+                    current_section={
+                        "number": 1,
+                        "content": None,
+                        "choices": [],
+                        "stats": {}
+                    },
                     rules={
-                        "needs_dice": False,
+                        "needs_dice": True,
                         "dice_type": "normal",
                         "conditions": [],
                         "next_sections": [],
@@ -201,7 +289,7 @@ class StoryGraph:
                     error=None,
                     needs_content=True,
                     user_response=None,
-                    dice_result=None,
+                    dice_result={},  # Initialiser avec un dictionnaire vide
                     trace={
                         "stats": {
                             "Caractéristiques": {
@@ -216,32 +304,33 @@ class StoryGraph:
                             "Inventaire": {
                                 "Objets": ["Épée", "Bouclier"]
                             }
-                        }
+                        },
+                        "history": []
                     }
                 )
                 state = initial_state.model_dump()
-                logging.debug(f"État initial créé: {state}")
+                logger.debug(f"État initial créé: {state}")
 
             # Continuer avec le flux normal
             async for updated_state in self._process_state(state):
                 yield updated_state
                 
         except Exception as e:
-            logging.error(f"Erreur dans _start_node: {str(e)}")
+            logger.error(f"Erreur dans _start_node: {str(e)}")
             yield {"error": str(e)}
 
     async def _process_state(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """Nœud de départ qui combine NarratorAgent et RulesAgent."""
-        logging.debug(f"Processing state with content: {state.get('content')}")
-        logging.debug(f"Current trace content: {state.get('trace', {})}")
+        logger.debug(f"Processing state with content: {state.get('content')}")
+        logger.debug(f"Current trace content: {state.get('trace', {})}")
         
         try:
             # Log state before processing
-            logging.debug(f"Pre-processing state: {state}")
+            logger.debug(f"Pre-processing state: {state}")
             
             # Ensure section number is set
             section_number = state.get("section_number", 1)
-            logging.debug(f"Processing section number: {section_number}")
+            logger.debug(f"Processing section number: {section_number}")
             
             # Pour les sections > 1, vérifier la décision préalable
             if section_number > 1 and not state.get("decision"):
@@ -257,7 +346,7 @@ class StoryGraph:
                     # Fusionner l'état au lieu de le remplacer
                     state.update(narrator_state)
             except Exception as e:
-                logging.error(f"Error in NarratorAgent: {str(e)}", exc_info=True)
+                logger.error(f"Error in NarratorAgent: {str(e)}", exc_info=True)
                 state["error"] = str(e)
                 await self.event_bus.update_state(state)
                 yield state
@@ -270,19 +359,19 @@ class StoryGraph:
                     # Fusionner l'état au lieu de le remplacer
                     state.update(rules)
             except Exception as e:
-                logging.error(f"Error in RulesAgent: {str(e)}", exc_info=True)
+                logger.error(f"Error in RulesAgent: {str(e)}", exc_info=True)
                 state["error"] = str(e)
                 await self.event_bus.update_state(state)
                 yield state
                 return
             
             # Log state after processing
-            logging.debug(f"Post-processing state: {state}")
+            logger.debug(f"Post-processing state: {state}")
             await self.event_bus.update_state(state)
             yield state
             
         except Exception as e:
-            logging.error(f"Error in _process_state: {str(e)}", exc_info=True)
+            logger.error(f"Error in _process_state: {str(e)}", exc_info=True)
             state["error"] = str(e)
             await self.event_bus.update_state(state)
             yield state
@@ -290,7 +379,7 @@ class StoryGraph:
     async def _decision_node(self, state: Dict) -> AsyncGenerator[Dict, None]:
         """Nœud de décision qui utilise le DecisionAgent."""
         try:
-            logging.debug("Entrée dans _decision_node")
+            logger.debug("Entrée dans _decision_node")
             current_state = await self.event_bus.get_state()
             
             # Vérifier si une décision est nécessaire
@@ -309,20 +398,20 @@ class StoryGraph:
                     yield await self.event_bus.get_state()
             
         except Exception as e:
-            logging.error(f"Erreur dans _decision_node: {str(e)}")
+            logger.error(f"Erreur dans _decision_node: {str(e)}")
             await self.event_bus.update_state({"error": str(e)})
             yield await self.event_bus.get_state()
 
     async def _trace_node(self, state: Dict, *args, **kwargs) -> AsyncGenerator[Dict, None]:
         """Nœud du graph pour le TraceAgent."""
         try:
-            logging.debug("Entrée dans _trace_node")
+            logger.debug("Entrée dans _trace_node")
             current_state = await self.event_bus.get_state()
             
             # Vérifier qu'on a une décision
             decision = current_state.get("decision", {})
             if not decision or "awaiting_action" not in decision:
-                logging.debug("Pas de décision pour TraceAgent")
+                logger.debug("Pas de décision pour TraceAgent")
                 yield current_state
                 return
             
@@ -333,7 +422,7 @@ class StoryGraph:
                     yield await self.event_bus.get_state()
             
         except Exception as e:
-            logging.error(f"Erreur dans _trace_node: {str(e)}")
+            logger.error(f"Erreur dans _trace_node: {str(e)}")
             await self.event_bus.update_state({"error": str(e)})
             yield await self.event_bus.get_state()
 
@@ -342,25 +431,25 @@ class StoryGraph:
         try:
             # Si on a une erreur, on arrête
             if state.get("error"):
-                logging.debug("Arrêt - Erreur détectée")
+                logger.debug("Arrêt - Erreur détectée")
                 return False
 
             # Si on n'a pas de décision, on arrête car on attend une action
             decision = state.get("decision", {})
             if not decision:
-                logging.debug("Arrêt - En attente d'une décision")
+                logger.debug("Arrêt - En attente d'une décision")
                 return False
 
             # Si on attend une action spécifique, on arrête aussi
             awaiting_action = decision.get("awaiting_action")
             if awaiting_action in ["user_input", "dice_roll"]:
-                logging.debug(f"Arrêt - En attente de : {awaiting_action}")
+                logger.debug(f"Arrêt - En attente de : {awaiting_action}")
                 return False
 
             # Si on a une décision mais pas d'attente d'action, on continue
-            logging.debug("Continuer - Décision prise sans attente d'action")
+            logger.debug("Continuer - Décision prise sans attente d'action")
             return True
 
         except Exception as e:
-            logging.error(f"Erreur dans _should_continue: {str(e)}")
+            logger.error(f"Erreur dans _should_continue: {str(e)}")
             return False

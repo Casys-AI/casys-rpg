@@ -1,20 +1,18 @@
 # app.py
 import random
 import streamlit as st
-from game_logic import GameState, StoryGraph
+from agents.story_graph import StoryGraph
+from agents.models import GameState
 from utils.game_utils import roll_dice
 import logging
 import os
 import asyncio
 from dotenv import load_dotenv
-load_dotenv()
+from logging_config import setup_logging
 
 # Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = logging.getLogger('app')
 
 # Configuration des chemins
 feedback_dir = os.path.join(os.path.dirname(__file__), "data", "feedback")
@@ -25,30 +23,32 @@ def init_session_state():
     logger.debug("Initialisation de l'état de session")
     if "game_state" not in st.session_state:
         logger.debug("Création d'un nouveau GameState")
-        game_state = GameState()
-        game_state.current_section = 1  # Section de départ
+        game_state = GameState(
+            section_number=1,  # Section de départ
+            trace={
+                "stats": {
+                    "Caractéristiques": {
+                        "Habileté": 10,
+                        "Chance": 5,
+                        "Endurance": 8
+                    },
+                    "Ressources": {
+                        "Or": 100,
+                        "Gemme": 5
+                    },
+                    "Inventaire": {
+                        "Objets": ["Épée", "Bouclier"]
+                    }
+                }
+            }
+        )
         st.session_state.game_state = game_state
+        
     if "story_graph" not in st.session_state:
         logger.debug("Création d'un nouveau StoryGraph")
         story_graph = StoryGraph()
         st.session_state.story_graph = story_graph
-        # Initialiser les stats par défaut
-        logger.debug("Initialisation des stats par défaut")
-        story_graph.trace.stats = {
-            "Caractéristiques": {
-                "Habileté": 10,
-                "Chance": 5,
-                "Endurance": 8
-            },
-            "Ressources": {
-                "Or": 100,
-                "Gemme": 5
-            },
-            "Inventaire": {
-                "Objets": ["Épée", "Bouclier"]
-            }
-        }
-        logger.debug(f"Stats initialisées: {story_graph.trace.stats}")
+    
     if "user_response" not in st.session_state:
         st.session_state.user_response = ""
     if "feedback_mode" not in st.session_state:
@@ -113,24 +113,42 @@ def display_game_content(result):
         st.write("Contenu du résultat :", result)  # Debug
         return
     
-    # Style simple pour justifier le texte
+    # Style pour le texte du jeu
     st.markdown("""
     <style>
     .stMarkdown p {
         text-align: justify;
+        line-height: 1.6;
+        margin-bottom: 1.2em;
+    }
+    .stMarkdown h1 {
+        color: #1E88E5;
+        font-size: 2em;
+        margin-bottom: 1em;
+        text-align: center;
+    }
+    .stMarkdown h2 {
+        color: #1565C0;
+        font-size: 1.5em;
+        margin-top: 1.5em;
+        margin-bottom: 1em;
+    }
+    .stMarkdown em {
+        color: #0D47A1;
+        font-style: italic;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Afficher le contenu avec le formatage markdown
-    st.markdown(result["state"]["formatted_content"])
+    # Afficher le contenu avec le formatage HTML
+    st.markdown(result["state"]["formatted_content"], unsafe_allow_html=True)
     
     # Afficher les choix dans une section distincte
     st.markdown("### Que souhaitez-vous faire ?")
 
 async def process_user_input():
     """Traite la saisie de l'utilisateur."""
-    st.session_state.user_response = st.text_input("Votre action :", key=f"user_input_{st.session_state.game_state.current_section}")
+    st.session_state.user_response = st.text_input("Votre action :", key=f"user_input_{st.session_state.game_state.section_number}")
     
     col1, col2 = st.columns([1, 4])
     with col1:
@@ -204,7 +222,7 @@ def render_feedback_form():
         if st.button("Envoyer"):
             if feedback:
                 # Récupérer toutes les informations nécessaires
-                current_section = st.session_state.game_state.current_section
+                current_section = st.session_state.game_state.section_number
                 previous_section = st.session_state.previous_section
                 last_response = st.session_state.user_response
                 
@@ -313,6 +331,27 @@ async def process_game_state(game_state):
         logger.debug("Début du traitement de l'état du jeu")
         async for state in game_state:
             logger.debug(f"État reçu du générateur: {state}")
+            # Vérifier et corriger l'état si nécessaire
+            if not isinstance(state, dict):
+                state = state.model_dump()
+            
+            if "trace" not in state or not state["trace"]:
+                state["trace"] = {
+                    "stats": {
+                        "Caractéristiques": {
+                            "Habileté": 10,
+                            "Chance": 5,
+                            "Endurance": 8
+                        },
+                        "Ressources": {
+                            "Or": 100,
+                            "Gemme": 5
+                        },
+                        "Inventaire": {
+                            "Objets": ["Épée", "Bouclier"]
+                        }
+                    }
+                }
             return state
     except Exception as e:
         logger.error(f"Erreur lors du traitement de l'état du jeu: {str(e)}")
@@ -333,7 +372,7 @@ async def main():
         if st.session_state.user_response:
             logger.debug(f"Traitement de la réponse utilisateur: {st.session_state.user_response}")
             current_state = {
-                "section_number": st.session_state.get("section_number", 1),
+                "section_number": st.session_state.game_state.section_number,
                 "user_response": st.session_state.user_response,
                 "dice_result": st.session_state.dice_result
             }
