@@ -65,3 +65,48 @@ class CacheManager:
     def clear_cache(self) -> None:
         """Clear all cached data."""
         self._section_cache.clear()
+
+    async def get_section_content(self, section_number: int) -> Optional[str]:
+        """
+        Get the content of a section from cache or file.
+        
+        Args:
+            section_number: Section number to retrieve
+            
+        Returns:
+            Optional[str]: Section content if exists, None otherwise
+        """
+        try:
+            logger.info(f"Récupération du contenu de la section {section_number}")
+            
+            # D'abord vérifier le cache
+            if self.check_section_cache(section_number):
+                logger.info("Contenu trouvé dans le cache")
+                return self.get_section(section_number)
+            
+            # Sinon, charger depuis le fichier
+            import os
+            from pathlib import Path
+            
+            # Construire le chemin du fichier
+            base_dir = Path(__file__).parent.parent
+            section_file = base_dir / "data" / "sections" / f"section_{section_number}.txt"
+            
+            # Vérifier si le fichier existe
+            if not os.path.exists(section_file):
+                logger.warning(f"Fichier de section non trouvé: {section_file}")
+                return None
+                
+            # Lire le contenu
+            logger.info(f"Lecture du fichier: {section_file}")
+            with open(section_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                
+            # Mettre en cache
+            self.cache_section(section_number, content)
+            
+            return content
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération du contenu: {str(e)}", exc_info=True)
+            return None

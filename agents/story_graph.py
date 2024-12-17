@@ -55,7 +55,7 @@ class StoryGraph(BaseAgent):
         self.trace = trace_agent or TraceAgent(event_bus=self.event_bus)
         
         # Initialize managers
-        self.state_manager = StateManager(event_bus)
+        self.state_manager = StateManager()
         self.agent_manager = AgentManager(
             self.narrator, 
             self.rules, 
@@ -181,7 +181,7 @@ class StoryGraph(BaseAgent):
                 merged_state = {
                     **state,
                     "content": content_result.get("content"),
-                    "formatted_content": content_result.get("formatted_content", ""),
+                    "content": content_result.get("content", ""),
                     "rules": rules_result.get("rules", {}),
                     "decision": rules_result.get("decision", {}),
                     "needs_content": False
@@ -352,6 +352,27 @@ class StoryGraph(BaseAgent):
         except Exception as e:
             logger.error(f"Error in StoryGraph invoke: {str(e)}")
             yield {"state": {"error": f"Error in story graph: {str(e)}"}}
+
+    async def get_state(self) -> Dict:
+        """
+        Récupère l'état actuel du jeu depuis le state manager.
+        
+        Returns:
+            Dict: État actuel du jeu
+        """
+        try:
+            logger.info("Tentative de récupération de l'état du jeu")
+            logger.debug(f"State Manager: {self.state_manager}")
+            
+            state = await self.state_manager.get_state()
+            logger.info("État récupéré avec succès")
+            logger.debug(f"État récupéré: {state}")
+            
+            return state
+        except Exception as e:
+            logger.error(f"Erreur détaillée lors de la récupération de l'état: {str(e)}", exc_info=True)
+            logger.error(f"Type d'erreur: {type(e)}")
+            return {"error": f"Error getting game state: {str(e)}"}
 
     async def initialize(self):
         """Initialize the StoryGraph components."""

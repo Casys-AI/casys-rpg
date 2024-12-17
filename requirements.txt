@@ -24,10 +24,12 @@ faiss-cpu
 pytest
 pytest-asyncio
 httpx
+pytest-cov
 
 # Utilitaires
 markdown
 black
+
 
 # Outils
 streamlit

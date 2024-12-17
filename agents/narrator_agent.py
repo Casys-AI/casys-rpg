@@ -19,7 +19,7 @@ class NarratorConfig(BaseModel):
     ))
     system_message: SystemMessage = Field(default_factory=lambda: SystemMessage(
         content="""Tu es un narrateur de livre-jeu. 
-        Tu doit lire et formater le contenu des sections en md pour une présentation agréable."""
+        """
     ))
     content_directory: str = Field(default="data/sections")
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -27,15 +27,15 @@ class NarratorConfig(BaseModel):
 class NarratorAgent(BaseAgent):
     """Agent responsable de la narration."""
 
-    def __init__(self, event_bus: EventBus, config: Optional[NarratorConfig] = None):
+    def __init__(self, event_bus: Optional[EventBus] = None, config: Optional[NarratorConfig] = None):
         """
         Initialise l'agent avec une configuration Pydantic.
         
         Args:
-            event_bus: Bus d'événements
+            event_bus: Bus d'événements (optionnel)
             config: Configuration Pydantic (optionnel)
         """
-        super().__init__(event_bus)  # Appel au constructeur parent
+        self.event_bus = event_bus
         self.config = config or NarratorConfig()
         self.llm = self.config.llm
         self.system_prompt = """Tu es un narrateur de livre-jeu.
@@ -138,7 +138,8 @@ Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
                                 },
                                 "formatted_content": error_html,
                                 "content": error_html,
-                                "needs_content": True
+                                "needs_content": True,
+                                "source": "not_found"
                             }
                         }
                     else:
@@ -148,7 +149,8 @@ Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
                                 "content": error_html,
                                 "raw_content": error_msg,
                                 "choices": [],
-                                "needs_content": True
+                                "needs_content": True,
+                                "source": "not_found"
                             }
                         }
                     
@@ -270,13 +272,14 @@ Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
 Contenu markdown :
 {content}
 
-Instructions :
+Tu doit lire et formater le contenu des sections en md pour une présentation agréable.
+        Instructions :
 1. Convertir les titres markdown (# et ##) en balises <h1> et <h2>
 2. Convertir l'italique (*texte*) en balises <em>
 3. Convertir les paragraphes en balises <p>
 4. Préserver le sens et le style du texte
-5. Ne donner que le contenu HTML, pas de wrapping
-""")
+5. Ne donner que le contenu HTML, pas de wrapping"""
+)
             ]
             
             response = await self.llm.ainvoke(messages)
@@ -290,82 +293,48 @@ Instructions :
                 return f"<p>{formatted}</p>"
                 
             return response.content
-
         except Exception as e:
             self._logger.error(f"Error formatting content: {str(e)}")
-            # En cas d'erreur, faire un formatage HTML basique
             return f"<p>{content}</p>"
 
     async def ainvoke(
-            self, input_data: Dict, config: Optional[Dict] = None
-        ) -> AsyncGenerator[Dict, None]:
+            self, input_data: Dict) -> AsyncGenerator[Dict, None]:
         """
         Version asynchrone de invoke.
         
         Args:
             input_data (Dict): Les données d'entrée avec l'état du jeu
-            config (Optional[Dict]): Configuration optionnelle
             
         Returns:
             AsyncGenerator[Dict, None]: Générateur asynchrone de résultats
         """
+        state = input_data.get("state", {})
+        
         try:
-            state = input_data.get("state", input_data)
-            
-            # Vérifier si l'état est vide
-            if isinstance(state, dict) and not state:
-                yield {
-                    "state": {
-                        "error": "Section number required",
-                        "formatted_content": "Section number required",
-                        "source": "error"
-                    }
-                }
-                return
-                
-            section_number = state.get("section_number", state.get("sectionNumber", 1))
+            section_number = state.get("section_number")
+            if not section_number:
+                raise ValueError("Section number is required")
+
             use_cache = state.get("use_cache", False)
             
-            # Charger le contenu avec gestion du cache
+            # Charger le contenu
             content = await self._load_section_content(section_number, use_cache)
-            if content is None:
-                error_message = f"Section {section_number} not found"
-                yield {
-                    "state": {
-                        "error": error_message,
-                        "formatted_content": error_message,
-                        "source": "not_found"
-                    }
-                }
-                return
+            if not content:
+                raise ValueError(f"Content not found for section {section_number}")
             
-            # Mettre à jour l'état avec uniquement le contenu formaté
-            state["formatted_content"] = await self._format_content(content)
+            # Mettre à jour l'état avec le contenu formaté
+            formatted_content = await self._format_content(content)
+            state["content"] = formatted_content
             state["source"] = "cache" if use_cache else "loaded"
-            
-            # Émettre l'événement
-            event = Event(
-                type="content_generated",
-                data={
-                    "section_number": section_number,
-                    "formatted_content": state["formatted_content"],
-                    "source": state["source"]
-                }
-            )
-            await self.event_bus.emit(event)
             
             # Retourner l'état mis à jour
             yield {"state": state}
             
         except Exception as e:
-            self._logger.error(f"Error in NarratorAgent.ainvoke: {str(e)}")
-            yield {
-                "state": {
-                    "error": str(e),
-                    "formatted_content": str(e),
-                    "source": "error"
-                }
-            }
+            self._logger.error(f"Error in NarratorAgent: {str(e)}")
+            state["error"] = str(e)
+            state["source"] = "not_found"
+            yield {"state": state}
 
     async def _get_section_content(self, section_number: int) -> str:
         """
@@ -406,4 +375,5 @@ Instructions :
 
     async def emit_event(self, event_type: str, data: Dict) -> None:
         """Émet un événement."""
-        await self.event_bus.emit(Event(type=event_type, data=data))
+        if self.event_bus:
+            await self.event_bus.emit(Event(type=event_type, data=data))

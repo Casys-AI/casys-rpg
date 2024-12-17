@@ -1,8 +1,8 @@
-import { component$, useStyles$, useSignal } from '@builder.io/qwik';
+import { component$, useStyles$, useSignal, type QRL } from '@builder.io/qwik';
 
 interface ActionDialogProps {
   message: string;
-  onSubmit$: (action: string) => void;
+  onSubmit$: QRL<(action: string) => void>;
 }
 
 export const ActionDialog = component$<ActionDialogProps>(({ message, onSubmit$ }) => {

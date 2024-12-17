@@ -7,7 +7,7 @@ interface StoryContentProps {
   choices: Choice[];
   onNavigate$: QRL<(sectionNumber: string) => Promise<any>>;
   actionMessage?: string;
-  onAction$?: (action: string) => void;
+  onAction$?: QRL<(action: string) => void>;
 }
 
 export const StoryContent = component$<StoryContentProps>(({ 

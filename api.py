@@ -163,12 +163,27 @@ async def startup_event():
 async def get_game_state(state: GameState = Depends(get_current_state)):
     """Récupère l'état actuel du jeu"""
     try:
-        logger.info("Récupération de l'état du jeu")
-        state = story_graph.get_state()
-        logger.debug(f"État du jeu récupéré : {state.model_dump()}")
-        return GameResponse(state=state.model_dump())
+        logger.info("Début de la route /game/state")
+        logger.debug(f"Story Graph: {story_graph}")
+        
+        logger.info("Appel de story_graph.get_state()")
+        state = await story_graph.get_state()
+        logger.info("Réponse reçue de story_graph.get_state()")
+        logger.debug(f"État reçu: {state}")
+        
+        if isinstance(state, dict):
+            logger.debug("L'état est un dictionnaire")
+            if "error" in state and state["error"] is not None:
+                logger.error(f"Erreur dans l'état: {state['error']}")
+                raise HTTPException(status_code=500, detail=state["error"])
+            logger.info("Retour de l'état")
+            return GameResponse(state=state)
+        
+        logger.info("Conversion de l'état en dictionnaire")
+        return GameResponse(state=state.dict() if hasattr(state, 'dict') else state)
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération de l'état du jeu : {str(e)}")
+        logger.error(f"Erreur détaillée dans /game/state: {str(e)}", exc_info=True)
+        logger.error(f"Type d'erreur: {type(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/game/action")
@@ -177,11 +192,13 @@ async def process_action(action: GameAction):
     global current_game_state
     try:
         logger.info(f"Traitement de l'action : {action}")
-        current_state = {
-            "section_number": current_game_state.section_number,
+        
+        # Convertir l'état complet en dictionnaire et mettre à jour avec la nouvelle action
+        current_state = current_game_state.dict() if current_game_state else {}
+        current_state.update({
             "user_response": action.user_response,
             "dice_result": action.dice_result
-        }
+        })
         
         async for new_state in story_graph.invoke(current_state):
             if "error" in new_state:
@@ -189,7 +206,7 @@ async def process_action(action: GameAction):
                 return GameResponse(state={}, error=new_state["error"])
             
             if "state" in new_state:
-                # Mise à jour du state global
+                # Mise à jour du state global avec le nouvel état complet
                 current_game_state = GameState(**new_state["state"])
                 logger.debug(f"Nouvel état : {new_state['state']}")
                 return GameResponse(state=new_state["state"])

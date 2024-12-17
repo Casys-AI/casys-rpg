@@ -5,6 +5,9 @@ from agents.rules_agent import RulesAgent
 from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+from typing import List
 
 class MockRulesAgent:
     """Mock pour RulesAgent"""
@@ -49,6 +52,38 @@ class MockRulesAgent:
         # Retourner l'état mis à jour
         yield {"state": state}
 
+class MockLLM(BaseChatModel):
+    """Mock pour le LLM"""
+    
+    @property
+    def _llm_type(self) -> str:
+        """Return type of llm."""
+        return "mock"
+
+    def _generate(self, messages: List[BaseMessage], **kwargs):
+        raise NotImplementedError("Use async version")
+
+    async def _agenerate(self, messages: List[BaseMessage], **kwargs):
+        """Mock de la génération de réponse."""
+        # Extraire les règles et la réponse du contexte
+        context = messages[1].content
+        if "trésor" in context.lower() and "gauche" in context.lower():
+            content = '{"analysis": "Le joueur va à gauche et trouve un trésor", "next_section": 2}'
+        else:
+            content = '{"analysis": "Choix de l\'option 1", "next_section": 2}'
+            
+        message = AIMessage(content=content)
+        generation = ChatGeneration(message=message)
+        return ChatResult(generations=[generation])
+
+    def get_num_tokens(self, text: str) -> int:
+        """Get number of tokens."""
+        return 0
+
+    def get_num_tokens_from_messages(self, messages: List[BaseMessage]) -> int:
+        """Get number of tokens from messages."""
+        return 0
+
 @pytest_asyncio.fixture
 async def event_bus():
     return EventBus()
@@ -58,10 +93,15 @@ async def rules_agent(event_bus):
     return MockRulesAgent(event_bus=event_bus)
 
 @pytest_asyncio.fixture
-async def decision_agent(event_bus, rules_agent):
+async def mock_llm():
+    return MockLLM()
+
+@pytest_asyncio.fixture
+async def decision_agent(event_bus, rules_agent, mock_llm):
     config = DecisionConfig(
-        llm=ChatOpenAI(model="gpt-4o-mini"),
-        rules_agent=rules_agent
+        llm=mock_llm,
+        rules_agent=rules_agent,
+        system_prompt="Test prompt"
     )
     return DecisionAgent(
         event_bus=event_bus,
@@ -104,31 +144,30 @@ async def test_decision_agent_with_rules(decision_agent, rules_agent):
     assert "next_section" in state or "error" in state
 
 @pytest.mark.asyncio
-async def test_decision_agent_events(decision_agent, event_bus):
-    """Test l'émission d'événements"""
-    events = []
-    async def event_listener(event):
-        events.append(event)
-
-    # Ajouter des règles pour que _analyze_decision puisse fonctionner
-    decision_agent.current_rules = {
-        "choices": ["Option 1", "Option 2"],
-        "next_sections": [2, 3],
-        "needs_dice": False
+async def test_decision_agent_state_handling(decision_agent):
+    """Test la gestion du state"""
+    # Préparer l'état initial
+    initial_state = {
+        "section_number": 1,
+        "user_response": "Option 1",
+        "rules": {
+            "choices": ["Option 1", "Option 2"],
+            "next_sections": [2, 3],
+            "needs_dice": False
+        }
     }
 
-    await event_bus.subscribe("decision_made", event_listener)
-
-    await decision_agent.invoke({
-        "state": {
-            "section_number": 1,
-            "user_response": "Option 1"
-        }
-    })
-
-    # Vérifier qu'on a reçu l'événement
-    assert len(events) > 0
-    assert events[0].type == "decision_made"
+    # Invoquer l'agent
+    result = await decision_agent.invoke({"state": initial_state})
+    
+    # Vérifier que le state contient les bonnes informations
+    assert "state" in result
+    state = result["state"]
+    assert "next_section" in state
+    assert "analysis" in state
+    assert state["next_section"] in [2, 3]  # Une des sections possibles
+    assert isinstance(state["analysis"], str)  # Une analyse textuelle
+    assert state["awaiting_action"] is None  # Plus d'action requise
 
 @pytest.mark.asyncio
 async def test_decision_agent_invalid_input(decision_agent):

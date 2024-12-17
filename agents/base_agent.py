@@ -6,7 +6,13 @@ import logging
 class BaseAgent:
     """Classe de base pour tous les agents."""
     
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: Optional[EventBus] = None):
+        """
+        Initialise l'agent.
+        
+        Args:
+            event_bus: Bus d'événements optionnel pour le logging et le monitoring
+        """
         self.event_bus = event_bus
         self._setup_logging()
 
@@ -21,7 +27,7 @@ class BaseAgent:
             
     async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
         """Invoke async."""
-        state = await self.event_bus.get_state()
+        state = await self.event_bus.get_state() if self.event_bus else {}
         result = await self.invoke(input_data)
         yield result
 

@@ -47,24 +47,7 @@ cache = {
 - Cache hit behavior
 - Field preservation
 
-### 3. Event System Test
-**Purpose**: Verify event emission and communication
-**Event Format**:
-```json
-{
-    "type": "rules_generated",
-    "data": {
-        "section_number": int,
-        "rules": "rules text"
-    }
-}
-```
-**Integration Points**:
-- EventBus communication
-- Event data structure
-- Event timing
-
-### 4. Input Validation Test
+### 3. Input Validation Test
 **Purpose**: Verify error handling and input validation
 **Error Cases**:
 - Missing section number
@@ -82,7 +65,7 @@ cache = {
 }
 ```
 
-### 5. Dice Roll Detection Test
+### 4. Dice Roll Detection Test
 **Purpose**: Verify dice roll requirement detection
 **Dice Types**:
 - Combat: For battle scenarios
@@ -104,47 +87,63 @@ cache = {
 ## Test Dependencies
 - pytest-asyncio: For async test execution
 - pytest: Test framework
-- langchain_openai: LLM integration
-- EventBus: Event system
+- langchain_community: LLM integration
 
 ## Model Configuration
 - Model: gpt-4o-mini
 - Temperature: 0 (deterministic for rules)
 """
 
+import os
+import json
 import pytest
 import pytest_asyncio
+from unittest.mock import AsyncMock, patch, MagicMock
+from langchain.schema import SystemMessage, AIMessage
 from agents.rules_agent import RulesAgent, RulesConfig
-from event_bus import EventBus, Event
-from langchain_openai import ChatOpenAI
-from langchain.chat_models.base import BaseChatModel
 import asyncio
 import tempfile
-import os
 import shutil
+import logging
+import sys
+from dotenv import load_dotenv
+from langchain_community.chat_models import ChatOpenAI
+
+# Charger les variables d'environnement depuis .env
+load_dotenv()
+
+# Configuration du logging pour les tests
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+class MockLLM:
+    async def ainvoke(self, messages):
+        # Log le prompt reçu
+        logging.debug(f"[MockLLM] Received prompt: {messages[1].content}")
+        
+        # Simuler une réponse du LLM
+        response = {
+            "needs_dice": True,
+            "dice_type": "combat",
+            "next_sections": [2, 3],
+            "conditions": ["Réussir le jet de combat"],
+            "choices": ["Combat"],
+            "rules_summary": "Un combat nécessitant un jet de dés"
+        }
+        
+        # Log la réponse
+        logging.debug(f"[MockLLM] Returning response: {json.dumps(response, indent=2)}")
+        
+        return AIMessage(content=json.dumps(response))
 
 @pytest_asyncio.fixture(scope="function")
 async def event_loop():
-    """
-    Event Loop Fixture
-    
-    Purpose:
-    --------
-    Provides an isolated event loop for each test to ensure clean async execution.
-    
-    Lifecycle:
-    ----------
-    1. Creates new event loop
-    2. Sets as current loop
-    3. Yields for test execution
-    4. Cleans up after test
-    
-    Cleanup Process:
-    ---------------
-    1. Stops loop
-    2. Closes loop
-    3. Resets event loop policy
-    """
+    """Create an instance of the default event loop for each test case."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
@@ -153,197 +152,178 @@ async def event_loop():
         loop.close()
     asyncio.set_event_loop(None)
 
-@pytest_asyncio.fixture
-async def event_bus(event_loop):
-    """
-    Event Bus Fixture
-    
-    Purpose:
-    --------
-    Provides a clean event bus instance for testing event communication.
-    
-    Features:
-    ---------
-    - Isolated event bus per test
-    - Clean event history
-    - Proper async context
-    """
-    return EventBus()
-
-@pytest_asyncio.fixture
-async def rules_dir():
-    """Crée un répertoire temporaire pour les règles de test."""
-    # Créer un répertoire temporaire
-    temp_dir = tempfile.mkdtemp()
-    
-    # Créer un fichier de règles de test
-    rules_content = """
-    {
-        "needs_dice": true,
-        "dice_type": "combat",
-        "choices": ["Attaquer", "Fuir"],
-        "formatted_content": "Test rules content"
-    }
-    """
-    
-    # Créer le fichier de règles pour la section 1
-    os.makedirs(os.path.join(temp_dir, "1"), exist_ok=True)
-    with open(os.path.join(temp_dir, "1", "rules.json"), "w") as f:
-        f.write(rules_content)
-    
-    yield temp_dir
-    
-    # Nettoyer après les tests
-    shutil.rmtree(temp_dir)
-
-@pytest_asyncio.fixture
-async def rules_agent(event_bus, rules_dir):
-    """
-    RulesAgent Fixture
-    
-    Purpose:
-    --------
-    Creates a configured RulesAgent instance for testing.
-    
-    Configuration:
-    -------------
-    - Model: gpt-4o-mini
-    - Event Bus: Clean instance
-    - Rules Directory: test data
-    
-    State:
-    ------
-    - Clean cache
-    - Fresh LLM instance
-    - Isolated event bus
-    """
-    config = RulesConfig(
-        llm=ChatOpenAI(model="gpt-4o-mini"),
-        rules_directory=rules_dir
+@pytest.fixture
+def rules_agent():
+    """Fixture pour le RulesAgent"""
+    config = RulesConfig()
+    config.llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0,
+        openai_api_key=os.getenv("OPENAI_API_KEY")
     )
-    return RulesAgent(
-        event_bus=event_bus,
-        config=config
-    )
+    return RulesAgent(config=config)
+
+@pytest.fixture
+def clean_cache():
+    """Nettoie le cache avant et après les tests"""
+    cache_dir = os.path.join("data", "rules", "cache")
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir)
+    os.makedirs(cache_dir)
+    yield
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir)
 
 @pytest.mark.asyncio
 async def test_rules_agent_basic(rules_agent):
-    """Test de base pour RulesAgent"""
+    """Test basique de l'agent des règles"""
     input_data = {
         "state": {
-            "section_number": 1
+            "section_number": 1,
+            "current_section": {
+                "content": "Test content"
+            }
         }
     }
     
-    result = await rules_agent.invoke(input_data)
-    
-    # Vérification de la structure de base
-    assert "state" in result
-    assert "rules" in result["state"]
-    assert "needs_dice" in result["state"]["rules"]
-    
-    # Vérification des champs attendus dans rules
-    rules = result["state"]["rules"]
-    assert "choices" in rules
-    assert isinstance(rules["choices"], list)
-    assert "dice_type" in rules
-    assert "formatted_content" in rules
+    async for result in rules_agent.ainvoke(input_data):
+        assert "state" in result
+        assert "rules" in result["state"]
+        assert "needs_dice" in result["state"]["rules"]
 
 @pytest.mark.asyncio
-async def test_rules_agent_cache(rules_agent):
-    """Test la mise en cache"""
-    section = 1
-    first_result = None
-    second_result = None
+async def test_rules_agent_cache(rules_agent, clean_cache):
+    """Test du cache sur disque"""
+    input_data = {
+        "state": {
+            "section_number": 1,
+            "current_section": {
+                "content": "Test content"
+            }
+        }
+    }
     
-    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
-        first_result = result
-    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
-        second_result = result
+    # Premier appel - devrait analyser et mettre en cache
+    async for result1 in rules_agent.ainvoke(input_data):
+        assert "rules" in result1["state"]
+        rules1 = result1["state"]["rules"]
     
-    assert first_result["state"] == second_result["state"]
-    assert "source" in second_result and second_result["source"] == "cache"
+    # Deuxième appel - devrait utiliser le cache
+    async for result2 in rules_agent.ainvoke(input_data):
+        assert "rules" in result2["state"]
+        rules2 = result2["state"]["rules"]
+        
+        # Vérifier que les résultats sont identiques
+        assert rules1 == rules2
 
 @pytest.mark.asyncio
-async def test_rules_agent_events(rules_agent, event_bus):
-    """Test l'émission d'événements"""
-    events = []
-    async def event_listener(event):
-        events.append(event)
-
-    await event_bus.subscribe("rules_generated", event_listener)
-    async for _ in rules_agent.ainvoke({"state": {"section_number": 1}}):
-        pass
+async def test_rules_agent_cache_error(rules_agent, clean_cache):
+    """Test de la gestion des erreurs de cache"""
+    input_data = {
+        "state": {
+            "section_number": 999,  # Section inexistante
+            "current_section": {}  # Pas de contenu
+        }
+    }
     
-    assert len(events) > 0
-    assert events[0].type == "rules_generated"
-    assert "rules" in events[0].data
+    async for result in rules_agent.ainvoke(input_data):
+        assert "state" in result
+        assert "rules" in result["state"]
+        assert "error" in result["state"]["rules"]
+        assert "No content found for section 999" in result["state"]["rules"]["error"]
+
+@pytest.mark.asyncio
+async def test_rules_agent_dice_handling(rules_agent):
+    """Test la détection des jets de dés"""
+    test_state = {
+        "state": {
+            "section_number": 1,
+            "current_section": {
+                "content": """
+                Vous devez faire un jet de dés de combat.
+                Si vous réussissez, allez à la section 2.
+                """
+            }
+        }
+    }
+    
+    async for result in rules_agent.ainvoke(test_state):
+        assert "rules" in result["state"]
+        rules = result["state"]["rules"]
+        assert rules["needs_dice"] == True
+        assert rules["dice_type"] == "combat"
+        assert 2 in rules["next_sections"]
+
+@pytest.mark.asyncio
+async def test_rules_agent_invalid_section(rules_agent):
+    """Test avec un numéro de section invalide"""
+    input_data = {
+        "state": {
+            "section_number": -1
+        }
+    }
+    
+    async for result in rules_agent.ainvoke(input_data):
+        assert "state" in result
+        assert "rules" in result["state"]
+        assert "error" in result["state"]["rules"]
+        assert "No content found for section -1" in result["state"]["rules"]["error"]
+
+@pytest.mark.asyncio
+async def test_rules_agent_analyze_content(rules_agent):
+    """Test de l'analyse de contenu"""
+    content = """
+    Vous êtes dans une pièce sombre. Vous pouvez:
+    - Allumer une torche et aller au [[2]]
+    - Continuer dans l'obscurité vers le [[3]]
+    """
+    
+    result = await rules_agent._analyze_rules(1, content)
+    assert isinstance(result, dict)
+    assert "choices" in result
+    assert "next_sections" in result
 
 @pytest.mark.asyncio
 async def test_rules_agent_invalid_input(rules_agent):
     """Test la gestion des entrées invalides"""
     async for result in rules_agent.ainvoke({"state": {}}):
-        assert "error" in result["state"]
-        assert result["state"].get("needs_dice") is False
-        assert result["state"].get("dice_type") is None
+        assert "state" in result
+        assert "rules" in result["state"]
+        assert "error" in result["state"]["rules"]
+        assert "No section number provided" in result["state"]["rules"]["error"]
 
 @pytest.mark.asyncio
-async def test_rules_agent_dice_handling():
-    event_bus = EventBus()
-    rules_agent = RulesAgent(event_bus)
+async def test_rules_agent_state_transmission(rules_agent):
+    """Test que les règles sont correctement transmises dans le state"""
     
-    test_state = {
-        "section_number": 1,
-        "content": "Pour vaincre ce monstre, lancez 2 dés et ajoutez votre score d'HABILETÉ."
-    }
-    
-    result = await rules_agent.invoke({"state": test_state})
-    
-    # Vérifications détaillées
-    assert "state" in result, "Result should contain state"
-    assert "rules" in result["state"], "State should contain rules"
-    rules = result["state"]["rules"]
-    
-    assert rules["needs_dice"] is True, f"Expected needs_dice to be True, got {rules['needs_dice']}"
-    assert rules["dice_type"] == "combat", f"Expected dice_type to be 'combat', got {rules['dice_type']}"
+    async for result in rules_agent.ainvoke({
+        "state": {
+            "section_number": 1,
+            "current_section": {
+                "content": """Dans cette section, vous devez faire un jet de dés de combat.
+                
+Si vous réussissez votre jet de combat, allez à la section 2.
+Si vous échouez, allez à la section 3.
 
-@pytest.mark.asyncio
-async def test_rules_agent_always_analyze(rules_agent, event_bus):
-    """
-    Test que le RulesAgent analyse toujours les règles et émet un événement,
-    même si le contenu est dans le cache.
-    """
-    section = 1
-    events = []
-    
-    async def event_listener(event):
-        events.append(event)
-    
-    await event_bus.subscribe("rules_generated", event_listener)
-    
-    # Premier appel - devrait analyser et mettre en cache
-    first_result = None
-    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
-        first_result = result
-    
-    assert len(events) == 1
-    assert events[0].type == "rules_generated"
-    assert events[0].data["section_number"] == section
-    assert "rules" in events[0].data
-    
-    # Deuxième appel - même si dans le cache, devrait quand même analyser
-    events.clear()
-    second_result = None
-    async for result in rules_agent.ainvoke({"state": {"section_number": section}}):
-        second_result = result
-    
-    # Vérifie que l'événement est toujours émis
-    assert len(events) == 1
-    assert events[0].type == "rules_generated"
-    assert events[0].data["section_number"] == section
-    assert "rules" in events[0].data
-    
-    # Vérifie que les résultats sont cohérents
-    assert first_result["state"]["rules"]["needs_dice"] == second_result["state"]["rules"]["needs_dice"]
-    assert first_result["state"]["rules"]["dice_type"] == second_result["state"]["rules"]["dice_type"]
-    assert first_result["state"]["rules"]["formatted_content"] == second_result["state"]["rules"]["formatted_content"]
+Faites votre choix avec sagesse."""
+            }
+        }
+    }):
+        # Vérifier la structure du state
+        assert "state" in result
+        assert "rules" in result["state"]
+        
+        # Vérifier les champs essentiels des règles
+        rules = result["state"]["rules"]
+        assert "needs_dice" in rules
+        assert "dice_type" in rules
+        assert "next_sections" in rules
+        assert "conditions" in rules
+        assert "choices" in rules
+        
+        # Vérifier les valeurs spécifiques basées sur le contenu
+        assert rules["needs_dice"] == True, "Un jet de dés est requis"
+        assert rules["dice_type"] == "combat", "Le type de dé devrait être combat"
+        assert 2 in rules["next_sections"], "La section 2 devrait être une destination possible"
+        assert 3 in rules["next_sections"], "La section 3 devrait être une destination possible"
+        assert len(rules["next_sections"]) == 2, "Il devrait y avoir exactement 2 sections possibles"

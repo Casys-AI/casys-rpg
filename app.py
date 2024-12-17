@@ -108,7 +108,7 @@ def display_game_content(result):
         st.error(f"Erreur: {result['error']}")
         return
         
-    if "state" not in result or "formatted_content" not in result["state"]:
+    if "state" not in result or "content" not in result["state"]:
         st.error("Erreur: contenu formaté manquant")
         st.write("Contenu du résultat :", result)  # Debug
         return
@@ -141,7 +141,7 @@ def display_game_content(result):
     """, unsafe_allow_html=True)
     
     # Afficher le contenu avec le formatage HTML
-    st.markdown(result["state"]["formatted_content"], unsafe_allow_html=True)
+    st.markdown(result["state"]["content"], unsafe_allow_html=True)
     
     # Afficher les choix dans une section distincte
     st.markdown("### Que souhaitez-vous faire ?")

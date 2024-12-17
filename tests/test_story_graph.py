@@ -63,7 +63,7 @@ async def narrator_agent(event_bus):
     async def mock_ainvoke(state):
         return {
             "state": {
-                "formatted_content": "Test content for section 1",
+                "content": "Test content for section 1",
                 "section_number": 1,
                 "needs_content": False
             }
