@@ -1,12 +1,31 @@
 # Ignorer les fichiers .env
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+htmlcov/
+
+# Environnements virtuels
 .venv/
-.env
+venv/
+ENV/
+
+# IDE
 .vscode/
-*.pdf
+.idea/
+*.swp
+*.swo
+
+# Logs et caches
 game.log
 .pytest_cache/
+.cache/
+
+# Notebooks
 extract_images.ipynb
 extract_metadata.ipynb
 extract_sections.ipynb
@@ -14,3 +33,23 @@ prepare_lorem.ipynb
 1_process_feedback.ipynb
 12_update_rules_index_only_feeback_sections.ipynb
 2_process_rule_and_update_index.ipynb
+*.ipynb
+
+# Fichiers de données générés
+data/trace/
+data/rules/cache/
+data/sections/cache/
+
+# Fichiers de configuration locaux
+.env
+.env.*
+
+# Build et dist
+dist/
+build/
+*.egg-info/
+
+# Autres
+*.pdf
+.DS_Store
+Thumbs.db
