@@ -72,23 +72,42 @@ class RulesAgent(BaseAgent):
             if "rules" in state:
                 rules = state["rules"]
             # Vérifier si le contenu est fourni directement
-            elif "formatted_content" in state:
-                content = state["formatted_content"]
+            elif "content" in state or "formatted_content" in state:
+                content = state.get("content") or state.get("formatted_content")
                 rules_lower = content.lower()
-                needs_dice = "dice" in rules_lower or "roll" in rules_lower or "dés" in rules_lower
-                dice_type = None
                 
+                # Détection des dés
+                dice_keywords = [
+                    "dés", "dé", "dice", "roll", "lancer", "lancez", "tentez",
+                    "jet", "jets", "throw", "rolling"
+                ]
+                
+                combat_keywords = [
+                    "combat", "fight", "battle", "monstre", "creature", "enemy",
+                    "attaquer", "attaque", "combattre", "affronter", "HABILETÉ",
+                    "habileté", "skill"
+                ]
+                
+                needs_dice = any(keyword in rules_lower for keyword in dice_keywords)
+                
+                dice_type = None
                 if needs_dice:
-                    if any(word in rules_lower for word in ["combat", "fight", "battle", "monstre"]):
+                    # Détection du type de jet
+                    if any(keyword in rules_lower for keyword in combat_keywords):
                         dice_type = "combat"
-                    elif any(word in rules_lower for word in ["chance", "luck", "fortune"]):
+                    elif any(word in rules_lower for word in [
+                        "chance", "luck", "fortune", "hasard", "tentez votre chance",
+                        "test your luck", "tenter votre chance"
+                    ]):
                         dice_type = "chance"
                 
                 rules = {
-                    "formatted_content": content,
                     "needs_dice": needs_dice,
                     "dice_type": dice_type,
-                    "choices": ["Continue"]
+                    "conditions": [],
+                    "next_sections": [],
+                    "rules_summary": "",
+                    "choices": ["Continue"] if needs_dice else []
                 }
             # Sinon vérifier le cache
             elif section_number in self.cache:
@@ -177,11 +196,22 @@ Exemples:
                 # self._logger.error(f"Failed to parse LLM response as JSON: {response.content}")
                 # Analyser manuellement si le LLM échoue
                 rules_lower = content.lower()
-                needs_dice = "dés" in rules_lower or "dice" in rules_lower or "roll" in rules_lower
+                dice_keywords = [
+                    "dés", "dé", "dice", "roll", "lancer", "lancez", "tentez",
+                    "jet", "jets", "throw", "rolling"
+                ]
+                
+                combat_keywords = [
+                    "combat", "fight", "battle", "monstre", "creature", "enemy",
+                    "attaquer", "attaque", "combattre", "affronter", "HABILETÉ",
+                    "habileté", "skill"
+                ]
+                
+                needs_dice = any(keyword in rules_lower for keyword in dice_keywords)
                 dice_type = None
                 
                 if needs_dice:
-                    if any(word in rules_lower for word in ["combat", "fight", "battle", "monstre", "monster"]):
+                    if any(keyword in rules_lower for keyword in combat_keywords):
                         dice_type = "combat"
                     elif any(word in rules_lower for word in ["chance", "luck", "fortune"]):
                         dice_type = "chance"

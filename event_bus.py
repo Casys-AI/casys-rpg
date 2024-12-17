@@ -13,7 +13,15 @@ class Event:
     data: Dict[str, Any]
 
 class EventBus:
-    """Event bus for managing game state and events."""
+    """
+    Event bus for managing game state and events.
+    
+    Attributes:
+        _state (Dict): Current game state
+        _subscribers (Dict): Event subscribers
+        _history (List): Event history
+        logger (Logger): Logger instance
+    """
     
     def __init__(self):
         self._state: Dict[str, Any] = {}
@@ -45,6 +53,20 @@ class EventBus:
             await asyncio.gather(
                 *[self._safe_execute(callback, event) for callback in self._subscribers[event.type]]
             )
+            
+    async def emit_agent_result(self, event_type: str, data: Dict):
+        """
+        Emit an agent result event
+        
+        Args:
+            event_type: Type of agent event
+            data: Event data
+        """
+        try:
+            await self.emit(Event(type=event_type, data=data))
+            self.logger.debug(f"Agent event emitted: {event_type}")
+        except Exception as e:
+            self.logger.error(f"Error emitting agent event {event_type}: {str(e)}")
 
     async def _safe_execute(self, callback: Callable[[Event], Awaitable[None]], event: Event):
         """Execute a callback safely."""

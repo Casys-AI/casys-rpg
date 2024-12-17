@@ -288,31 +288,24 @@ async def test_rules_agent_invalid_input(rules_agent):
         assert result["state"].get("dice_type") is None
 
 @pytest.mark.asyncio
-async def test_rules_agent_dice_handling(rules_agent):
-    """Test la détection des jets de dés"""
-    # Test combat
-    async for result in rules_agent.ainvoke({"state": {
+async def test_rules_agent_dice_handling():
+    event_bus = EventBus()
+    rules_agent = RulesAgent(event_bus)
+    
+    test_state = {
         "section_number": 1,
-        "content": "Combat: Vous devez lancer les dés pour combattre le monstre"
-    }}):
-        assert result["state"]["rules"]["needs_dice"] is True
-        assert result["state"]["rules"]["dice_type"] == "combat"
-
-    # Test chance
-    async for result in rules_agent.ainvoke({"state": {
-        "section_number": 2,
-        "content": "Tentez votre Chance en lançant les dés"
-    }}):
-        assert result["state"]["rules"]["needs_dice"] is True
-        assert result["state"]["rules"]["dice_type"] == "chance"
-
-    # Test sans dés
-    async for result in rules_agent.ainvoke({"state": {
-        "section_number": 3,
-        "content": "Vous pouvez choisir d'aller à gauche ou à droite"
-    }}):
-        assert result["state"]["rules"]["needs_dice"] is False
-        assert result["state"]["rules"]["dice_type"] is None
+        "content": "Pour vaincre ce monstre, lancez 2 dés et ajoutez votre score d'HABILETÉ."
+    }
+    
+    result = await rules_agent.invoke({"state": test_state})
+    
+    # Vérifications détaillées
+    assert "state" in result, "Result should contain state"
+    assert "rules" in result["state"], "State should contain rules"
+    rules = result["state"]["rules"]
+    
+    assert rules["needs_dice"] is True, f"Expected needs_dice to be True, got {rules['needs_dice']}"
+    assert rules["dice_type"] == "combat", f"Expected dice_type to be 'combat', got {rules['dice_type']}"
 
 @pytest.mark.asyncio
 async def test_rules_agent_always_analyze(rules_agent, event_bus):

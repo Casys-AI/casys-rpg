@@ -59,23 +59,101 @@ class NarratorAgent(BaseAgent):
             Dict: Nouvel état avec le contenu formaté
         """
         try:
-            # Initialiser le GameState
-            game_state = GameState(**state)
+            # Extraire les valeurs clés de l'état, quel que soit le format
+            section_number = state.get("section_number", state.get("sectionNumber", 1))
+            needs_content = state.get("needs_content", True)
+            current_content = state.get("content", state.get("current_section", {}).get("content", None))
             
-            # Vérifier d'abord le cache
-            cache_path = os.path.join(self.content_directory, "cache", f"{game_state.section_number}_cached.md")
+            # Si c'est la section 1 et qu'il n'y a pas de contenu, utiliser le message de bienvenue
+            if section_number == 1 and needs_content:
+                raw_content = """# Bienvenue dans Casys RPG !
+
+Vous êtes sur le point de commencer une aventure extraordinaire. 
+Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
+
+## Votre Personnage
+- **Habileté**: 10
+- **Endurance**: 20
+- **Chance**: 8
+
+## Ressources
+- Or: 100 pièces
+- Gemmes: 5
+
+## Inventaire
+- Épée
+- Bouclier
+
+*Prêt à commencer votre quête ?*"""
+                
+                # Formater le contenu de bienvenue
+                formatted_content = await self._format_content(raw_content)
+                
+                # Retourner l'état dans le bon format
+                if "current_section" in state:
+                    return {
+                        "state": {
+                            "section_number": section_number,
+                            "current_section": {
+                                "number": section_number,
+                                "content": formatted_content,  # Utiliser le contenu formaté directement
+                                "choices": []
+                            },
+                            "needs_content": False
+                        }
+                    }
+                else:
+                    return {
+                        "state": {
+                            "sectionNumber": section_number,
+                            "content": formatted_content,  # Utiliser le contenu formaté directement
+                            "choices": [],
+                            "needs_content": False
+                        }
+                    }
+            
+            # Pour les autres sections, vérifier d'abord le cache
+            cache_path = os.path.join(self.content_directory, "cache", f"{section_number}_cached.md")
             if os.path.exists(cache_path):
-                self._logger.debug(f"Utilisation du contenu en cache pour la section {game_state.section_number}")
+                self._logger.debug(f"Utilisation du contenu en cache pour la section {section_number}")
                 with open(cache_path, "r", encoding="utf-8") as f:
                     formatted_content = f.read()
+                    raw_content = formatted_content  # Pour le moment, on garde le même contenu
             else:
                 # Si pas dans le cache, charger et formater
-                content = await self._load_section_content(game_state.section_number)
-                if content is None:
-                    raise ValueError(f"Section {game_state.section_number} not found")
+                raw_content = await self._load_section_content(section_number)
+                if raw_content is None:
+                    error_msg = f"Section {section_number} introuvable"
+                    self._logger.error(error_msg)
+                    error_html = f"<p>{error_msg}</p>"
+                    # Retourner l'erreur dans le bon format
+                    if "current_section" in state:
+                        return {
+                            "state": {
+                                "section_number": section_number,
+                                "current_section": {
+                                    "number": section_number,
+                                    "content": error_msg,
+                                    "choices": []
+                                },
+                                "formatted_content": error_html,
+                                "content": error_html,
+                                "needs_content": True
+                            }
+                        }
+                    else:
+                        return {
+                            "state": {
+                                "sectionNumber": section_number,
+                                "content": error_html,
+                                "raw_content": error_msg,
+                                "choices": [],
+                                "needs_content": True
+                            }
+                        }
                     
                 # Formater le contenu
-                formatted_content = await self._format_content(content)
+                formatted_content = await self._format_content(raw_content)
                 
                 # Sauvegarder dans le cache
                 try:
@@ -85,15 +163,58 @@ class NarratorAgent(BaseAgent):
                 except Exception as e:
                     self._logger.error(f"Erreur lors de la sauvegarde dans le cache: {str(e)}")
             
-            # Mettre à jour l'état
-            game_state.formatted_content = formatted_content
-            game_state.needs_content = False
-            
-            return {"state": game_state.model_dump()}
+            # Retourner l'état dans le bon format
+            if "current_section" in state:
+                return {
+                    "state": {
+                        "section_number": section_number,
+                        "current_section": {
+                            "number": section_number,
+                            "content": formatted_content,  # Utiliser le contenu formaté directement
+                            "choices": []
+                        },
+                        "needs_content": False
+                    }
+                }
+            else:
+                return {
+                    "state": {
+                        "sectionNumber": section_number,
+                        "content": formatted_content,  # Utiliser le contenu formaté directement
+                        "choices": [],
+                        "needs_content": False
+                    }
+                }
             
         except Exception as e:
-            self._logger.error(f"Error in NarratorAgent.invoke: {str(e)}")
-            raise
+            error_msg = f"Erreur dans NarratorAgent.invoke: {str(e)}"
+            self._logger.error(error_msg)
+            error_html = f"<p>{error_msg}</p>"
+            # Retourner l'erreur dans le bon format
+            if "current_section" in state:
+                return {
+                    "state": {
+                        "section_number": state.get("section_number", 1),
+                        "current_section": {
+                            "number": state.get("section_number", 1),
+                            "content": error_msg,
+                            "choices": []
+                        },
+                        "formatted_content": error_html,
+                        "content": error_html,
+                        "needs_content": True
+                    }
+                }
+            else:
+                return {
+                    "state": {
+                        "sectionNumber": state.get("sectionNumber", 1),
+                        "content": error_html,
+                        "raw_content": error_msg,
+                        "choices": [],
+                        "needs_content": True
+                    }
+                }
 
     async def _load_section_content(self, section_number: int, use_cache: bool = False) -> Optional[str]:
         """
@@ -202,7 +323,7 @@ Instructions :
                 }
                 return
                 
-            section_number = state.get("section_number", 1)
+            section_number = state.get("section_number", state.get("sectionNumber", 1))
             use_cache = state.get("use_cache", False)
             
             # Charger le contenu avec gestion du cache
