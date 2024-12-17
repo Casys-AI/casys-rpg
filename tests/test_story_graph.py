@@ -175,12 +175,9 @@ async def test_story_graph_user_response_without_dice(story_graph):
 @pytest.mark.asyncio
 async def test_story_graph_error_handling(story_graph):
     """Test de la gestion des erreurs dans le StoryGraph."""
+    # Créer un mock d'agent qui lève une exception
     error_agent = AsyncMock()
-    
-    async def mock_invoke(state):
-        raise Exception("Test error")
-    
-    error_agent.invoke = mock_invoke
+    error_agent.invoke = AsyncMock(side_effect=Exception("Test error"))
     
     # Remplacer tous les agents par notre mock qui lève une exception
     story_graph.narrator = error_agent
@@ -189,12 +186,28 @@ async def test_story_graph_error_handling(story_graph):
     story_graph.trace = error_agent
     
     state = {
-        "section_number": 1,
-        "error": None,
-        "needs_content": True
+        "process_section": {
+            "section_number": 1,
+            "current_section": "test_section",
+            "content": "test content",
+            "error": None,
+            "needs_content": True,
+            "trace": {
+                "stats": {},
+                "history": [],
+                "identifier": "test"
+            }
+        }
     }
     
+    error_found = False
     async for result in story_graph.invoke(state):
-        assert isinstance(result.get("error"), str)
-        assert "Test error" in result.get("error")
-        break
+        # L'erreur est soit directement dans result, soit dans result["state"]
+        error = result.get("error") or result.get("state", {}).get("error")
+        if error:
+            assert isinstance(error, str)
+            assert "Test error" in error
+            error_found = True
+            break
+    
+    assert error_found, "No error was propagated"

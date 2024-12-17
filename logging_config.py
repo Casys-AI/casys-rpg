@@ -11,7 +11,7 @@ LOGGING_CONFIG = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'level': 'ERROR',
+            'level': 'DEBUG',
             'formatter': 'standard',
             'stream': 'ext://sys.stdout'
         }
@@ -19,22 +19,22 @@ LOGGING_CONFIG = {
     'loggers': {
         '': {  # root logger
             'handlers': ['console'],
-            'level': 'ERROR',
+            'level': 'DEBUG',
             'propagate': True
         },
         'app': {  # logger spécifique pour app.py
             'handlers': ['console'],
-            'level': 'ERROR',
+            'level': 'DEBUG',
             'propagate': False
         },
         'agents': {  # logger pour tous les agents
             'handlers': ['console'],
-            'level': 'ERROR',
+            'level': 'DEBUG',
             'propagate': False
         },
         'story_graph': {  # logger pour story_graph.py
             'handlers': ['console'],
-            'level': 'ERROR',
+            'level': 'DEBUG',
             'propagate': False
         },
         'openai': {  # logger pour les appels OpenAI
