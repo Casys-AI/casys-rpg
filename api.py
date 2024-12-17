@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from agents.story_graph import StoryGraph
@@ -11,17 +12,17 @@ import asyncio
 from dotenv import load_dotenv
 from logging_config import setup_logging
 
+# Configuration du logging
+setup_logging()
+logger = logging.getLogger('api')
+
 # Chargement des variables d'environnement
 load_dotenv()
 
 # Configuration de l'API
-API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_HOST = os.getenv("API_HOST", "127.0.0.1")  # Utiliser IPv4
 API_PORT = int(os.getenv("API_PORT", "8000"))
 API_DEBUG = os.getenv("API_DEBUG", "True").lower() == "true"
-
-# Configuration du logging
-setup_logging()
-logger = logging.getLogger('api')
 
 # Configuration des chemins
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +34,15 @@ app = FastAPI(
     title="Casys RPG API",
     description="API pour le jeu de rôle Casys RPG",
     version="1.0.0"
+)
+
+# Configuration CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # URL du frontend Qwik
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Modèles Pydantic pour les requêtes
@@ -54,54 +64,111 @@ class FeedbackRequest(BaseModel):
 story_graph = None
 current_game_state = None
 
+# Dépendance pour obtenir le state
+async def get_current_state():
+    """Dépendance FastAPI pour obtenir l'état actuel du jeu"""
+    global current_game_state
+    if current_game_state is None:
+        # Vérifier si le contenu en cache existe pour la section 1
+        cache_path = os.path.join(BASE_DIR, "data/sections/cache/1_cached.md")
+        content = None
+        
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    logger.info("Contenu formaté chargé depuis le cache")
+            except Exception as e:
+                logger.error(f"Erreur lors de la lecture du cache: {str(e)}")
+        
+        if not content:
+            content = """# Bienvenue dans Casys RPG !
+
+Vous êtes sur le point de commencer une aventure extraordinaire. 
+Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
+
+## Votre Personnage
+- **Habileté**: 10
+- **Endurance**: 20
+- **Chance**: 8
+
+## Ressources
+- Or: 100 pièces
+- Gemmes: 5
+
+## Inventaire
+- Épée
+- Bouclier
+
+*Prêt à commencer votre quête ?*"""
+        
+        current_game_state = GameState(
+            section_number=1,
+            current_section={
+                "number": 1,
+                "content": content,  # Contenu déjà formaté
+                "choices": []
+            },
+            trace={
+                "stats": {
+                    "Caractéristiques": {
+                        "Habileté": 10,
+                        "Endurance": 20,
+                        "Chance": 8
+                    },
+                    "Ressources": {
+                        "Or": 100,
+                        "Gemme": 5
+                    },
+                    "Inventaire": {
+                        "Objets": ["Épée", "Bouclier"]
+                    }
+                },
+                "history": []
+            },
+            needs_content=False
+        )
+    return current_game_state
+
 # Initialisation asynchrone des composants
 async def init_components():
     """Initialise les composants qui nécessitent une boucle asyncio"""
     global story_graph, current_game_state
     
-    story_graph = StoryGraph()
-    await story_graph.initialize()  # Méthode à ajouter dans StoryGraph
-    
-    current_game_state = GameState(
-        section_number=1,
-        trace={
-            "stats": {
-                "Caractéristiques": {
-                    "Habileté": 10,
-                    "Endurance": 20,
-                    "Chance": 8
-                },
-                "Ressources": {
-                    "Or": 100,
-                    "Gemme": 5
-                },
-                "Inventaire": {
-                    "Objets": ["Épée", "Bouclier"]
-                }
-            }
-        }
-    )
+    try:
+        story_graph = StoryGraph()
+        success = await story_graph.initialize()
+        if not success:
+            logger.error("Failed to initialize StoryGraph")
+            raise RuntimeError("Failed to initialize game components")
+            
+        current_game_state = await get_current_state()
+        logger.info("Game components initialized successfully")
+    except Exception as e:
+        logger.error(f"Error during initialization: {str(e)}")
+        raise RuntimeError(f"Failed to initialize game components: {str(e)}")
 
 @app.on_event("startup")
 async def startup_event():
     """Événement de démarrage de FastAPI"""
-    await init_components()
+    try:
+        await init_components()
+        logger.info("API started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start API: {str(e)}")
+        raise RuntimeError(f"Failed to start API: {str(e)}")
 
 # Routes
-@app.get("/game/state")
-async def get_game_state():
+@app.get("/game/state", response_model=GameResponse)
+async def get_game_state(state: GameState = Depends(get_current_state)):
     """Récupère l'état actuel du jeu"""
     try:
-        logger.debug("Récupération de l'état du jeu")
-        return GameResponse(
-            state={
-                "section_number": current_game_state.section_number,
-                "current_section": current_game_state.current_section,
-                "character_stats": current_game_state.character_stats
-            }
-        )
+        logger.info("Récupération de l'état du jeu")
+        state = story_graph.get_state()
+        logger.debug(f"État du jeu récupéré : {state.model_dump()}")
+        return GameResponse(state=state.model_dump())
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération de l'état: {str(e)}")
+        logger.error(f"Erreur lors de la récupération de l'état du jeu : {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/game/action")
@@ -109,7 +176,7 @@ async def process_action(action: GameAction):
     """Traite une action du joueur"""
     global current_game_state
     try:
-        logger.debug(f"Traitement de l'action: {action}")
+        logger.info(f"Traitement de l'action : {action}")
         current_state = {
             "section_number": current_game_state.section_number,
             "user_response": action.user_response,
@@ -118,32 +185,84 @@ async def process_action(action: GameAction):
         
         async for new_state in story_graph.invoke(current_state):
             if "error" in new_state:
-                logger.error(f"Erreur dans le traitement: {new_state['error']}")
+                logger.error(f"Erreur dans le traitement : {new_state['error']}")
                 return GameResponse(state={}, error=new_state["error"])
             
             if "state" in new_state:
                 # Mise à jour du state global
                 current_game_state = GameState(**new_state["state"])
-                logger.debug(f"Nouvel état: {new_state['state']}")
+                logger.debug(f"Nouvel état : {new_state['state']}")
                 return GameResponse(state=new_state["state"])
                 
     except Exception as e:
-        logger.error(f"Erreur lors du traitement de l'action: {str(e)}")
+        logger.error(f"Erreur lors du traitement de l'action : {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/game/reset")
 async def reset_game():
     """Réinitialise le jeu"""
     try:
-        logger.debug("Réinitialisation du jeu")
+        logger.info("Réinitialisation du jeu")
         global current_game_state
+        
+        # Vérifier si le contenu en cache existe pour la section 1
+        cache_path = os.path.join(BASE_DIR, "data/sections/cache/1_cached.md")
+        content = None
+        
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    logger.info("Contenu formaté chargé depuis le cache")
+            except Exception as e:
+                logger.error(f"Erreur lors de la lecture du cache: {str(e)}")
+        
+        if not content:
+            content = """# Bienvenue dans Casys RPG !
+
+Vous êtes sur le point de commencer une aventure extraordinaire. 
+Dans ce jeu interactif, vos choix détermineront le cours de l'histoire.
+
+## Votre Personnage
+- **Habileté**: 10
+- **Endurance**: 20
+- **Chance**: 8
+
+## Ressources
+- Or: 100 pièces
+- Gemmes: 5
+
+## Inventaire
+- Épée
+- Bouclier
+
+*Prêt à commencer votre quête ?*"""
+
         initial_state = {
             "section_number": 1,
-            "content": None,
-            "rules": None,
-            "decision": None,
-            "error": None,
-            "needs_content": True
+            "current_section": {
+                "number": 1,
+                "content": content,
+                "choices": []
+            },
+            "trace": {
+                "stats": {
+                    "Caractéristiques": {
+                        "Habileté": 10,
+                        "Endurance": 20,
+                        "Chance": 8
+                    },
+                    "Ressources": {
+                        "Or": 100,
+                        "Gemme": 5
+                    },
+                    "Inventaire": {
+                        "Objets": ["Épée", "Bouclier"]
+                    }
+                },
+                "history": []
+            },
+            "needs_content": False
         }
         
         async for new_state in story_graph.invoke(initial_state):

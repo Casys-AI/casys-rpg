@@ -30,6 +30,12 @@ class StateManager:
     def __init__(self, event_bus: EventBus):
         """Initialize StateManager with event bus."""
         self.event_bus = event_bus
+        self._state = None
+
+    async def initialize(self):
+        """Initialize the state manager and create initial state."""
+        self._state = await self.initialize_state()
+        return self._state
 
     async def initialize_state(self) -> Dict:
         """
@@ -41,15 +47,15 @@ class StateManager:
         try:
             initial_state = GameState(
                 section_number=1,
-                formatted_content="Test content for section 1",
+                formatted_content="Bienvenue dans Casys RPG !",
                 current_section={
                     "number": 1,
-                    "content": "Test content for section 1",
+                    "content": "Bienvenue dans Casys RPG !",
                     "choices": [],
                     "stats": {}
                 },
                 rules={
-                    "needs_dice": True,
+                    "needs_dice": False,
                     "dice_type": "normal",
                     "conditions": [],
                     "next_sections": [],
@@ -59,15 +65,33 @@ class StateManager:
                     "awaiting_action": "user_input",
                     "section_number": 1
                 },
-                stats=None,
+                stats={},
                 history=[],
                 error=None,
                 needs_content=True,
                 user_response=None,
                 dice_result=None,
-                trace=self._get_default_trace()
+                trace={
+                    "stats": {
+                        "Caractéristiques": {
+                            "Habileté": 10,
+                            "Chance": 5,
+                            "Endurance": 8
+                        },
+                        "Ressources": {
+                            "Or": 100,
+                            "Gemme": 5
+                        },
+                        "Inventaire": {
+                            "Objets": ["Épée", "Bouclier"]
+                        }
+                    },
+                    "history": []
+                },
+                debug=False
             )
             validated_state = initial_state.model_dump()
+            self._state = validated_state
             await self.event_bus.update_state(validated_state)
             return validated_state
         except Exception as e:
@@ -84,8 +108,52 @@ class StateManager:
         Returns:
             Dict: Updated state with initialized trace
         """
-        if not state.get("trace") or "stats" not in state.get("trace", {}):
-            state["trace"] = self._get_default_trace()
+        if not state.get("trace"):
+            # S'assurer que nous avons tous les champs requis
+            default_state = {
+                "section_number": state.get("section_number", 1),
+                "current_section": state.get("current_section", {
+                    "number": 1,
+                    "content": None,
+                    "choices": [],
+                    "stats": {}
+                }),
+                "formatted_content": state.get("formatted_content"),
+                "rules": state.get("rules", {
+                    "needs_dice": False,
+                    "dice_type": "normal",
+                    "conditions": [],
+                    "next_sections": [],
+                    "rules_summary": ""
+                }),
+                "decision": state.get("decision", {
+                    "awaiting_action": "user_input",
+                    "section_number": 1
+                }),
+                "error": state.get("error"),
+                "needs_content": state.get("needs_content", True),
+                "trace": {
+                    "stats": {
+                        "Caractéristiques": {
+                            "Habileté": 10,
+                            "Chance": 5,
+                            "Endurance": 8
+                        },
+                        "Ressources": {
+                            "Or": 100,
+                            "Gemme": 5
+                        },
+                        "Inventaire": {
+                            "Objets": ["Épée", "Bouclier"]
+                        }
+                    },
+                    "history": []
+                }
+            }
+            
+            # Mettre à jour l'état avec les valeurs par défaut
+            state.update(default_state)
+            
             try:
                 # Validate with Pydantic
                 validated_state = GameState(**state)
@@ -182,17 +250,29 @@ class AgentManager:
         state_manager (StateManager): State management
     """
     
-    def __init__(self, narrator, rules, decision, trace, event_bus: EventBus, state_manager: StateManager):
+    def __init__(self, narrator=None, rules=None, decision=None, trace=None, event_bus=None, state_manager=None):
+        """Initialize AgentManager with all components."""
         self.narrator = narrator
         self.rules = rules
         self.decision = decision
         self.trace = trace
         self.event_bus = event_bus
         self.state_manager = state_manager
-        
+
+    async def initialize(self, narrator=None, rules=None, decision=None, trace=None):
+        """Initialize with agent instances if not provided in constructor."""
+        if narrator:
+            self.narrator = narrator
+        if rules:
+            self.rules = rules
+        if decision:
+            self.decision = decision
+        if trace:
+            self.trace = trace
+
     async def process_section(self, section_number: int, content: str) -> Dict:
         """
-        Process a new section through all agents
+        Process a complete section through all agents.
         
         Args:
             section_number: Section number to process
@@ -201,7 +281,10 @@ class AgentManager:
         Returns:
             Dict: Updated game state
         """
+        # Update section state first
         await self.state_manager.update_section_state(section_number, content)
+        
+        # Get updated state
         state = await self.event_bus.get_state()
         
         # Run narrator and rules agents in parallel
@@ -266,14 +349,21 @@ class AgentManager:
                     return decision_result
             return state.copy()
         except Exception as e:
-            logger.error(f"Error in DecisionAgent: {str(e)}")
+            logger.error(f"Error in DecisionAgent: {str(e)}", exc_info=True)
             return {"error": str(e)}
-            
+
     async def handle_user_choice(self, choice: str):
         """Handle user choice"""
-        state = await self.event_bus.get_state()
-        state["user_response"] = choice
-        await self.event_bus.update_state(state)
+        try:
+            state = await self.event_bus.get_state()
+            if not state:
+                state = {'section_number': 1}
+            state["user_response"] = choice
+            await self.event_bus.update_state(state)
+            return state
+        except Exception as e:
+            logger.error(f"Error handling user choice: {str(e)}")
+            return {"error": f"Error handling user choice: {str(e)}"}
 
 class CacheManager:
     """

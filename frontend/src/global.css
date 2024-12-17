@@ -10,6 +10,39 @@
   --qwik-dirty-black: #1d2033;
   --qwik-dark-background: #151934;
   --qwik-dark-text: #ffffff;
+  
+  /* Couleurs */
+  --color-paper: #fff;
+  --color-ink: #2c3e50;
+  --color-ink-dark: #1a2634;
+  --color-ink-light: #95a5a6;
+  --color-primary: #3498db;
+  --color-primary-dark: #2980b9;
+  
+  /* Espacement */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  /* Typographie */
+  --font-primary: 'Crimson Text', Georgia, serif;
+  --font-secondary: 'Cinzel', serif;
+  
+  /* Bordures et ombres */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Réinitialisation */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 html {
@@ -27,4 +60,62 @@ body {
   padding: 0;
   margin: 0;
   line-height: inherit;
+  font-family: var(--font-primary);
+  color: var(--color-ink);
+  line-height: 1.6;
+  background-color: #f5f6fa;
 }
+
+/* Styles de base */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-secondary);
+  color: var(--color-ink-dark);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-primary-dark);
+}
+
+/* Styles des boutons */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Styles des conteneurs */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+}
+
+/* Utilitaires */
+.text-center {
+  text-align: center;
+}
+
+.mb-1 { margin-bottom: var(--spacing-sm); }
+.mb-2 { margin-bottom: var(--spacing-md); }
+.mb-3 { margin-bottom: var(--spacing-lg); }
+.mb-4 { margin-bottom: var(--spacing-xl); }

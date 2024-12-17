@@ -1,52 +1,84 @@
 from typing import Dict, Optional, Any, List
-from pydantic import BaseModel, ConfigDict, field_validator, computed_field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field
 import copy
 
 class GameState(BaseModel):
-    """État du jeu pour le StateGraph."""
-    section_number: int = 1
-    current_section: Dict[str, Any] = {
-        "number": 1,
-        "content": None,
-        "choices": [],
-        "stats": {}
-    }
-    formatted_content: Optional[str] = None
-    rules: Dict[str, Any] = {
-        "needs_dice": False,
-        "dice_type": "normal",
-        "conditions": [],
-        "next_sections": [],
-        "rules_summary": ""
-    }
-    decision: Dict[str, Any] = {
-        "awaiting_action": "user_input",
-        "section_number": 1
-    }
-    stats: Dict[str, Any] = {}
-    history: List[Dict[str, Any]] = []
-    error: Optional[str] = None
-    needs_content: bool = True
-    user_response: Optional[str] = None
-    dice_result: Optional[Dict[str, Any]] = None
-    trace: Dict[str, Any] = {
-        "stats": {
-            "Caractéristiques": {
-                "Habileté": 10,
-                "Chance": 5,
-                "Endurance": 8
-            },
-            "Ressources": {
-                "Or": 100,
-                "Gemme": 5
-            },
-            "Inventaire": {
-                "Objets": ["Épée", "Bouclier"]
-            }
+    """Modèle Pydantic pour l'état du jeu."""
+    section_number: int = Field(default=1, description="Numéro de la section actuelle")
+    current_section: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "number": 1,
+            "content": "",  # Contenu formaté de la section
+            "choices": [],
+            "stats": {}
         },
-        "history": []
-    }
-    debug: bool = False
+        description="Section actuelle avec son contenu formaté et ses choix"
+    )
+    rules: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "needs_dice": False,
+            "dice_type": "normal",
+            "conditions": [],
+            "next_sections": [],
+            "rules_summary": ""
+        },
+        description="Règles de la section actuelle"
+    )
+    decision: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "awaiting_action": "user_input",
+            "section_number": 1
+        },
+        description="État de la décision en cours"
+    )
+    stats: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Statistiques du personnage"
+    )
+    history: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Historique des actions"
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Message d'erreur éventuel"
+    )
+    needs_content: bool = Field(
+        default=True,
+        description="Indique si la section a besoin de contenu"
+    )
+    user_response: Optional[str] = Field(
+        default=None,
+        description="Réponse de l'utilisateur"
+    )
+    dice_result: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Résultat du lancer de dés"
+    )
+    trace: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "stats": {
+                "Caractéristiques": {
+                    "Habileté": 10,
+                    "Chance": 5,
+                    "Endurance": 8
+                },
+                "Ressources": {
+                    "Or": 100,
+                    "Gemme": 5
+                },
+                "Inventaire": {
+                    "Objets": ["Épée", "Bouclier"]
+                }
+            },
+            "history": []
+        },
+        description="Trace du jeu pour le suivi"
+    )
+    debug: bool = Field(
+        default=False,
+        description="Mode debug activé ou non"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

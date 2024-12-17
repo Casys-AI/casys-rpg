@@ -153,37 +153,18 @@ async def process_user_input():
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("Valider") and st.session_state.user_response:
-            try:
-                # Sauvegarder la section actuelle avant de passer à la suivante
-                current = st.session_state.game_state.current_section
-                if "content" in current:
-                    st.session_state.previous_section = current
-                
-                # Traiter la réponse de l'utilisateur via le StoryGraph
-                story_graph = st.session_state.story_graph
-                current_state = {
-                    "section_number": st.session_state.game_state.section_number,
-                    "user_response": st.session_state.user_response,
-                    "dice_result": st.session_state.dice_result
-                }
-                
-                # Traiter l'état via le StoryGraph
-                async for new_state in story_graph.invoke(current_state):
-                    if "error" in new_state:
-                        st.error(new_state["error"])
-                        return
-                    
-                    if "state" in new_state:
-                        # Mettre à jour l'état du jeu
-                        st.session_state.game_state = GameState(**new_state["state"])
-                        # Nettoyer la réponse utilisateur
-                        st.session_state.user_response = None
-                        st.rerun()
-                        return
-                        
-            except Exception as e:
-                st.error(f"Une erreur s'est produite: {str(e)}")
-                
+            # Sauvegarder la section actuelle avant de passer à la suivante
+            current = await st.session_state.game_state.get_current_section()
+            if "content" in current:
+                st.session_state.previous_section = current
+            
+            result = await st.session_state.game_state.process_response(st.session_state.user_response)
+            if "error" in result:
+                st.error(result["error"])
+            else:
+                # Nettoyer la saisie et remonter en haut
+                st.session_state.user_response = ""
+                st.rerun()
     with col2:
         if st.button("Donner un feedback"):
             st.session_state.feedback_mode = True

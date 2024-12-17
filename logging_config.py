@@ -7,34 +7,37 @@ LOGGING_CONFIG = {
         'standard': {
             'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         },
+        'detailed': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+        }
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'level': 'DEBUG',
-            'formatter': 'standard',
+            'formatter': 'detailed',
             'stream': 'ext://sys.stdout'
         }
     },
     'loggers': {
         '': {  # root logger
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True
         },
-        'app': {  # logger spécifique pour app.py
+        'api': {  # logger spécifique pour api.py
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False
         },
         'agents': {  # logger pour tous les agents
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False
         },
         'story_graph': {  # logger pour story_graph.py
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': False
         },
         'openai': {  # logger pour les appels OpenAI

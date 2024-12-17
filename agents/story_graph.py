@@ -37,50 +37,38 @@ class StoryGraph(BaseAgent):
 
     def __init__(
         self,
-        narrator_agent=None,
-        rules_agent=None,
-        decision_agent=None,
-        trace_agent=None,
+        event_bus: Optional[EventBus] = None,
+        narrator_agent: Optional[NarratorAgent] = None,
+        rules_agent: Optional[RulesAgent] = None,
+        decision_agent: Optional[DecisionAgent] = None,
+        trace_agent: Optional[TraceAgent] = None
     ):
-        """Initialise le graphe d'histoire."""
-        self.event_bus = EventBus()
+        """Initialize StoryGraph with agents and managers."""
+        # Initialize event bus and base
+        event_bus = event_bus or EventBus()
+        super().__init__(event_bus)
         
-        # Les agents seront initialisés dans initialize()
-        self._narrator = narrator_agent
-        self._rules = rules_agent
-        self._decision = decision_agent
-        self._trace = trace_agent
+        # Initialize agents
+        self.narrator = narrator_agent or NarratorAgent(event_bus=self.event_bus)
+        self.rules = rules_agent or RulesAgent(event_bus=self.event_bus)
+        self.decision = decision_agent or DecisionAgent(event_bus=self.event_bus)
+        self.trace = trace_agent or TraceAgent(event_bus=self.event_bus)
         
-        self.logger = logging.getLogger(__name__)
-
-    async def initialize(self):
-        """Initialise les agents de manière asynchrone"""
-        try:
-            self.logger.debug("Initialisation des agents...")
-            
-            # Initialiser les agents si non fournis
-            if not self._narrator:
-                from agents.narrator_agent import NarratorAgent
-                self._narrator = NarratorAgent(event_bus=self.event_bus)
-                
-            if not self._rules:
-                from agents.rules_agent import RulesAgent
-                self._rules = RulesAgent(event_bus=self.event_bus)
-                
-            if not self._decision:
-                from agents.decision_agent import DecisionAgent
-                self._decision = DecisionAgent(event_bus=self.event_bus)
-                await self._decision._setup_events()  # Initialisation asynchrone
-                
-            if not self._trace:
-                from agents.trace_agent import TraceAgent
-                self._trace = TraceAgent(event_bus=self.event_bus)
-            
-            self.logger.debug("Agents initialisés avec succès")
-            
-        except Exception as e:
-            self.logger.error(f"Erreur lors de l'initialisation des agents: {str(e)}")
-            raise
+        # Initialize managers
+        self.state_manager = StateManager(event_bus)
+        self.agent_manager = AgentManager(
+            self.narrator, 
+            self.rules, 
+            self.decision, 
+            self.trace, 
+            event_bus,
+            self.state_manager
+        )
+        self.cache_manager = CacheManager()
+        self.stats_manager = StatsManager(event_bus)
+        
+        # Setup state graph
+        self.graph = self._setup_graph()
 
     def _setup_graph(self) -> StateGraph:
         """Setup the state graph for game flow."""
@@ -179,10 +167,6 @@ class StoryGraph(BaseAgent):
                 
                 if content_result.get("error"):
                     return content_result
-                
-                # Extract content from narrator response
-                if "state" in content_result:
-                    content_result = content_result["state"]
                     
                 # Then process through rules agent
                 rules_result = await self.rules.invoke({
@@ -193,15 +177,11 @@ class StoryGraph(BaseAgent):
                 if rules_result.get("error"):
                     return rules_result
                     
-                # Extract rules from rules response
-                if "state" in rules_result:
-                    rules_result = rules_result["state"]
-                    
                 # Merge results without duplicating state
                 merged_state = {
                     **state,
                     "content": content_result.get("content"),
-                    "formatted_content": content_result.get("formatted_content"),
+                    "formatted_content": content_result.get("formatted_content", ""),
                     "rules": rules_result.get("rules", {}),
                     "decision": rules_result.get("decision", {}),
                     "needs_content": False
@@ -336,35 +316,58 @@ class StoryGraph(BaseAgent):
             
         return True
 
-    async def invoke(self, state: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-        """Invoque le graphe d'histoire avec un état donné."""
+    async def invoke(self, state: Dict) -> AsyncGenerator[Dict, None]:
+        """
+        Process game state through the graph.
+        
+        Args:
+            state: Current game state
+            
+        Yields:
+            Updated game states
+        """
         try:
-            # Traiter la section avec le NarratorAgent
-            content = await self._narrator.process_section(state["section_number"])
-            
-            # Analyser les règles avec le RulesAgent
-            rules = await self._rules.analyze_rules(state["section_number"])
-            
-            # Traiter la décision avec le DecisionAgent
-            decision = await self._decision.process_decision(
-                state["user_response"] if "user_response" in state else None,
-                rules
-            )
-            
-            # Tracer l'état avec le TraceAgent
-            trace = await self._trace.record_state(state)
-            
-            # Construire le nouvel état
-            new_state = {
-                "section_number": state["section_number"],
-                "content": content,
-                "rules": rules,
-                "decision": decision,
-                "trace": trace
-            }
-            
-            yield {"state": new_state}
-            
+            if state is None:
+                state = {}
+                
+            # Wrap state in expected structure if needed
+            if not isinstance(state, dict) or "state" not in state:
+                state = {"state": state}
+                
+            # Process section first
+            processed_state = await self._process_section(state["state"])
+            if "error" in processed_state:
+                yield {"state": processed_state}
+                return
+                
+            # Then handle decision if needed
+            if processed_state.get("user_response"):
+                processed_state = await self._handle_decision(processed_state)
+                if "error" in processed_state:
+                    yield {"state": processed_state}
+                    return
+                    
+            yield {"state": processed_state}
+                
         except Exception as e:
-            self.logger.error(f"Erreur dans invoke: {str(e)}")
-            yield {"error": str(e)}
+            logger.error(f"Error in StoryGraph invoke: {str(e)}")
+            yield {"state": {"error": f"Error in story graph: {str(e)}"}}
+
+    async def initialize(self):
+        """Initialize the StoryGraph components."""
+        try:
+            # Initialize agents if needed
+            if not self.narrator:
+                self.narrator = self.create_narrator_agent()
+            if not self.rules:
+                self.rules = self.create_rules_agent()
+            if not self.decision:
+                self.decision = self.create_decision_agent()
+            if not self.trace:
+                self.trace = self.create_trace_agent()
+                
+            logger.info("StoryGraph initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error initializing StoryGraph: {str(e)}")
+            return False
