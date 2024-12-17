@@ -9,3 +9,6 @@
 <p>Bien que l'occasion vous ait été donnée à maintes reprises de contempler ce spectacle au cours de vos voyages vers Vénus ou vers Mercure, vous ressentez toujours, à sa vue, un petit pincement au cœur et une émotion nostalgique. <em>Reverrez-vous jamais la Terre ?</em> D'un haussement d'épaules vous chassez ces pensées car seul, compte, désormais, votre mission.</p>
 
 <p>Des heures s'écoulent, uniformes et lentes. Puis votre écran revient soudain à la vie. L'ordinateur de bord vous avertit qu'un autre vaisseau spatial suit la même trajectoire que vous tout en maintenant soigneusement un écart constant. Cela ressemble à s'y méprendre à une filature. Allez-vous donner l'ordre à votre ordinateur d'engager la procédure d'évasion (rendez-vous au <a href="#48">48</a>) ou préférez-vous continuer votre route (rendez-vous au <a href="#398">398</a>) ?</p>
+
+
+test

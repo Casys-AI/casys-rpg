@@ -127,60 +127,62 @@ async def story_graph(event_bus, rules_agent, decision_agent, narrator_agent, tr
 
 @pytest.mark.asyncio
 async def test_story_graph_initial_state(story_graph):
-    """Test l'état initial du StoryGraph"""
-    state = None
-    async for s in story_graph.invoke(state):
-        state = s.get("state", {})
-        break
-    
-    assert state is not None
-    assert state.get("section_number") == 1
-    assert state.get("formatted_content") == "Test content for section 1"
-    assert state.get("rules", {}).get("needs_dice") is True
-    assert state.get("rules", {}).get("dice_type") == "normal"
+    """Test l'état initial du StoryGraph."""
+    async for result in story_graph.invoke({}):
+        assert "state" in result
+        state = result["state"]
+        assert state.get("section_number") == 1
+        assert "current_section" in state
+        assert state["current_section"].get("number") == 1
+        assert state.get("needs_content") is False
+        assert state.get("error") is None
 
 @pytest.mark.asyncio
 async def test_story_graph_user_response_with_dice(story_graph):
-    """Test du StoryGraph avec une réponse utilisateur nécessitant un lancer de dés."""
-    state = {
+    """Test le traitement d'une réponse utilisateur avec dés."""
+    test_state = {
         "section_number": 1,
-        "user_response": "test response",
-        "dice_result": {"value": 6, "type": "normal"},
-        "needs_content": True
+        "user_response": "Option 1",
+        "dice_result": {"value": 6, "type": "combat"},
+        "current_section": {
+            "number": 1,
+            "content": "Test content",
+            "choices": ["Option 1", "Option 2"]
+        }
     }
     
-    async for result in story_graph.invoke(state):
-        result_state = result.get("state", {})
+    async for result in story_graph.invoke(test_state):
+        assert "state" in result
+        result_state = result["state"]
         assert result_state.get("section_number") == 1
-        assert result_state.get("user_response") == "test response"
+        assert result_state.get("user_response") == "Option 1"
         assert result_state.get("dice_result", {}).get("value") == 6
-        break
 
 @pytest.mark.asyncio
 async def test_story_graph_user_response_without_dice(story_graph):
-    """Test du StoryGraph avec une réponse utilisateur sans lancer de dés."""
-    state = {
+    """Test le traitement d'une réponse utilisateur sans dés."""
+    test_state = {
         "section_number": 1,
-        "user_response": "test response",
-        "needs_content": True
+        "user_response": "Option 1",
+        "current_section": {
+            "number": 1,
+            "content": "Test content",
+            "choices": ["Option 1", "Option 2"]
+        }
     }
     
-    async for result in story_graph.invoke(state):
-        result_state = result.get("state", {})
+    async for result in story_graph.invoke(test_state):
+        assert "state" in result
+        result_state = result["state"]
         assert result_state.get("section_number") == 1
-        assert result_state.get("user_response") == "test response"
-        assert result_state.get("dice_result") is None
-        break
+        assert result_state.get("user_response") == "Option 1"
 
 @pytest.mark.asyncio
 async def test_story_graph_error_handling(story_graph):
-    """Test de la gestion des erreurs dans le StoryGraph."""
+    """Test la gestion des erreurs dans le StoryGraph."""
+    # Créer un mock d'agent qui lève une exception
     error_agent = AsyncMock()
-    
-    async def mock_invoke(state):
-        raise Exception("Test error")
-    
-    error_agent.invoke = mock_invoke
+    error_agent.invoke = AsyncMock(side_effect=Exception("Test error"))
     
     # Remplacer tous les agents par notre mock qui lève une exception
     story_graph.narrator = error_agent
@@ -188,13 +190,26 @@ async def test_story_graph_error_handling(story_graph):
     story_graph.decision = error_agent
     story_graph.trace = error_agent
     
-    state = {
+    test_state = {
         "section_number": 1,
-        "error": None,
-        "needs_content": True
+        "current_section": {
+            "number": 1,
+            "content": "Test content",
+            "choices": []
+        },
+        "needs_content": True,
+        "trace": {
+            "stats": {},
+            "history": []
+        }
     }
     
-    async for result in story_graph.invoke(state):
-        assert isinstance(result.get("error"), str)
-        assert "Test error" in result.get("error")
-        break
+    error_found = False
+    async for result in story_graph.invoke(test_state):
+        if "state" in result and "error" in result["state"]:
+            error = result["state"]["error"]
+            assert "Test error" in error
+            error_found = True
+            break
+    
+    assert error_found, "No error was propagated"

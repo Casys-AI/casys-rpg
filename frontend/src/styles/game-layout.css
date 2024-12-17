@@ -1,0 +1,85 @@
+/* Game Layout Styles */
+.game-book {
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  background: var(--background-color);
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr 300px;
+  gap: var(--spacing-lg);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.character-panel {
+  position: sticky;
+  top: var(--spacing-lg);
+  height: fit-content;
+}
+
+.story-panel {
+  background: var(--card-background);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  min-height: 80vh;
+}
+
+.feedback-panel {
+  position: sticky;
+  top: var(--spacing-lg);
+  height: fit-content;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  font-family: var(--font-secondary);
+  color: var(--secondary-color);
+  font-size: 1.2em;
+}
+
+.error {
+  padding: var(--spacing-lg);
+  background: var(--accent-color);
+  color: white;
+  border-radius: var(--border-radius);
+  text-align: center;
+  font-family: var(--font-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .game-layout {
+    grid-template-columns: 250px 1fr 250px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .character-panel,
+  .feedback-panel {
+    position: static;
+  }
+
+  .story-panel {
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .game-book {
+    padding: var(--spacing-md);
+  }
+
+  .story-panel {
+    padding: var(--spacing-md);
+  }
+}

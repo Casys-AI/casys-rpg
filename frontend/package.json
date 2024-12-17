@@ -17,7 +17,7 @@
     "build.preview": "vite build --ssr src/entry.preview.tsx",
     "build.types": "tsc --incremental --noEmit",
     "deploy": "echo 'Run \"npm run qwik add\" to install a server adapter'",
-    "dev": "vite --mode ssr",
+    "dev": "vite --mode ssr --host",
     "dev.debug": "node --inspect-brk ./node_modules/vite/bin/vite.js --mode ssr --force",
     "fmt": "prettier --write .",
     "fmt.check": "prettier --check .",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@builder.io/qwik": "^1.11.0",
     "@builder.io/qwik-city": "^1.11.0",
+    "@tailwindcss/typography": "^0.5.15",
     "@types/eslint": "8.56.10",
     "@types/node": "20.14.11",
     "@typescript-eslint/eslint-plugin": "7.16.1",
@@ -42,7 +43,6 @@
     "vite-tsconfig-paths": "^4.2.1"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.15",
     "marked": "^15.0.3",
     "tailwindcss": "^3.4.16"
   }
