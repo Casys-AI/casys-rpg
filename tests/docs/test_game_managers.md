@@ -1,17 +1,25 @@
 # Test Documentation: Game Managers
 
 ## Overview
-This document details the test suite for the Game Managers components, which handle state management, agent coordination, caching, and event management in the game system.
+This document details the test suite for the game management components, including state management, agent coordination, caching, and event handling.
 
 ## Test Infrastructure
 
-### Mock Components
+### Fixtures
 
-#### State Manager Mock
-**Purpose**: Simulates game state management
-**Initial State Structure**:
+#### `event_bus`
+**Purpose**: Mock EventBus for testing event emission and state updates
 ```python
-{
+mock = Mock(spec=EventBus)
+mock.emit = AsyncMock()
+mock.update_state = AsyncMock()
+mock.get_state = AsyncMock()
+```
+
+#### `state_manager`
+**Purpose**: Mock StateManager with initial game state
+```python
+initial_state = {
     'section_number': 1,
     'needs_content': True,
     'trace': {
@@ -34,147 +42,137 @@ This document details the test suite for the Game Managers components, which han
 }
 ```
 
-#### Cache Manager
-**Purpose**: Manages section content caching
-**Configuration**:
-- Cache directory: "test_cache"
-- Implements file-based caching
-- Handles cache invalidation
+#### `mock_agents`
+**Purpose**: Mock agent implementations for testing
+- **Narrator**: Content loading and formatting
+- **Rules**: Game rules processing
+- **Decision**: Choice handling
+- **Trace**: History tracking
 
-#### Event Manager
-**Purpose**: Manages event distribution
-**Features**:
-- Event emission
-- State updates
-- Event history tracking
+## Test Cases
 
-## Detailed Test Cases
+### StateManager Tests
 
-### 1. State Manager Tests (`TestStateManager`)
+#### 1. State Initialization (`test_initialize_state`)
+**Purpose**: Verify correct initial game state setup
 
-#### `test_initialize_state`
-**Purpose**: Verify state initialization
 **Validations**:
 ```python
-assert isinstance(state, dict)
 assert state['section_number'] == 1
 assert state['needs_content'] is True
-assert 'trace' in state
-assert 'stats' in state['trace']
+assert 'Caractéristiques' in stats
+assert stats['Caractéristiques']['Habileté'] == 10
+assert 'Épée' in stats['Inventaire']['Objets']
 ```
-**Specific Checks**:
-- Character stats initialization
-  - Habileté: 10
-  - Chance: 5
-  - Endurance: 8
-- Inventory setup
-  - Initial items: ['Épée', 'Bouclier']
-- Resource tracking
-  - Or: 100
-  - Gemme: 5
 
-#### `test_get_default_trace`
-**Purpose**: Verify trace structure initialization
-**Expected Structure**:
+#### 2. Default Trace (`test_get_default_trace`)
+**Purpose**: Verify correct trace structure initialization
+
+**Validations**:
+```python
+assert 'stats' in trace
+assert 'history' in trace
+assert isinstance(trace['history'], list)
+```
+
+### AgentManager Tests
+
+#### 1. Narrator Processing Success (`test_process_narrator_success`)
+**Purpose**: Test successful content processing by narrator agent
+
+**Test Flow**:
+1. Configure mock narrator response
+2. Process initial state
+3. Verify content update
+
+**Validations**:
+```python
+assert result["state"]["initial"] == "state"
+assert result["state"]["current_section"]["content"] == "test content"
+```
+
+#### 2. Narrator Processing Error (`test_process_narrator_error`)
+**Purpose**: Test error handling in narrator processing
+
+**Test Flow**:
+1. Configure mock to raise exception
+2. Verify exception handling
+
+#### 3. Rules Processing (`test_process_rules`)
+**Purpose**: Test game rules application
+
+**Expected Rules Structure**:
 ```python
 {
-    'stats': {
-        'Caractéristiques': {...},
-        'Inventaire': {...},
-        'Ressources': {...}
-    },
-    'history': []
+    "needs_dice": True,
+    "dice_type": None,
+    "conditions": [],
+    "next_sections": [],
+    "rules_summary": None,
+    "choices": []
 }
 ```
-**Validations**:
-- Trace dictionary structure
-- Stats categories presence
-- Empty history initialization
 
-### 2. Agent Manager Tests (`TestAgentManager`)
+#### 4. Decision Processing (`test_process_decision`)
+**Purpose**: Test choice handling and validation
 
-#### `test_process_narrator_success`
-**Purpose**: Test narrator processing
-**Input**:
-```python
-initial_state = {
-    "state": {
-        "initial": "state"
-    }
-}
-```
-**Expected Output**:
+**Expected Decision Structure**:
 ```python
 {
-    "state": {
-        "initial": "state",
-        "current_section": {
-            "content": "test content"
-        }
-    }
+    "choice": "A",
+    "awaiting_action": "choice"
 }
 ```
-**Validations**:
-- State preservation
-- Content addition
-- Structure integrity
 
-#### `test_process_narrator_error`
-**Purpose**: Test error handling
-**Error Simulation**:
-```python
-mock_agents['narrator'].ainvoke.side_effect = Exception("Test error")
-```
-**Validations**:
-- Error capture
-- State preservation
-- Error reporting
+### CacheManager Tests
 
-### 3. Cache Manager Tests (`TestCacheManager`)
+#### 1. Cache Checking (`test_check_section_cache`)
+**Purpose**: Verify cache existence checking
 
-#### `test_check_section_cache`
-**Purpose**: Verify cache checking
-**Process**:
-1. Create test cache entry
-2. Verify cache presence
-3. Test cache retrieval
-4. Validate content integrity
+**Test Flow**:
+1. Setup test cache directory
+2. Check cache existence
+3. Cleanup test environment
 
-#### `test_get_cache_path`
-**Purpose**: Test path generation
-**Validations**:
-- Path format
-- Directory structure
-- File naming convention
+#### 2. Cache Path Generation (`test_get_cache_path`)
+**Purpose**: Verify correct cache file path generation
 
-### 4. Event Manager Tests (`TestEventManager`)
+### EventManager Tests
 
-#### `test_emit_game_event`
-**Purpose**: Test event emission
-**Event Types**:
-- State updates
-- User actions
-- System events
-**Validations**:
-- Event delivery
-- Data integrity
-- State synchronization
+#### 1. Game Event Emission (`test_emit_game_event`)
+**Purpose**: Test event broadcasting to event bus
 
-#### `test_truncate_for_log`
-**Purpose**: Test log management
-**Features**:
-- Log size control
-- Content preservation
-- Format consistency
+**Test Flow**:
+1. Create game event
+2. Emit event
+3. Verify event bus interaction
 
-## Configuration Details
-- Uses pytest-asyncio for async testing
-- Implements comprehensive mocking
-- Maintains isolated test environment
-- Simulates full game state cycle
+#### 2. Log Truncation (`test_truncate_for_log`)
+**Purpose**: Test log message formatting
+
+## Component Interactions
+
+### State Flow
+1. State initialization by StateManager
+2. State updates through AgentManager
+3. State persistence in cache
+4. State broadcasting via EventManager
+
+### Agent Coordination
+1. Narrator processes content
+2. Rules evaluate game logic
+3. Decision handles user choices
+4. Trace records game history
 
 ## Error Handling
-- Tests all error scenarios
-- Validates error propagation
-- Ensures system stability
-- Maintains state consistency
+- Invalid state handling
+- Agent processing errors
+- Cache access failures
+- Event emission errors
+
+## Best Practices
+- Mock all external dependencies
+- Use async/await for asynchronous operations
+- Clean up test resources
+- Verify component interactions
+- Test both success and error cases

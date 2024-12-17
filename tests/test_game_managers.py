@@ -196,12 +196,14 @@ class TestAgentManager:
         
         # Test
         state = {'initial': 'state'}
-        result = await agent_manager.process_narrator(state)
+        with pytest.raises(Exception) as exc_info:
+            await agent_manager.process_narrator(state)
         
-        # Verify error handling
-        assert 'error' in result
-        assert isinstance(result['error'], str)
-        assert 'Test error' in result['error']
+        # Verify error message
+        assert str(exc_info.value) == "Test error"
+        
+        # Verify the call was attempted
+        mock_agents['narrator'].ainvoke.assert_called_once_with(state)
 
     @pytest.mark.asyncio
     async def test_process_rules(self, agent_manager, mock_agents):
@@ -218,6 +220,23 @@ class TestAgentManager:
         # Verify result contains both initial state and new rules
         assert result['state']['initial'] == 'state'
         assert result['state']['rules']['needs_dice'] is True
+
+    @pytest.mark.asyncio
+    async def test_process_rules_error(self, agent_manager, mock_agents):
+        """Test rules processing with error"""
+        # Setup mock to raise exception
+        mock_agents['rules'].ainvoke.side_effect = Exception("Rules error")
+        
+        # Test
+        state = {'initial': 'state'}
+        with pytest.raises(Exception) as exc_info:
+            await agent_manager.process_rules(state)
+        
+        # Verify error message
+        assert str(exc_info.value) == "Rules error"
+        
+        # Verify the call was attempted
+        mock_agents['rules'].ainvoke.assert_called_once_with(state)
 
     @pytest.mark.asyncio
     async def test_process_decision(self, agent_manager, mock_agents):
@@ -255,56 +274,92 @@ class TestAgentManager:
         assert result['decision']['awaiting_action'] == 'choice'
 
     @pytest.mark.asyncio
+    async def test_process_decision_error(self, agent_manager, mock_agents):
+        """Test decision processing with error"""
+        # Setup mock to raise exception
+        mock_agents['decision'].ainvoke.side_effect = Exception("Decision error")
+        
+        # Test
+        state = {'initial': 'state'}
+        with pytest.raises(Exception) as exc_info:
+            await agent_manager.process_decision(state)
+        
+        # Verify error message
+        assert str(exc_info.value) == "Decision error"
+        
+        # Verify the call was attempted
+        mock_agents['decision'].ainvoke.assert_called_once_with(state)
+
+    @pytest.mark.asyncio
     async def test_process_section(self, agent_manager, mock_agents, state_manager):
         """Test full section processing with parallel execution"""
         # Setup
-        initial_state = {"state": {"initial": "state"}}
-        state_manager.get_state.return_value = initial_state
+        section_number = 1
+        content = "test content"
         
         # Configure mocks
-        mock_agents['narrator'].ainvoke.return_value = {'content': 'test content'}
+        mock_agents['narrator'].ainvoke.return_value = {
+            "state": {
+                "content": "formatted test content"
+            }
+        }
         mock_agents['rules'].ainvoke.return_value = {
             "state": {
-                "initial": "state",
                 "rules": {
                     "needs_dice": True,
                     "dice_type": None,
                     "conditions": [],
                     "next_sections": [],
-                    "rules_summary": None,
-                    "raw_content": "",
-                    "choices": []
+                    "rules_summary": None
                 }
             }
         }
         mock_agents['decision'].ainvoke.return_value = {
-            "decision": {
-                "awaiting_action": "choice",
-                "choices": []
+            "state": {
+                "decision": {
+                    "awaiting_action": "choice",
+                    "choices": []
+                }
             }
         }
         
         # Execute
-        await agent_manager.process_section(1, "test content")
+        result = await agent_manager.process_section(section_number, content)
         
-        # Verify both narrator and rules were called with initial state
-        mock_agents['narrator'].ainvoke.assert_called_once_with(initial_state)
-        mock_agents['rules'].ainvoke.assert_called_once_with(initial_state)
+        # Verify the base state was created correctly
+        expected_base_state = GameState(
+            section_number=section_number,
+            current_section={
+                "number": section_number,
+                "content": content,
+                "choices": [],
+                "stats": {}
+            },
+            needs_content=False
+        ).model_dump()
         
-        # Verify decision was called after both narrator and rules
-        mock_agents['decision'].ainvoke.assert_called_once_with({
-            "state": {
-                "rules": {
-                    "needs_dice": True,
-                    "dice_type": None,
-                    "conditions": [],
-                    "next_sections": [],
-                    "rules_summary": None,
-                    "raw_content": "",
-                    "choices": []
-                }
-            }
-        })
+        # Verify narrator and rules were called with the base state
+        mock_agents['narrator'].ainvoke.assert_called_once()
+        call_args = mock_agents['narrator'].ainvoke.call_args[0][0]
+        assert call_args["section_number"] == expected_base_state["section_number"]
+        assert call_args["current_section"]["content"] == expected_base_state["current_section"]["content"]
+        
+        mock_agents['rules'].ainvoke.assert_called_once()
+        call_args = mock_agents['rules'].ainvoke.call_args[0][0]
+        assert call_args["section_number"] == expected_base_state["section_number"]
+        
+        # Verify decision was called with combined state
+        mock_agents['decision'].ainvoke.assert_called_once()
+        decision_call_args = mock_agents['decision'].ainvoke.call_args[0][0]
+        assert "rules" in decision_call_args
+        assert decision_call_args["rules"]["needs_dice"] is True
+        
+        # Verify final result structure
+        assert isinstance(result, dict)
+        assert result["section_number"] == section_number
+        assert "current_section" in result
+        assert "rules" in result
+        assert result["rules"]["needs_dice"] is True
 
 # CacheManager Tests
 class TestCacheManager:

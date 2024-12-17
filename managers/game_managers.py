@@ -38,103 +38,50 @@ class StateManager:
 
     async def initialize_state(self) -> Dict:
         """
-        Initialize a new game state with default values and Pydantic validation.
+        Initialize a new game state with default values from GameState model.
         
         Returns:
             Dict: Validated initial game state
         """
         try:
-            logger.info("Début de initialize_state")
-            logger.debug("Création de l'état initial avec GameState")
-
-            # Récupérer le contenu initial depuis le cache ou le fichier
+            logger.info("Starting initialize_state")
+            
+            # Create new state with default values from GameState model
+            initial_state = GameState()
+            
+            # Get initial content from cache or use default
             try:
                 from managers.cache_manager import CacheManager
                 cache_manager = CacheManager()
                 section_content = await cache_manager.get_section_content(1)
-                if not section_content:
-                    section_content = "Bienvenue dans Casys RPG !"
+                if section_content:
+                    initial_state.current_section.content = section_content
             except Exception as e:
-                logger.warning(f"Impossible de charger le contenu de la section 1: {str(e)}")
-                section_content = "Bienvenue dans Casys RPG !"
-
-            # Formater le contenu avec le NarratorAgent
-            try:
-                from agents.narrator_agent import NarratorAgent
-                event_bus = EventBus()
-                narrator = NarratorAgent(event_bus=event_bus)
-                state = {
-                    "section_number": 1,
-                    "content": section_content,
-                    "needs_content": True
-                }
-                narrator_response = await narrator.ainvoke(state)
-                formatted_content = narrator_response["state"]["content"]
-                if not formatted_content:
-                    formatted_content = section_content
-            except Exception as e:
-                logger.warning(f"Impossible de formater le contenu: {str(e)}")
-                formatted_content = section_content
-
-            initial_state = GameState(
-                section_number=1,
-                current_section={
-                    "number": 1,
-                    "content": section_content,  
-                    "choices": [],
-                    "stats": {}
-                },
-                rules={
-                    "needs_dice": False,
-                    "dice_type": "normal",
-                    "conditions": [],
-                    "next_sections": [],
-                    "rules_summary": ""
-                },
-                decision={
-                    "awaiting_action": "user_input",
-                    "section_number": 1
-                },
-                stats={},
-                history=[],
-                error=None,
-                needs_content=True,
-                user_response=None,
-                dice_result=None,
-                trace={
-                    "stats": {
-                        "Caractéristiques": {
-                            "Habileté": 10,
-                            "Chance": 5,
-                            "Endurance": 8
-                        },
-                        "Ressources": {
-                            "Or": 100,
-                            "Gemme": 5
-                        },
-                        "Inventaire": {
-                            "Objets": ["Épée", "Bouclier"]
-                        }
-                    },
-                    "history": []
-                },
-                debug=False
-            )
-            logger.info("État initial créé avec succès")
-            logger.debug("Validation avec model_dump")
-            validated_state = initial_state.model_dump()
-            logger.info("État validé avec succès")
-            logger.debug(f"État validé: {validated_state}")
-            self._state = validated_state
-            return validated_state
+                logger.warning(f"Could not load section 1 content: {str(e)}")
+            
+            # Format content with NarratorAgent if available
+            if initial_state.current_section.content:
+                try:
+                    from agents.narrator_agent import NarratorAgent
+                    event_bus = EventBus()
+                    narrator = NarratorAgent(event_bus=event_bus)
+                    narrator_response = await narrator.ainvoke(initial_state.model_dump())
+                    if narrator_response and "state" in narrator_response:
+                        initial_state.current_section.content = narrator_response["state"].get("content", initial_state.current_section.content)
+                except Exception as e:
+                    logger.warning(f"Could not format content: {str(e)}")
+            
+            logger.info("State initialized successfully")
+            self._state = initial_state.model_dump()
+            return self._state
+            
         except Exception as e:
-            logger.error(f"Erreur détaillée dans initialize_state: {str(e)}", exc_info=True)
-            logger.error(f"Type d'erreur: {type(e)}")
+            logger.error(f"Error in initialize_state: {str(e)}", exc_info=True)
             return {"error": str(e)}
 
     async def initialize_trace(self, state: Dict) -> Dict:
         """
-        Initialize trace if not present.
+        Initialize trace if not present using GameState defaults.
         
         Args:
             state: Current game state
@@ -143,59 +90,17 @@ class StateManager:
             Dict: Updated state with initialized trace
         """
         if not state.get("trace"):
-            # S'assurer que nous avons tous les champs requis
-            default_state = {
-                "section_number": state.get("section_number", 1),
-                "current_section": state.get("current_section", {
-                    "number": 1,
-                    "content": None,
-                    "choices": [],
-                    "stats": {}
-                }),
-                "formatted_content": state.get("formatted_content"),
-                "rules": state.get("rules", {
-                    "needs_dice": False,
-                    "dice_type": "normal",
-                    "conditions": [],
-                    "next_sections": [],
-                    "rules_summary": ""
-                }),
-                "decision": state.get("decision", {
-                    "awaiting_action": "user_input",
-                    "section_number": 1
-                }),
-                "error": state.get("error"),
-                "needs_content": state.get("needs_content", True),
-                "trace": {
-                    "stats": {
-                        "Caractéristiques": {
-                            "Habileté": 10,
-                            "Chance": 5,
-                            "Endurance": 8
-                        },
-                        "Ressources": {
-                            "Or": 100,
-                            "Gemme": 5
-                        },
-                        "Inventaire": {
-                            "Objets": ["Épée", "Bouclier"]
-                        }
-                    },
-                    "history": []
-                }
-            }
+            # Create a new GameState to get default trace
+            default_state = GameState()
+            state["trace"] = default_state.trace
             
-            # Mettre à jour l'état avec les valeurs par défaut
-            state.update(default_state)
-            
-            try:
-                # Validate with Pydantic
-                validated_state = GameState(**state)
-                state = validated_state.model_dump()
-            except Exception as e:
-                logger.error(f"Error initializing trace: {str(e)}")
-                state["error"] = str(e)
-        return state
+        try:
+            # Validate entire state
+            validated_state = GameState(**state)
+            return validated_state.model_dump()
+        except Exception as e:
+            logger.error(f"Error initializing trace: {str(e)}")
+            return state
 
     async def update_section_state(self, section_number: int, content: Optional[str] = None) -> None:
         """
@@ -231,7 +136,9 @@ class StateManager:
         """
         try:
             if "trace" not in self._state:
-                self._state["trace"] = self._get_default_trace()
+                default_state = GameState()
+                self._state["trace"] = default_state.trace
+                
             self._state["trace"]["stats"].update(stats)
             
             # Validate with Pydantic
@@ -260,31 +167,6 @@ class StateManager:
             logger.error(f"Erreur détaillée dans get_state: {str(e)}", exc_info=True)
             logger.error(f"Type d'erreur: {type(e)}")
             return {"error": str(e)}
-
-    def _get_default_trace(self) -> Dict:
-        """
-        Get default trace data.
-        
-        Returns:
-            Dict: Default trace structure
-        """
-        return {
-            "stats": {
-                "Caractéristiques": {
-                    "Habileté": 10,
-                    "Chance": 5,
-                    "Endurance": 8
-                },
-                "Ressources": {
-                    "Or": 100,
-                    "Gemme": 5
-                },
-                "Inventaire": {
-                    "Objets": ["Épée", "Bouclier"]
-                }
-            },
-            "history": []
-        }
 
 class EventManager:
     """Responsible for managing game events and notifications"""
@@ -338,6 +220,18 @@ class AgentManager:
             self.decision = decision
         if trace:
             self.trace = trace
+            
+        # Validate that required agents are present
+        missing_agents = []
+        if not self.narrator:
+            missing_agents.append("narrator")
+        if not self.rules:
+            missing_agents.append("rules")
+        if not self.decision:
+            missing_agents.append("decision")
+            
+        if missing_agents:
+            raise ValueError(f"Missing required agents: {', '.join(missing_agents)}")
 
     async def process_section(self, section_number: int, content: str) -> Dict:
         """
@@ -351,35 +245,61 @@ class AgentManager:
             Dict: Updated game state
         """
         try:
-            # Update section state first
-            await self.state_manager.update_section_state(section_number, content)
-            
-            # Get updated state
-            state = await self.state_manager.get_state()
-            
-            # Run narrator and rules agents in parallel
-            narrator_task = asyncio.create_task(self.process_narrator(state))
-            rules_task = asyncio.create_task(self.process_rules(state))
-            
-            # Wait for both to complete
-            narrator_result, rules_result = await asyncio.gather(narrator_task, rules_task)
-            
-            # Merge results
-            updated_state = {
-                "state": {
-                    "section_number": section_number,
+            # Create base state
+            base_state = GameState(
+                section_number=section_number,
+                current_section={
+                    "number": section_number,
                     "content": content,
-                    "needs_content": False,
-                    "rules": rules_result.get("state", {}).get("rules", {})
+                    "choices": [],
+                    "stats": {}
+                },
+                needs_content=False
+            )
+            
+            # Process with narrator and rules agents concurrently
+            tasks = [
+                self._process_with_agent(self.narrator, base_state.model_dump(), "narrator"),
+                self._process_with_agent(self.rules, base_state.model_dump(), "rules")
+            ]
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle results and combine state
+            combined_state = base_state.model_dump()
+            for result, agent_type in zip(results, ["narrator", "rules"]):
+                if isinstance(result, Exception):
+                    logger.error(f"Error in {agent_type} processing: {str(result)}")
+                    combined_state["error"] = f"{agent_type} error: {str(result)}"
+                elif result and "state" in result:
+                    if agent_type == "narrator" and "content" in result["state"]:
+                        combined_state["current_section"]["content"] = result["state"]["content"]
+                    elif agent_type == "rules" and "rules" in result["state"]:
+                        combined_state["rules"] = result["state"]["rules"]
+            
+            # Process with decision agent
+            decision_result = await self._process_with_agent(
+                self.decision, 
+                combined_state,
+                "decision"
+            )
+            
+            if isinstance(decision_result, Exception):
+                logger.error(f"Error in decision processing: {str(decision_result)}")
+                combined_state["error"] = f"Decision error: {str(decision_result)}"
+            elif decision_result and "state" in decision_result:
+                combined_state.update(decision_result["state"])
+            
+            # Final validation
+            try:
+                final_state = GameState(**combined_state)
+                return final_state.model_dump()
+            except Exception as e:
+                logger.error(f"Error validating final state: {str(e)}")
+                return {
+                    "error": f"State validation error: {str(e)}",
+                    **combined_state
                 }
-            }
-            
-            # Process decision with combined state
-            decision_result = await self.process_decision(updated_state)
-            if decision_result:
-                updated_state["state"].update(decision_result)
-            
-            return updated_state["state"]
             
         except Exception as e:
             logger.error(f"Error in process_section: {str(e)}", exc_info=True)
@@ -389,83 +309,75 @@ class AgentManager:
                 "content": content
             }
 
+    async def _process_with_agent(self, agent, state: Dict, agent_type: str) -> Dict:
+        """
+        Process state with a specific agent with proper error handling.
+        
+        Args:
+            agent: Agent instance to process with
+            state: Current state to process
+            agent_type: Type of agent for logging
+            
+        Returns:
+            Dict: Processed state or error
+        """
+        if not agent:
+            raise ValueError(f"Missing {agent_type} agent")
+            
+        try:
+            logger.debug(f"Processing with {agent_type} agent. Input state: {state}")
+            result = await agent.ainvoke(state)
+            logger.debug(f"{agent_type.capitalize()} result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in {agent_type} processing: {str(e)}")
+            raise
+
     async def process_narrator(self, state: Dict) -> Dict:
         """Process state through narrator agent"""
-        try:
-            logger.debug(f"Input state: {state}")
-            result = await self.narrator.ainvoke(state)
-            print(f"Narrator raw result: {result}")
-            
-            if not result:
-                logger.debug("No result from narrator")
-                return state.copy()
-                
-            if not isinstance(result, dict):
-                logger.debug(f"Result is not a dict: {type(result)}")
-                return state.copy()
-            
-            # S'assurer que nous avons la structure de base
-            if "state" not in result:
-                logger.debug("Adding state wrapper")
-                result = {"state": result}
-            else:
-                # Faire une copie profonde pour éviter les références partagées
-                result = {"state": result["state"].copy()}
-                
-            print(f"Final narrator result: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in NarratorAgent: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+        return await self._process_with_agent(self.narrator, state, "narrator")
 
     async def process_rules(self, state: Dict) -> Dict:
         """Process state through rules agent"""
-        try:
-            result = await self.rules.ainvoke(state)
-            
-            if result and "state" in result and "rules" in result["state"]:
-                if result["state"]["rules"].get("error"):
-                    logger.warning(f"RulesAgent error: {result['state']['rules']['error']}")
-                    return result
-                
-                return result
-            
-        except Exception as e:
-            logger.error(f"Error in RulesAgent: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+        return await self._process_with_agent(self.rules, state, "rules")
 
     async def process_decision(self, state: Dict) -> Dict:
         """Process state through decision agent"""
-        try:
-            # Extract only the rules part for decision agent
-            rules = state.get("state", {}).get("rules", {})
-            decision_input = {"state": {"rules": rules}}
-            result = await self.decision.ainvoke(decision_input)
-            
-            if result and "decision" in result:
-                if result["decision"].get("awaiting_action") is None:
-                    result["decision"]["awaiting_action"] = "choice"
-                return result
-                
-            return state.copy()
-            
-        except Exception as e:
-            logger.error(f"Error in DecisionAgent: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+        return await self._process_with_agent(self.decision, state, "decision")
 
-    async def handle_user_choice(self, choice: str):
-        """Handle user choice"""
+    async def handle_user_choice(self, choice: str) -> Dict:
+        """
+        Handle user choice with proper validation.
+        
+        Args:
+            choice: User's choice
+            
+        Returns:
+            Dict: Updated game state
+        """
         try:
-            state = await self.state_manager.get_state()
-            if not state:
-                state = {'section_number': 1}
-            state["user_response"] = choice
-            await self.state_manager.update_section_state(state["section_number"], state["content"])
-            return state
+            current_state = await self.state_manager.get_state()
+            if not current_state:
+                raise ValueError("No current game state")
+                
+            # Update state with user choice
+            current_state["user_response"] = choice
+            
+            # Process with decision agent
+            result = await self.process_decision(current_state)
+            
+            if result and "state" in result:
+                # Validate and update state
+                validated_state = GameState(**result["state"])
+                return validated_state.model_dump()
+            return current_state
+            
         except Exception as e:
             logger.error(f"Error handling user choice: {str(e)}")
-            return {"error": f"Error handling user choice: {str(e)}"}
+            return {
+                "error": str(e),
+                "user_response": choice
+            }
 
 class CacheManager:
     """
