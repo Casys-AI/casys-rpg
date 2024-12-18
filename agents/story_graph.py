@@ -1,394 +1,211 @@
 """
-StoryGraph Module
-Manages the flow and progression of the interactive story using a state graph approach.
+Story Graph Module
+Handles game workflow and progression.
 """
 
-from typing import Dict, Optional, Any, AsyncGenerator
-from langgraph.graph import StateGraph
-from event_bus import EventBus
+from typing import Dict, Optional, AsyncGenerator, Any
+from pydantic import Field, ConfigDict
+
+from agents.base_agent import BaseAgent
+from models.game_state import GameState
+from models.narrator_model import NarratorModel
+from models.rules_model import RulesModel
+from models.trace_model import TraceModel
+from models.decision_model import DecisionModel
+from config.agent_config import AgentConfig
+from config.logging_config import get_logger
+from agents.protocols import StoryGraphProtocol
 from agents.narrator_agent import NarratorAgent
 from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
 from agents.trace_agent import TraceAgent
-from agents.models import GameState
-from agents.base_agent import BaseAgent
-import logging
-from logging_config import setup_logging
-from managers.game_managers import StateManager, AgentManager
-from managers.stats_manager import StatsManager
+from managers.state_manager import StateManager
+from managers.trace_manager import TraceManager
+from langgraph.graph import StateGraph, END
 from managers.cache_manager import CacheManager
 
-# Setup logging
-setup_logging()
-logger = logging.getLogger('story_graph')
+logger = get_logger('story_graph')
 
-class StoryGraph(BaseAgent):
-    """
-    Manages game flow using StateGraph for main workflow and managers for game logic.
+class StoryGraph(BaseAgent, StoryGraphProtocol):
+    """Agent responsible for managing game workflow and progression."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
-    Attributes:
-        event_bus (EventBus): Event bus for component communication
-        state_manager (StateManager): Manages game state
-        agent_manager (AgentManager): Coordinates different agents
-        cache_manager (CacheManager): Handles section caching
-        stats_manager (StatsManager): Manages character statistics
-        graph (StateGraph): Manages game flow
-    """
+    # Configuration de base
+    config: AgentConfig = Field(default_factory=AgentConfig)
+    
+    # Composants requis
+    narrator: NarratorAgent
+    rules: RulesAgent
+    decision: DecisionAgent
+    trace: TraceAgent
+    state_manager: StateManager
+    trace_manager: TraceManager
+    
+    # État interne
+    _graph: Optional[StateGraph] = None
 
     def __init__(
         self,
-        event_bus: Optional[EventBus] = None,
-        narrator_agent: Optional[NarratorAgent] = None,
-        rules_agent: Optional[RulesAgent] = None,
-        decision_agent: Optional[DecisionAgent] = None,
-        trace_agent: Optional[TraceAgent] = None
+        config: AgentConfig,
+        cache_manager: CacheManager,
+        narrator: NarratorAgent,
+        rules: RulesAgent,
+        decision: DecisionAgent,
+        trace: TraceAgent,
+        state_manager: StateManager,
+        trace_manager: TraceManager,
+        **data
     ):
-        """Initialize StoryGraph with agents and managers."""
-        # Initialize event bus and base
-        event_bus = event_bus or EventBus()
-        super().__init__(event_bus)
-        
-        # Initialize agents
-        self.narrator = narrator_agent or NarratorAgent(event_bus=self.event_bus)
-        self.rules = rules_agent or RulesAgent(event_bus=self.event_bus)
-        self.decision = decision_agent or DecisionAgent(event_bus=self.event_bus)
-        self.trace = trace_agent or TraceAgent(event_bus=self.event_bus)
-        
-        # Initialize managers
-        self.state_manager = StateManager()
-        self.agent_manager = AgentManager(
-            self.narrator, 
-            self.rules, 
-            self.decision, 
-            self.trace, 
-            event_bus,
-            self.state_manager
-        )
-        self.cache_manager = CacheManager()
-        self.stats_manager = StatsManager(event_bus)
-        
-        # Setup state graph
-        self.graph = self._setup_graph()
+        """Initialize StoryGraph with all required components."""
+        super().__init__(config=config, cache_manager=cache_manager)
+        self.narrator = narrator
+        self.rules = rules
+        self.decision = decision
+        self.trace = trace
+        self.state_manager = state_manager
+        self.trace_manager = trace_manager
 
-    def _setup_graph(self) -> StateGraph:
-        """Setup the state graph for game flow."""
-        graph = StateGraph(
-            state_schema=Dict[str, Any]  # Set recursion limit during initialization
-        )
-        
-        # Add nodes
-        graph.add_node("process_section", self._process_section)
-        graph.add_node("handle_decision", self._handle_decision)
-        graph.add_node("update_trace", self._update_trace)
-        graph.add_node("end", lambda x: x)  # Add end node
-        
-        # Configure flow
-        graph.set_entry_point("process_section")
-        graph.add_edge("process_section", "handle_decision")
-        graph.add_edge("handle_decision", "update_trace")
-        
-        # Add conditional edges
-        graph.add_conditional_edges(
-            "update_trace",
-            self._should_continue,
-            {True: "process_section", False: "end"}
-        )
-        
-        return graph.compile()
+    async def _process_with_agent(self, agent: Any, state: Dict) -> AsyncGenerator[Dict, None]:
+        """Process state with an agent."""
+        result = await agent.process(state)
+        yield result
 
-    async def check_section_cache(self, section_number: int) -> bool:
-        """Delegate to cache manager."""
-        return self.cache_manager.check_section_cache(section_number)
+    def _merge_parallel_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge results from parallel agent executions."""
+        try:
+            section = results.get("narrator", {})
+            rules = results.get("rules", {})
+            return {
+                "section": section,
+                "rules": rules,
+                "state": GameState(
+                    current_section=section,
+                    current_rules=rules
+                )
+            }
+        except Exception as e:
+            logger.error(f"Error merging results: {e}")
+            raise
 
-    async def get_character_stats(self) -> Dict:
-        """Delegate to stats manager."""
-        return await self.stats_manager.get_character_stats()
-
-    async def _initialize_trace(self, state: Dict) -> Dict:
-        """
-        Initialize trace if not present.
+    async def _initialize_state(self, state: Dict) -> Dict:
+        """Initialize and validate game state.
         
         Args:
-            state: Current game state
+            state: Initial state dict
             
         Returns:
-            Dict: Updated state with initialized trace
+            Validated GameState
         """
-        return await self.state_manager.initialize_trace(state)
+        logger.debug("Initializing game state")
+        
+        try:
+            # Create initial state
+            initial_state = GameState.create_initial_state()
+            
+            # Process with agents
+            narrator_result = await self.narrator.process(initial_state.model_dump())
+            rules_result = await self.rules.process(initial_state.model_dump())
+            
+            # Merge results
+            merged = self._merge_parallel_results({
+                "narrator": narrator_result,
+                "rules": rules_result
+            })
+            
+            return merged
+            
+        except Exception as e:
+            logger.error(f"Error initializing state: {e}")
+            return self.state_manager.create_error_state(str(e))
 
-    async def _process_section(self, state: Dict) -> Dict:
-        """
-        Process a section through the agent manager.
+    def _setup_workflow(self) -> None:
+        """Setup the story graph workflow."""
+        if self._graph is not None:
+            return
+
+        logger.debug("Setting up story graph workflow")
+        workflow = StateGraph({})
+
+        # Add start node for initialization
+        workflow.add_node("start", self._initialize_state)
+
+        # Add nodes for each agent
+        workflow.add_node("narrator", lambda x: self._process_with_agent(self.narrator, x))
+        workflow.add_node("rules", lambda x: self._process_with_agent(self.rules, x))
+        workflow.add_node("decision", lambda x: self._process_with_agent(self.decision, x))
+        workflow.add_node("trace", lambda x: self._process_with_agent(self.trace, x))
+
+        # Configure parallel execution
+        workflow.add_node("merge", self._merge_parallel_results)
+        
+        # Define workflow edges
+        workflow.add_edge("start", "narrator")  # Start -> Narrator
+        workflow.add_edge("narrator", "rules")  # Narrator -> Rules
+        workflow.add_edge("rules", "decision")  # Rules -> Decision
+        workflow.add_edge("decision", "trace")  # Decision -> Trace
+        workflow.add_edge("trace", END)         # Trace -> End
+
+        self._graph = workflow
+
+    async def _process_workflow(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Process state through the workflow."""
+        if not self._graph:
+            self._setup_workflow()
+        
+        async for output in self._graph.astream(state):
+            if output:
+                return output
+        return state
+
+    async def process_section(self, section_number: int) -> Dict[str, Any]:
+        """Process a complete section through the workflow.
         
         Args:
-            state: Current game state
+            section_number: Section number to process
             
         Returns:
-            Dict: Updated game state
+            Dict[str, Any]: Processed game state
         """
         try:
-            # Extract actual state if needed
-            if isinstance(state, dict):
-                if "state" in state:
-                    state = state["state"]
-                elif any(key in state for key in ["process_section", "handle_decision", "update_trace", "end"]):
-                    for key in ["process_section", "handle_decision", "update_trace", "end"]:
-                        if key in state:
-                            state = state[key]
-                            break
-
-            # Initialize state if None or empty
-            if not state:
-                state = {
-                    "section_number": 1,
-                    "content": None,
-                    "rules": None,
-                    "decision": None,
-                    "error": None,
-                    "needs_content": True
-                }
-
-            # Initialize trace if needed
-            state = await self._initialize_trace(state)
-            if state.get("error"):
-                return state
-
-            # Verify decision for sections > 1
-            section_number = state.get("section_number", 1)
-            if section_number > 1 and not state.get("decision"):
-                return {"error": "No decision found for section > 1"}
-                    
-            try:
-                # Process through narrator agent first
-                content_result = await self.narrator.invoke({
-                    "section_number": section_number,
-                    "needs_content": state.get("needs_content", True)
-                })
-                
-                if content_result.get("error"):
-                    return content_result
-                    
-                # Then process through rules agent
-                rules_result = await self.rules.invoke({
-                    "section_number": section_number,
-                    "content": content_result.get("content")
-                })
-                
-                if rules_result.get("error"):
-                    return rules_result
-                    
-                # Merge results without duplicating state
-                merged_state = {
-                    **state,
-                    "content": content_result.get("content"),
-                    "content": content_result.get("content", ""),
-                    "rules": rules_result.get("rules", {}),
-                    "decision": rules_result.get("decision", {}),
-                    "needs_content": False
-                }
-                
-                return merged_state
-                
-            except Exception as e:
-                return {"error": f"Error in agent manager while processing section {section_number}: {str(e)}"}
-                
+            # Create initial state
+            state = await self.state_manager.create_initial_state()
+            state["section_number"] = section_number
+            
+            # Process through workflow
+            return await self._process_workflow(state)
+            
         except Exception as e:
-            return {"error": f"Error processing section: {str(e)}"}
+            logger.error(f"Error processing section {section_number}: {str(e)}")
+            return self.state_manager.create_error_state(str(e))
 
-    async def _handle_decision(self, state: Dict) -> Dict:
-        """
-        Handle user decisions and choices.
+    async def process_user_input(self, user_input: str) -> Dict[str, Any]:
+        """Process user input and update game state accordingly.
         
         Args:
-            state: Current game state
+            user_input: User's response or decision
             
         Returns:
-            Dict: Updated state with decision results
+            Dict[str, Any]: Updated game state
         """
         try:
-            # Extract actual state if needed
-            if isinstance(state, dict):
-                if "state" in state:
-                    state = state["state"]
-
-            if state.get("user_response"):
-                try:
-                    # Process through decision agent
-                    decision_result = await self.decision.invoke({
-                        "section_number": state.get("section_number"),
-                        "user_response": state.get("user_response"),
-                        "rules": state.get("rules", {})
-                    })
-                    
-                    if decision_result.get("error"):
-                        return decision_result
-
-                    # Update state with decision results
-                    merged_state = {
-                        **state,
-                        "decision": decision_result.get("decision", {}),
-                        "dice_result": None if not state.get("rules", {}).get("needs_dice") else state.get("dice_result")
-                    }
-
-                    # Handle stats updates
-                    if decision_result.get("stats"):
-                        await self.event_bus.emit(Event(
-                            type="stats_updated",
-                            data={"stats": decision_result["stats"]}
-                        ))
-                        merged_state["stats"] = decision_result["stats"]
-
-                    return merged_state
-                    
-                except Exception as e:
-                    return {"error": f"Error handling user choice: {str(e)}"}
+            # Get current state and update with user input
+            current_state = await self.trace_manager.get_state()
+            updated_state = await self.state_manager.handle_decision(user_input, current_state)
             
-            return state
+            # Process through workflow
+            return await self._process_workflow(updated_state)
             
         except Exception as e:
-            return {"error": f"Error in decision handling: {str(e)}"}
+            logger.error(f"Error processing user input: {str(e)}")
+            return self.state_manager.create_error_state(str(e))
 
-    async def _update_trace(self, state: Dict) -> Dict:
-        """
-        Update game trace with current state.
-        
-        Args:
-            state: Current game state
-            
-        Returns:
-            Dict: Updated state with trace information
-        """
+    async def initialize(self) -> None:
+        """Initialize the story graph and its initial state."""
+        logger.debug("Initializing story graph")
         try:
-            # Extract actual state if needed
-            if isinstance(state, dict):
-                if any(key in state for key in ["process_section", "handle_decision", "update_trace", "end"]):
-                    for key in ["process_section", "handle_decision", "update_trace", "end"]:
-                        if key in state:
-                            state = state[key]
-                            break
-
-            if state.get("error"):
-                return state
-
-            try:
-                # Update trace through trace agent
-                result = await self.trace.invoke({"state": state})
-                if result.get("error"):
-                    return result
-                
-                return {**state, **result}
-                
-            except Exception as e:
-                return {"error": f"Error updating trace: {str(e)}"}
-                
+            initial_state = {}
+            await self._initialize_state(initial_state)
+            logger.info("Story graph initialized successfully")
         except Exception as e:
-            return {"error": f"Error in trace update: {str(e)}"}
-
-    def _should_continue(self, state: Dict) -> bool:
-        """
-        Determine if the game should continue.
-        
-        Args:
-            state: Current game state
-            
-        Returns:
-            bool: True if game should continue, False otherwise
-        """
-        # Extract actual state if needed
-        if isinstance(state, dict):
-            if any(key in state for key in ["process_section", "handle_decision", "update_trace", "end"]):
-                for key in ["process_section", "handle_decision", "update_trace", "end"]:
-                    if key in state:
-                        state = state[key]
-                        break
-        
-        # Stop if there's an error
-        if state.get("error"):
-            return False
-            
-        # Stop if we reach the end
-        if state.get("end_game"):
-            return False
-            
-        # Stop if we don't have a valid section
-        if not state.get("section_number"):
-            return False
-            
-        return True
-
-    async def invoke(self, state: Dict) -> AsyncGenerator[Dict, None]:
-        """
-        Process game state through the graph.
-        
-        Args:
-            state: Current game state
-            
-        Yields:
-            Updated game states
-        """
-        try:
-            if state is None:
-                state = {}
-                
-            # Wrap state in expected structure if needed
-            if not isinstance(state, dict) or "state" not in state:
-                state = {"state": state}
-                
-            # Process section first
-            processed_state = await self._process_section(state["state"])
-            if "error" in processed_state:
-                yield {"state": processed_state}
-                return
-                
-            # Then handle decision if needed
-            if processed_state.get("user_response"):
-                processed_state = await self._handle_decision(processed_state)
-                if "error" in processed_state:
-                    yield {"state": processed_state}
-                    return
-                    
-            yield {"state": processed_state}
-                
-        except Exception as e:
-            logger.error(f"Error in StoryGraph invoke: {str(e)}")
-            yield {"state": {"error": f"Error in story graph: {str(e)}"}}
-
-    async def get_state(self) -> Dict:
-        """
-        Récupère l'état actuel du jeu depuis le state manager.
-        
-        Returns:
-            Dict: État actuel du jeu
-        """
-        try:
-            logger.info("Tentative de récupération de l'état du jeu")
-            logger.debug(f"State Manager: {self.state_manager}")
-            
-            state = await self.state_manager.get_state()
-            logger.info("État récupéré avec succès")
-            logger.debug(f"État récupéré: {state}")
-            
-            return state
-        except Exception as e:
-            logger.error(f"Erreur détaillée lors de la récupération de l'état: {str(e)}", exc_info=True)
-            logger.error(f"Type d'erreur: {type(e)}")
-            return {"error": f"Error getting game state: {str(e)}"}
-
-    async def initialize(self):
-        """Initialize the StoryGraph components."""
-        try:
-            # Initialize agents if needed
-            if not self.narrator:
-                self.narrator = self.create_narrator_agent()
-            if not self.rules:
-                self.rules = self.create_rules_agent()
-            if not self.decision:
-                self.decision = self.create_decision_agent()
-            if not self.trace:
-                self.trace = self.create_trace_agent()
-                
-            logger.info("StoryGraph initialized successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Error initializing StoryGraph: {str(e)}")
-            return False
+            logger.error(f"Failed to initialize story graph: {e}")
+            raise

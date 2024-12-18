@@ -1,355 +1,195 @@
-from typing import Dict, Optional, Any, List
-from pydantic import BaseModel, ConfigDict, Field
-from event_bus import EventBus, Event
-from agents.models import GameState
+"""
+Trace Agent Module
+Handles game state tracking and analysis.
+"""
+
+from typing import Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
 import logging
-import json
 from pathlib import Path
-import shutil
+from models.game_state import GameState
+from models.trace_model import TraceModel
+from models.character_model import CharacterModel
+from config.core_config import ComponentConfig
 from agents.base_agent import BaseAgent
+from managers.cache_manager import CacheManager
+from agents.protocols import TraceAgentProtocol
 
-class TraceConfig(BaseModel):
-    """Configuration pour TraceAgent."""
-    trace_directory: str = Field(default="data/trace")
-    initial_stats: Dict = Field(default_factory=lambda: {
-        "Caractéristiques": {
-            "Habileté": 10,
-            "Chance": 5,
-            "Endurance": 8
-        },
-        "Ressources": {
-            "Or": 100
-        },
-        "Inventaire": {
-            "Objets": ["Épée", "Bouclier"]
+class TraceAgentConfig(ComponentConfig):
+    """Configuration for TraceAgent"""
+    trace_manager: Optional[Any] = None
+    character_manager: Optional[Any] = None
+    cache_manager: Optional[Any] = None
+    dependencies: Dict[str, Any] = {}
+
+class TraceAgent(BaseAgent, TraceAgentProtocol):
+    """
+    Handles game state tracking and analysis.
+    This agent is responsible for:
+    1. Analyzing game state changes
+    2. Making decisions about state transitions
+    3. Creating and analyzing game actions
+    4. Providing feedback on game progression
+    """
+    
+    def __init__(self, config: TraceAgentConfig, cache_manager: CacheManager):
+        super().__init__(config=config, cache_manager=cache_manager)
+        self.logger = logging.getLogger(__name__)
+        
+        # Get managers from dependencies
+        self.trace_manager = self.config.dependencies.get("trace_manager")
+        self.character_manager = self.config.dependencies.get("character_manager")
+
+    def _create_action_from_state(self, state: GameState) -> Dict[str, Any]:
+        """
+        Create action entry from game state.
+        Analyzes the current state to determine what action occurred.
+        """
+        action_type = self._determine_action_type(state)
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "section": state.section_number,
+            "action_type": action_type,
+            "details": self._get_action_details(state, action_type)
         }
-    })
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class TraceAgent(BaseAgent):
-    """Agent responsable du traçage."""
-
-    def __init__(self, event_bus: EventBus, config: Optional[TraceConfig] = None, **kwargs):
+    def _determine_action_type(self, state: GameState) -> str:
         """
-        Initialise l'agent avec une configuration Pydantic.
+        Determine the type of action from state.
+        Analyzes state components to identify what kind of action occurred.
+        """
+        if state.dice_roll:
+            return "dice_roll"
+        elif state.player_input:
+            return "user_input"
+        elif state.decision:
+            return "decision"
+        return "unknown"
+
+    def _get_action_details(self, state: GameState, action_type: str) -> Dict[str, Any]:
+        """
+        Get details specific to the action type.
+        Extracts and formats relevant information based on the action type.
+        """
+        details = {}
+        
+        if action_type == "dice_roll" and state.dice_roll:
+            details.update({
+                "dice_type": state.rules.dice_type,
+                "result": state.dice_roll.value,
+                "dice_roll": state.dice_roll.model_dump(),
+                "next_section": state.decision.section_number if state.decision else None,
+                "conditions": state.rules.conditions if state.rules else []
+            })
+        elif action_type == "user_input" and state.player_input:
+            details["response"] = state.player_input
+        elif action_type == "decision" and state.decision:
+            details.update({
+                "next_section": state.decision.section_number,
+                "conditions": state.rules.conditions if state.rules else []
+            })
+            
+        return details
+
+    async def analyze_state(self, state: GameState) -> GameState:
+        """
+        Analyze the current game state and make decisions.
+        This is where the agent's intelligence comes in.
         
         Args:
-            event_bus: Bus d'événements
-            config: Configuration Pydantic (optionnel)
-            **kwargs: Arguments supplémentaires pour la configuration
-        """
-        super().__init__(event_bus)  # Appel au constructeur parent
-        self.config = config or TraceConfig(**kwargs)
-        self.trace_directory = Path(self.config.trace_directory)
-        self._session_dir = self.create_session_dir()
-        self.history = []
-        self.stats = self.config.initial_stats.copy()
-        self.save_adventure_stats()
-        self.save_history()
-    
-    def create_session_dir(self) -> Path:
-        """Crée le répertoire de session pour cette partie"""
-        # Supprimer les anciens dossiers de session si nécessaire
-        if self.trace_directory.exists():
-            for old_dir in self.trace_directory.glob("game_*"):
-                if old_dir.is_dir():
-                    shutil.rmtree(old_dir)
-        
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        session_dir = self.trace_directory / f"game_{timestamp}"
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir
-    
-    def save_adventure_stats(self) -> None:
-        """Sauvegarde les statistiques de l'aventure"""
-        stats_file = self._session_dir / "adventure_stats.json"
-        with open(stats_file, "w", encoding="utf-8") as f:
-            json.dump(self.stats, f, ensure_ascii=False, indent=2)
-    
-    def save_history(self) -> None:
-        """Sauvegarde l'historique des actions"""
-        history_file = self._session_dir / "history.json"
-        with open(history_file, "w", encoding="utf-8") as f:
-            json.dump(self.history, f, ensure_ascii=False, indent=2)
-    
-    def validate_state(self, state: Dict) -> Dict:
-        """Valide et corrige l'état si nécessaire."""
-        logging.getLogger(__name__).debug(f"Validating state: {state}")
-        
-        if not state:
-            state = {}
-        
-        # S'assurer que trace existe
-        if 'trace' not in state or state['trace'] is None:
-            state['trace'] = {}
-            
-        # S'assurer que stats existe dans trace
-        if 'stats' not in state['trace']:
-            logging.getLogger(__name__).warning("Stats missing in trace, restoring from agent defaults")
-            state['trace']['stats'] = self.stats.copy()
-            
-        # Valider la structure des stats
-        stats = state['trace'].get('stats', {})
-        if not isinstance(stats, dict):
-            logging.getLogger(__name__).error(f"Invalid stats type: {type(stats)}")
-            stats = self.stats.copy()
-            
-        # S'assurer que toutes les catégories requises existent
-        for category in ['Caractéristiques', 'Ressources', 'Inventaire']:
-            if category not in stats:
-                logging.getLogger(__name__).warning(f"Missing category {category} in stats")
-                stats[category] = self.stats[category].copy()
-                
-        state['trace']['stats'] = stats
-        logging.getLogger(__name__).debug(f"Validated state: {state}")
-        return state
-
-    async def invoke(self, input_data: Dict) -> Dict:
-        """
-        Enregistre une action dans l'historique et met à jour les stats si nécessaire.
-        
-        Args:
-            input_data (Dict): Données de l'action avec state
+            state: Current game state
             
         Returns:
-            Dict: État mis à jour avec historique et stats
+            GameState: Updated game state with decisions
         """
         try:
-            # Valider l'état d'abord
-            state = self.validate_state(input_data.get("state", {}))
+            # Create action from current state
+            action = self._create_action_from_state(state)
             
-            # Déterminer le type d'action
-            action_type = "unknown"
-            if "dice_result" in state:
-                action_type = "dice_roll"
-            elif "user_response" in state and (
-                "decision" not in state or 
-                not state.get("decision", {}).get("next_section")
-            ):
-                action_type = "user_input"
-            elif "decision" in state:
-                action_type = "decision"
-            elif "user_response" in state:
-                action_type = "user_input"
-
-            # Créer l'entrée d'historique
-            entry = {
-                "timestamp": datetime.now().isoformat(),
-                "section": state.get("section_number"),
-                "action_type": action_type,
-                "stats": self.stats.copy()
-            }
-
-            # Ajouter la réponse utilisateur si présente
-            if "user_response" in state:
-                entry["user_response"] = state["user_response"]
-
-            # Ajouter les détails spécifiques selon le type d'action
-            if action_type == "dice_roll":
-                dice_result = state.get("dice_result", {})
-                if dice_result is not None:
-                    entry.update({
-                        "dice_type": dice_result.get("type", "normal"),
-                        "dice_value": dice_result.get("value"),
-                        "dice_result": dice_result,  # Garder le résultat complet
-                        "next_section": state.get("decision", {}).get("next_section"),
-                        "awaiting_action": state.get("decision", {}).get("awaiting_action", False),
-                        "conditions": state.get("decision", {}).get("conditions", []),
-                        "rules_summary": state.get("decision", {}).get("rules_summary", "")
-                    })
-            elif action_type == "user_input" and "user_response" in state:
-                entry.update({
-                    "response": state["user_response"]
-                })
-            elif action_type == "decision" and "decision" in state:
-                decision = state["decision"]
-                entry.update({
-                    "next_section": decision.get("next_section"),
-                    "awaiting_action": decision.get("awaiting_action"),
-                    "conditions": decision.get("conditions", []),
-                    "rules_summary": decision.get("rules_summary", ""),
-                    "decision": decision  # Garder la décision complète pour compatibilité
-                })
-
-            # Ajouter à l'historique et sauvegarder
-            self.history.append(entry)
-            self.save_history()  # Plus d'await car la méthode n'est pas async
+            # Process trace via manager
+            if self.trace_manager:
+                self.trace_manager.process_trace(state, action)
             
-            # Émettre l'événement
-            event = Event(
-                type="state_traced",
-                data={
-                    "history_entry": entry,
-                    "history_length": len(self.history)
-                }
-            )
-            await self.event_bus.emit(event)
-            
-            # Mettre à jour l'état avec l'historique et les stats
-            state["history"] = self.history
-            state["trace"] = {
-                "stats": self.stats,
-                "history": self.history
-            }
-            
-            return {
-                "state": state,
-                "history": self.history,  # Pour compatibilité
-                "stats": self.stats,      # Pour compatibilité
-                "trace": {
-                    "history": self.history,
-                    "stats": self.stats
-                }
-            }
-            
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
-            return {
-                "state": {
-                    "error": str(e),
-                    "history": self.history,  # Ajout de la clé history
-                    "trace": {
-                        "history": self.history,
-                        "stats": self.stats
-                    }
-                }
-            }
-    
-    async def ainvoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
-        """
-        Version asynchrone de invoke.
-        """
-        try:
-            state = input_data.get("state", input_data)
-            logging.getLogger(__name__).debug(f"Validating state: {state}")
-            
-            # Valider et corriger l'état
-            state = self.validate_state(state)
-            logging.getLogger(__name__).debug(f"Validated state: {state}")
-            
-            # Déterminer le type d'action
-            action_type = "unknown"
-            if "dice_result" in state:
-                action_type = "dice_roll"
-            elif "user_response" in state:
-                action_type = "user_input"
-            elif "decision" in state:
-                action_type = "decision"
-            
-            # Créer l'entrée de base
-            entry = {
-                "timestamp": datetime.now().isoformat(),
-                "section": state.get("section_number", 1),
-                "action_type": action_type
-            }
-            
-            # Ajouter les détails spécifiques à l'action
-            if action_type == "dice_roll" and "dice_result" in state:
-                entry.update({
-                    "dice_type": state.get("rules", {}).get("dice_type", "normal"),
-                    "result": state["dice_result"]
-                })
-            elif action_type == "user_input" and "user_response" in state:
-                entry.update({
-                    "response": state["user_response"]
-                })
-            elif action_type == "decision" and "decision" in state:
-                decision = state["decision"]
-                entry.update({
-                    "next_section": decision.get("next_section"),
-                    "awaiting_action": decision.get("awaiting_action"),
-                    "conditions": decision.get("conditions", []),
-                    "rules_summary": decision.get("rules_summary", ""),
-                    "decision": decision  # Garder la décision complète pour compatibilité
-                })
-
-            # Ajouter à l'historique et sauvegarder
-            self.history.append(entry)
-            self.save_history()  # Plus d'await car la méthode n'est pas async
-            
-            # Émettre l'événement
-            event = Event(
-                type="state_traced",
-                data={
-                    "history_entry": entry,
-                    "history_length": len(self.history)
-                }
-            )
-            await self.event_bus.emit(event)
-            
-            # Mettre à jour l'état avec l'historique
-            state["history"] = self.history
-            state["trace"] = {
-                "stats": self.stats,
-                "history": self.history
-            }
+            # TODO: Add LLM analysis for game state
+            # This will include:
+            # - Analyzing player decisions and their impact
+            # - Evaluating game progression
+            # - Suggesting potential paths or strategies
+            # - Identifying key decision points
             
             return state
             
         except Exception as e:
-            logging.getLogger(__name__).error(f"Erreur dans TraceAgent.invoke: {str(e)}", exc_info=True)
-            return {
-                "error": str(e),
-                "history": self.history,
-                "trace": {
-                    "stats": self.stats,
-                    "history": self.history
-                }
-            }
-    
-    async def get_character_stats(self) -> Dict:
+            self.logger.error(f"Error analyzing game state: {e}")
+            state.error = str(e)
+            return state
+
+    async def get_feedback(self, state: GameState) -> str:
         """
-        Récupère les statistiques actuelles du personnage.
-        
-        Returns:
-            Dict: Les statistiques du personnage
-        """
-        return self.stats.copy()
-    
-    async def update_stats(self, updates: Dict) -> None:
-        """
-        Met à jour les statistiques du personnage.
+        Get feedback about the current game state.
         
         Args:
-            updates (Dict): Les mises à jour à appliquer aux stats
+            state: Current game state
+            
+        Returns:
+            str: Feedback about the current state
         """
-        for category, values in updates.items():
-            if category in self.stats:
-                if isinstance(self.stats[category], dict):
-                    self.stats[category].update(values)
-                else:
-                    self.stats[category] = values
-            else:
-                self.stats[category] = values
-        
-        # Sauvegarder les stats mises à jour
-        self.save_adventure_stats()
-        
-        # Émettre un événement de mise à jour des stats
-        await self.event_bus.emit(Event(
-            type="stats_updated",
-            data={"stats": self.stats.copy()}
-        ))
+        try:
+            if self.trace_manager:
+                return self.trace_manager.get_state_feedback(state)
+            return "Game state processed successfully."
+            
+        except Exception as e:
+            self.logger.error(f"Error getting feedback: {e}")
+            return f"Error getting feedback: {e}"
 
-    def get_stats(self) -> Dict:
+    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Récupère les statistiques actuelles.
+        Asynchronous invocation of the agent.
         
-        Returns:
-            Dict: Statistiques du personnage
+        Args:
+            input_data: Input data containing game state
+            
+        Yields:
+            Dict[str, Any]: Updated game state
         """
-        stats_file = self._session_dir / "adventure_stats.json"
-        if stats_file.exists():
-            with open(stats_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return self.stats
-    
-    def get_history(self) -> List[Dict]:
+        try:
+            # Parse input state
+            state = GameState.model_validate(input_data.get("state", input_data))
+            
+            # Analyze state and get decisions
+            updated_state = await self.analyze_state(state)
+            
+            # Get feedback if needed
+            if updated_state.error:
+                feedback = await self.get_feedback(updated_state)
+                updated_state.error = feedback
+            
+            yield updated_state.model_dump()
+            
+        except Exception as e:
+            self.logger.error(f"Error in TraceAgent.ainvoke: {e}")
+            yield {"error": str(e)}
+
+    def invoke(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Récupère l'historique des actions.
+        Synchronous version of ainvoke.
         
+        Args:
+            input_data: Input data containing game state
+            
         Returns:
-            List[Dict]: Historique des actions
+            Dict[str, Any]: Updated game state
         """
-        return self.history.copy()
+        try:
+            # Parse input state
+            state = GameState.model_validate(input_data.get("state", input_data))
+            
+            # Analyze state
+            updated_state = self.analyze_state(state)
+            
+            return updated_state.model_dump()
+            
+        except Exception as e:
+            self.logger.error(f"Error in TraceAgent.invoke: {e}")
+            return {"error": str(e)}

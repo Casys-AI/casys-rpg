@@ -1,36 +1,58 @@
-"""Agent de base avec gestion d'état via EventBus."""
-from typing import Dict, Optional, Any, AsyncGenerator
-from event_bus import EventBus, Event
+"""Agent de base avec gestion d'état."""
+from typing import Dict, Optional, Any, AsyncGenerator, ClassVar
+from pydantic import Field, ConfigDict
+from managers.cache_manager import CacheManager
+from config.agent_config import AgentConfig
+from config.logging_config import get_logger
+from agents.protocols import BaseAgentProtocol
+from models.game_state import GameState
 import logging
 
-class BaseAgent:
+class BaseAgent(BaseAgentProtocol):
     """Classe de base pour tous les agents."""
-    
-    def __init__(self, event_bus: Optional[EventBus] = None):
-        """
-        Initialise l'agent.
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    config: AgentConfig = Field(default_factory=AgentConfig)
+    cache_manager: Optional[CacheManager] = None
+    logger: ClassVar = get_logger(__name__)
+
+    def __init__(self, config: AgentConfig, cache_manager: CacheManager):
+        """Initialize BaseAgent.
         
         Args:
-            event_bus: Bus d'événements optionnel pour le logging et le monitoring
+            config: Configuration for the agent
+            cache_manager: Cache manager instance
         """
-        self.event_bus = event_bus
-        self._setup_logging()
-
-    def _setup_logging(self):
-        """Configure le logging de manière centralisée pour tous les agents."""
-        self._logger = logging.getLogger(self.__class__.__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.ERROR)  # Niveau ERROR par défaut
+        if not config:
+            raise ValueError("config is required")
+        if not cache_manager:
+            raise ValueError("cache_manager is required")
             
-    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
-        """Invoke async."""
-        state = await self.event_bus.get_state() if self.event_bus else {}
-        result = await self.invoke(input_data)
-        yield result
+        self.config = config
+        self.cache_manager = cache_manager
+        self.config.setup_logging(self.__class__.__name__)
 
-    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict:
-        """Invoke sync."""
+    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Asynchronous invocation of the agent.
+        
+        Args:
+            input_data (Dict[str, Any]): Input data for the agent
+            
+        Returns:
+            AsyncGenerator[Dict[str, Any], None]: Generator yielding updated states
+        """
+        raise NotImplementedError("Subclasses must implement ainvoke")
+
+    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict[str, GameState]:
+        """
+        Invoke sync.
+        
+        Args:
+            input_data (Dict): Input data containing game state
+            config (Optional[Dict]): Optional configuration
+            
+        Returns:
+            Dict[str, GameState]: Updated game state
+        """
         raise NotImplementedError("Subclasses must implement invoke")

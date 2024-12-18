@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
-from agents.trace_agent import TraceAgent, TraceConfig
+from typing import Dict, Any, List, Optional, AsyncGenerator
+from agents.trace_agent import TraceAgent, TraceAgentConfig
 from event_bus import Event, EventBus
 from pathlib import Path
 import json
@@ -21,7 +22,7 @@ def trace_directory(tmp_path):
 @pytest_asyncio.fixture
 async def trace_agent(event_bus, trace_directory):
     """Crée une instance de TraceAgent pour les tests."""
-    config = TraceConfig(
+    config = TraceAgentConfig(
         trace_directory=str(trace_directory)  # Convertir Path en str
     )
     agent = TraceAgent(
@@ -47,7 +48,7 @@ async def test_record_decision(trace_agent):
                 "needs_dice": True,
                 "dice_type": "combat"
             },
-            "user_response": "Je vais à gauche"
+            "player_input": "Je vais à gauche"
         }
     }
     
@@ -67,7 +68,7 @@ async def test_record_decision(trace_agent):
     assert entry["awaiting_action"] is True
     assert "needs_dice_roll" in entry["conditions"]
     assert entry["rules_summary"] == "Un jet de dé est nécessaire"
-    assert entry["user_response"] == "Je vais à gauche"
+    assert entry["player_input"] == "Je vais à gauche"
     
     # Vérifier que le fichier history.json existe et contient les bonnes données
     history_file = Path(trace_agent._session_dir) / "history.json"
@@ -123,7 +124,7 @@ async def test_multiple_actions_sequence(trace_agent):
     await trace_agent.invoke({
         "state": {
             "section_number": 1,
-            "user_response": "Je vais à gauche",
+            "player_input": "Je vais à gauche",
             "decision": {
                 "next_section": None,
                 "awaiting_action": True,

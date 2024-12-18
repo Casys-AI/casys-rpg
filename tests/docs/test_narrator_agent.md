@@ -7,156 +7,192 @@ This document details the test suite for the Narrator Agent component, which man
 
 ### Fixtures
 
-#### `content_dir`
-**Purpose**: Provides test content environment
-**Setup**:
+#### `temp_dir`
+**Purpose**: Creates a temporary directory for test files
 ```python
-temp_dir = tempfile.mkdtemp()
-cache_dir = os.path.join(temp_dir, "cache")
-os.makedirs(cache_dir)
+@pytest.fixture
+def temp_dir():
+    temp = tempfile.mkdtemp()
+    yield temp
+    shutil.rmtree(temp)
+```
 
-# Test content creation with representative game book content
-test_content = """La Forêt Mystérieuse
+#### `cache_config`
+**Purpose**: Provides configuration for the cache manager
+```python
+@pytest.fixture
+def cache_config(temp_dir):
+    return CacheManagerConfig(
+        cache_dir=temp_dir,
+        content_dir=os.path.join(temp_dir, "sections"),
+        trace_dir=os.path.join(temp_dir, "trace")
+    )
+```
 
-Vous arrivez à l'orée d'une forêt sombre. Les arbres semblent murmurer des secrets anciens.
+#### `cache_manager`
+**Purpose**: Creates a cache manager instance for testing
+```python
+@pytest.fixture
+def cache_manager(cache_config):
+    return CacheManager(config=cache_config)
+```
 
-Que souhaitez-vous faire ?
+#### `narrator_config`
+**Purpose**: Provides configuration for the narrator agent
+```python
+@pytest.fixture
+def narrator_config():
+    return NarratorConfig(
+        model_name="gpt-4o-mini",
+        temperature=0.7,
+        system_message="You are a skilled narrator for an interactive game book."
+    )
+```
 
-1. Explorer plus profondément dans la forêt
-2. Retourner au village
-3. Examiner les traces au sol"""
+#### `mock_llm`
+**Purpose**: Provides a mock LLM for testing
+```python
+class MockResponse:
+    def __init__(self, content):
+        self.content = content
 
-with open(os.path.join(temp_dir, "1.md"), "w", encoding="utf-8") as f:
-    f.write(test_content)
+@pytest.fixture
+def mock_llm():
+    mock = AsyncMock()
+    mock.ainvoke.return_value = MockResponse("Formatted Test content")
+    return mock
 ```
 
 #### `narrator_agent`
-**Configuration**:
+**Purpose**: Creates a narrator agent instance for testing
 ```python
-config = NarratorConfig(
-    llm=ChatOpenAI(model="gpt-4o-mini", temperature=0),
-    content_directory=content_dir,
-    cache_directory=cache_dir
-)
+@pytest.fixture
+def narrator_agent(narrator_config, cache_manager, mock_llm):
+    agent = NarratorAgent(
+        config=narrator_config,
+        cache_manager=cache_manager
+    )
+    agent.llm = mock_llm
+    return agent
 ```
 
-## Detailed Test Cases
+## Test Cases
 
-### 1. Cache Usage (`test_narrator_agent_cache`)
-**Purpose**: Verify that cached content is used directly when available
+### 1. Content Formatting (`test_narrator_agent_format_content`)
+**Purpose**: Verify that the agent correctly formats content using the LLM
 
 #### Test Sequence:
 ```python
-# Create cached content
-cached_content = "This is a cached content that should be used directly"
-with open(cache_path, "w") as f:
-    f.write(cached_content)
-
-# Verify cache usage
-async for result in narrator_agent.ainvoke({"state": {"section_number": section}}):
-    assert result["state"]["content"] == cached_content
-    assert result["state"]["source"] == "cache"
+@pytest.mark.asyncio
+async def test_narrator_agent_format_content(narrator_agent, mock_llm):
+    raw_content = "Test content"
+    mock_llm.ainvoke.return_value = MockResponse(f"# Formatted Content\n\n{raw_content}")
+    formatted = await narrator_agent.format_content(raw_content)
 ```
 
-### 2. No Cache Processing (`test_narrator_agent_no_cache`)
-**Purpose**: Verify content processing when no cache exists
+#### Validations:
+- Content is not None
+- Content is a string
+- Original content is preserved in the formatted output
+- LLM is called correctly with system and human messages
+
+### 2. Section Reading (`test_narrator_agent_read_section`)
+**Purpose**: Verify section reading from source files
 
 #### Test Sequence:
 ```python
-# Create source content without cache
-test_content = """Test Section
-
-This is a test section with some *italic* text."""
-
-# Verify processing
-async for result in narrator_agent.ainvoke({"state": {"section_number": section}}):
-    assert content != test_content  # Content should be formatted
-    assert "**" in content  # Should contain Markdown formatting
-    assert result["state"]["source"] in ["loaded", "cache"]
-```
-
-### 3. Invalid Input (`test_narrator_agent_invalid_input`)
-**Purpose**: Test error handling for invalid inputs
-
-#### Validations:
-```python
-async for result in narrator_agent.ainvoke({"state": {}}):
-    assert "error" in result["state"]
-```
-
-### 4. Missing Section (`test_narrator_agent_section_not_found`)
-**Purpose**: Test handling of non-existent sections
-
-#### Validations:
-```python
-async for result in narrator_agent.ainvoke({"state": {"section_number": 999}}):
-    assert "error" in result["state"]
-    assert result["state"]["error"] == "Section 999 not found"
-    assert result["state"]["source"] == "not_found"
-```
-
-### 5. Content Format (`test_narrator_agent_content_format`)
-**Purpose**: Verify basic Markdown formatting
-
-#### Validations:
-```python
-assert isinstance(content, str)
-assert "#" in content  # Title formatting
-assert "**" in content  # Bold text
-assert not "<h1>" in content  # No HTML tags
-```
-
-### 6. Section References (`test_narrator_agent_content_formatting`)
-**Purpose**: Test section reference formatting
-
-#### Test Content:
-```markdown
-Un titre simple
-
-Un paragraphe avec du texte en *italique* et quelques mots importants.
-
-1. Premier choix - aller à la section 3
-2. Deuxième choix - aller à la section 4
-3. Troisième choix - aller à la section 5
+@pytest.mark.asyncio
+async def test_narrator_agent_read_section(narrator_agent, cache_manager, temp_dir, mock_llm):
+    section = 1
+    raw_content = "Test section content"
+    
+    # Create test section file
+    os.makedirs(os.path.join(temp_dir, "sections"), exist_ok=True)
+    with open(os.path.join(temp_dir, "sections", f"{section}.md"), "w") as f:
+        f.write(raw_content)
 ```
 
 #### Validations:
-```python
-assert "[[3]]" in content and "[[4]]" in content and "[[5]]" in content
-```
+- Content is properly formatted with Markdown
+- Section links are correctly formatted
+- Content is cached after reading
+- Source type is correctly set
 
-### 7. Section Selection (`test_narrator_section_selection`)
-**Purpose**: Test basic section loading functionality
+### 3. Cache Reading (`test_narrator_agent_cache`)
+**Purpose**: Verify reading content from cache
+
+#### Test Sequence:
+```python
+@pytest.mark.asyncio
+async def test_narrator_agent_cache(narrator_agent, cache_manager, mock_llm):
+    section = 1
+    cached_content = "Cached content"
+    cache_section = NarratorModel(
+        section_number=section,
+        content=cached_content,
+        source_type=SourceType.CACHED
+    )
+    cache_manager.save_section_to_cache(section, cache_section)
+```
 
 #### Validations:
+- Cached content is retrieved correctly
+- Source type is set to CACHED
+- No formatting is performed on cached content
+
+### 4. Section Not Found (`test_narrator_agent_section_not_found`)
+**Purpose**: Verify handling of non-existent sections
+
+#### Test Sequence:
 ```python
-assert "state" in result
-assert "content" in result["state"]
-assert result["state"]["source"] in ["loaded", "cache"]
+@pytest.mark.asyncio
+async def test_narrator_agent_section_not_found(narrator_agent, mock_llm):
+    section = 999  # Non-existent section
+    state = GameState(
+        section_number=section,
+        narrative=NarratorModel(
+            section_number=section,
+            content="",
+            source_type=SourceType.RAW
+        )
+    )
 ```
 
-## Content Processing
-1. Load Phase:
-   - Check for cached content
-   - Load from source if no cache exists
-   - Content reading with proper encoding
-2. Format Phase:
-   - Markdown formatting (titles, bold text)
-   - Section reference formatting [[X]]
-   - Maintaining engaging narrative style
-3. Cache Phase:
-   - Automatic cache management
-   - Source tracking (loaded/cache)
+#### Validations:
+- Error is properly set in the response
+- "Section not found" message is included
+- Error handling preserves game state
 
 ## Error Handling
-- Missing sections
-- Invalid inputs
-- Section not found
-- Clear error messages
 
-## Best Practices
-- UTF-8 encoding for all files
-- Explicit section numbering
-- Clear separation of content and formatting
-- Robust cache management
-- Comprehensive error reporting
+The test suite verifies error handling for:
+- Missing sections
+- Invalid cache entries
+- LLM formatting failures
+- File system errors
+
+## Mock Configuration
+
+The test suite uses mocks for:
+- LLM responses
+- File system operations (when needed)
+- Cache operations (when testing error cases)
+
+## Test Coverage
+
+The test suite covers:
+- Content formatting
+- Section reading
+- Cache management
+- Error handling
+- State management
+- LLM integration
+
+## Future Improvements
+
+Consider adding tests for:
+- Concurrent section access
+- Large content handling
+- Network failures with LLM
+- Cache invalidation
+- Performance benchmarks
