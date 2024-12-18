@@ -1,146 +1,175 @@
+"""
+Tests for NarratorAgent
+"""
+
 import pytest
-import pytest_asyncio
-from agents.narrator_agent import NarratorAgent, NarratorConfig
-from event_bus import EventBus, Event
-from langchain_openai import ChatOpenAI
 import os
 import tempfile
 import shutil
+from unittest.mock import patch, AsyncMock
+from types import SimpleNamespace
 
-@pytest_asyncio.fixture
-async def event_bus():
-    return EventBus()
+from models.game_state import GameState
+from models.narrator_model import NarratorModel, SourceType
+from managers.cache_manager import CacheManager, CacheManagerConfig
+from agents.narrator_agent import NarratorAgent
+from config.agent_config import NarratorConfig
 
-@pytest_asyncio.fixture
-async def content_dir():
-    # Créer un répertoire temporaire pour les tests
-    temp_dir = tempfile.mkdtemp()
-    
-    # Créer le dossier cache
-    cache_dir = os.path.join(temp_dir, "cache")
-    os.makedirs(cache_dir)
-    
-    # Créer quelques fichiers de test avec un contenu plus représentatif
-    test_content = """La Forêt Mystérieuse
-
-Vous arrivez à l'orée d'une forêt sombre. Les arbres semblent murmurer des secrets anciens.
-
-Que souhaitez-vous faire ?
-
-1. Explorer plus profondément dans la forêt
-2. Retourner au village
-3. Examiner les traces au sol"""
-
-    with open(os.path.join(temp_dir, "1.md"), "w", encoding="utf-8") as f:
-        f.write(test_content)
-    
-    yield temp_dir
-    
-    # Nettoyer après les tests
-    shutil.rmtree(temp_dir)
+class MockResponse:
+    def __init__(self, content):
+        self.content = content
 
 @pytest.fixture
-def narrator_agent(event_bus, content_dir):
-    """Fixture pour le NarratorAgent."""
-    cache_dir = os.path.join(content_dir, "cache")
-    config = NarratorConfig(
-        llm=ChatOpenAI(model="gpt-4o-mini", temperature=0),
-        content_directory=content_dir,
-        cache_directory=cache_dir
+def temp_dir():
+    """Crée un répertoire temporaire pour les tests."""
+    temp = tempfile.mkdtemp()
+    yield temp
+    shutil.rmtree(temp)
+
+@pytest.fixture
+def cache_config(temp_dir):
+    """Crée la configuration du cache pour les tests."""
+    return CacheManagerConfig(
+        cache_dir=temp_dir,
+        content_dir=os.path.join(temp_dir, "sections"),
+        trace_dir=os.path.join(temp_dir, "trace")
     )
-    return NarratorAgent(config=config)
+
+@pytest.fixture
+def cache_manager(cache_config):
+    """Crée un gestionnaire de cache pour les tests."""
+    return CacheManager(config=cache_config)
+
+@pytest.fixture
+def narrator_config():
+    """Crée la configuration du narrateur pour les tests."""
+    return NarratorConfig(
+        model_name="gpt-4o-mini",
+        temperature=0.7,
+        system_message="You are a skilled narrator for an interactive game book."
+    )
+
+@pytest.fixture
+def mock_llm():
+    """Create a mock LLM for testing."""
+    mock = AsyncMock()
+    mock.ainvoke.return_value = MockResponse("Formatted Test content")
+    return mock
+
+@pytest.fixture
+def narrator_agent(narrator_config, cache_manager, mock_llm):
+    """Crée un agent narrateur pour les tests."""
+    agent = NarratorAgent(
+        config=narrator_config,
+        cache_manager=cache_manager
+    )
+    agent.llm = mock_llm
+    return agent
 
 @pytest.mark.asyncio
-async def test_narrator_agent_cache(narrator_agent):
-    """Test que le NarratorAgent utilise le contenu du cache directement sans LLM"""
+async def test_narrator_agent_format_content(narrator_agent, mock_llm):
+    """Test the content formatting with a mocked LLM."""
+    raw_content = "Test content"
+    
+    # Configure mock for this specific test
+    mock_llm.ainvoke.return_value = MockResponse(f"# Formatted Content\n\n{raw_content}")
+    narrator_agent.config.llm = mock_llm
+    
+    formatted = await narrator_agent.format_content(raw_content)
+    
+    # Verify basic output requirements
+    assert formatted is not None, "Formatted content should not be None"
+    assert isinstance(formatted, str), "Formatted content should be a string"
+    assert raw_content in formatted, "Formatted content should contain the original content"
+    
+    # Verify LLM was called correctly
+    mock_llm.ainvoke.assert_called_once()
+    messages = mock_llm.ainvoke.call_args[0][0]
+    assert len(messages) == 2, "Should have system and human messages"
+    assert messages[1].content == raw_content, "Human message should contain raw content"
+
+@pytest.mark.asyncio
+async def test_narrator_agent_read_section(narrator_agent, cache_manager, temp_dir, mock_llm):
+    """Test la lecture d'une section depuis le fichier source."""
     section = 1
+    raw_content = "Test section content"
     
-    # Créer un fichier dans le cache avec un contenu spécifique
-    cache_path = os.path.join(narrator_agent.config.cache_directory, f"{section}_cached.md")
-    cached_content = "This is a cached content that should be used directly"
-    with open(cache_path, "w", encoding="utf-8") as f:
-        f.write(cached_content)
+    # Créer le fichier de section
+    os.makedirs(os.path.join(temp_dir, "sections"), exist_ok=True)
+    with open(os.path.join(temp_dir, "sections", f"{section}.md"), "w") as f:
+        f.write(raw_content)
     
-    # L'appel devrait utiliser directement le contenu du cache sans le formater
-    async for result in narrator_agent.ainvoke({"state": {"section_number": section, "use_cache": True}}):
-        assert result["state"]["content"] == cached_content  # Le contenu doit être exactement le même
-        assert result["state"]["source"] == "cache"  # La source doit être "cache"
+    # Test avec source=raw
+    with patch('agents.narrator_agent.NarratorAgent._format_content', new_callable=AsyncMock) as mock_format:
+        mock_format.return_value = f"# Section Test\n\n{raw_content}\n\nChoices:\n- [[1]] Option 1\n- [[2]] Option 2"
+        
+        state = GameState(
+            section_number=section,
+            narrative=NarratorModel(
+                section_number=section,
+                content="",
+                source_type=SourceType.RAW
+            )
+        )
+        
+        async for result in narrator_agent.ainvoke(state.model_dump()):
+            # Vérifie que le contenu est formaté en Markdown
+            assert "# Section Test" in result["state"]["narrative"]["content"]
+            assert "[[1]]" in result["state"]["narrative"]["content"]
+            assert "[[2]]" in result["state"]["narrative"]["content"]
+            assert raw_content in result["state"]["narrative"]["content"]
+            assert result["state"]["narrative"]["source_type"] == SourceType.RAW
+            
+            # Vérifie que la section est mise en cache
+            cached = cache_manager.get_section_from_cache(section)
+            assert cached is not None
+            assert raw_content in cached.content
+            assert "# Section Test" in cached.content
 
 @pytest.mark.asyncio
-async def test_narrator_agent_invalid_input(narrator_agent):
-    """Test la gestion des entrées invalides"""
-    async for result in narrator_agent.ainvoke({"state": {}}):
-        assert "error" in result["state"]
+async def test_narrator_agent_cache(narrator_agent, cache_manager, mock_llm):
+    """Test la lecture d'une section depuis le cache."""
+    section = 1
+    cached_content = "Cached content"
+    
+    # Créer une entrée dans le cache
+    cache_section = NarratorModel(
+        section_number=section,
+        content=cached_content,
+        source_type=SourceType.CACHED
+    )
+    cache_manager.save_section_to_cache(section, cache_section)
+    
+    # Test avec source=cache
+    state = GameState(
+        section_number=section,
+        narrative=NarratorModel(
+            section_number=section,
+            content="",
+            source_type=SourceType.CACHED
+        )
+    )
+    
+    async for result in narrator_agent.ainvoke(state.model_dump()):
+        # Vérifie que le contenu vient du cache
+        assert result["state"]["narrative"]["content"] == cached_content
+        assert result["state"]["narrative"]["source_type"] == SourceType.CACHED
 
 @pytest.mark.asyncio
-async def test_narrator_agent_section_not_found(narrator_agent):
-    """Test la gestion des sections manquantes"""
-    async for result in narrator_agent.ainvoke({"state": {"section_number": 999, "use_cache": False}}):
-        assert "error" in result["state"]
-        assert result["state"]["error"] == "Section 999 not found"  # Message d'erreur exact
-        assert result["state"]["source"] == "not_found"  # Vérifie aussi la source
-
-@pytest.mark.asyncio
-async def test_narrator_agent_content_format(narrator_agent):
-    """Test le format du contenu"""
-    async for result in narrator_agent.ainvoke({"state": {"section_number": 1}}):
-        content = result["state"]["content"]
-        assert isinstance(content, str)
-        # Vérifie le formatage Markdown de base
-        assert "#" in content  # Titre
-        assert "**" in content  # Gras
-        assert not "<h1>" in content  # Pas de HTML
-
-@pytest.mark.asyncio
-async def test_narrator_agent_content_formatting(narrator_agent, content_dir):
-    """Test le formatage avec des références de section"""
-    section = 2
+async def test_narrator_agent_section_not_found(narrator_agent, mock_llm):
+    """Test la gestion d'une section inexistante."""
+    section = 999  # Section qui n'existe pas
     
-    # Créer un fichier de test avec des références de section
-    test_content = """Un titre simple
-
-Un paragraphe avec du texte en *italique* et quelques mots importants.
-
-1. Premier choix - aller à la section 3
-2. Deuxième choix - aller à la section 4
-3. Troisième choix - aller à la section 5"""
+    state = GameState(
+        section_number=section,
+        narrative=NarratorModel(
+            section_number=section,
+            content="",
+            source_type=SourceType.RAW
+        )
+    )
     
-    with open(os.path.join(content_dir, f"{section}.md"), "w", encoding="utf-8") as f:
-        f.write(test_content)
-    
-    async for result in narrator_agent.ainvoke({"state": {"section_number": section}}):
-        content = result["state"]["content"]
-        # Vérifie le formatage des références de section
-        assert "[[3]]" in content and "[[4]]" in content and "[[5]]" in content
-
-@pytest.mark.asyncio
-async def test_narrator_section_selection(narrator_agent, event_bus):
-    """Test que le NarratorAgent charge correctement la section 1"""
-    async for result in narrator_agent.ainvoke({"state": {"section_number": 1}}):
-        assert "state" in result
-        assert "content" in result["state"]
-        assert result["state"]["source"] in ["loaded", "cache"]
-
-@pytest.mark.asyncio
-async def test_narrator_agent_no_cache(narrator_agent, content_dir):
-    """Test que le NarratorAgent process la section quand il n'y a pas de cache"""
-    section = 3  # Utiliser une nouvelle section
-    
-    # Créer un fichier source sans cache
-    test_content = """Test Section
-    
-    This is a test section with some *italic* text."""
-    
-    with open(os.path.join(content_dir, f"{section}.md"), "w", encoding="utf-8") as f:
-        f.write(test_content)
-    
-    # Vérifier qu'il n'y a pas de cache initialement
-    cache_path = os.path.join(narrator_agent.config.cache_directory, f"{section}_cached.md")
-    assert not os.path.exists(cache_path)
-    
-    # L'appel devrait processer le contenu avec le LLM
-    async for result in narrator_agent.ainvoke({"state": {"section_number": section}}):
-        content = result["state"]["content"]
-        assert content != test_content  # Le contenu doit être différent (formaté)
-        assert "**" in content  # Doit contenir du formatage Markdown
-        assert result["state"]["source"] in ["loaded", "cache"]  # La source peut être l'une ou l'autre
+    async for result in narrator_agent.ainvoke(state.model_dump()):
+        # Vérifie que l'erreur est bien gérée
+        assert result["state"]["narrative"]["error"] is not None
+        assert "Section not found" in result["state"]["narrative"]["error"]

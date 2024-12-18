@@ -1,197 +1,149 @@
-# coding: utf-8
-from typing import Dict, Optional, Any, List, AsyncGenerator
-from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, ConfigDict, Field, computed_field
-from event_bus import EventBus, Event
-from agents.models import GameState
-from langchain_openai import ChatOpenAI
-from langchain.chat_models.base import BaseChatModel
-from langchain.schema import SystemMessage, HumanMessage
-from agents.base_agent import BaseAgent
-import logging
-import os
-import json
+"""NarratorAgent Module
+Handles reading and presenting game sections.
+"""
+
+from typing import Dict, Optional, AsyncGenerator, Any
 from datetime import datetime
+from pydantic import Field, ValidationError, BaseModel
+from langchain_core.messages import SystemMessage, HumanMessage
+import re
 
-class SectionContent(BaseModel):
-    """Model for section content"""
-    raw_content: str
-    formatted_content: Optional[str] = None
-    cache_path: Optional[str] = None
-    last_modified: Optional[datetime] = None
+from agents.base_agent import BaseAgent
+from models.game_state import GameState
+from models.narrator_model import NarratorModel, SourceType
+from managers.cache_manager import CacheManager
+from config.agent_config import NarratorConfig
+from config.logging_config import get_logger
+from agents.protocols import NarratorAgentProtocol
+
+logger = get_logger('narrator_agent')
+
+class NarratorAgent(BaseAgent, NarratorAgentProtocol):
+    """Agent responsable de la lecture et présentation des sections."""
     
-    @computed_field
-    def is_cached(self) -> bool:
-        return self.cache_path is not None and os.path.exists(self.cache_path)
+    config: NarratorConfig = Field(default_factory=NarratorConfig)
+    current_section: int = Field(default=1, description="Current section number")
 
-class NarratorState(BaseModel):
-    """Model for narrator state input/output"""
-    section_number: int = Field(default=1, description="Current section number")
-    content: Optional[str] = None
-    needs_content: bool = True
-    use_cache: bool = Field(default=False, description="Whether to use cached content")
-    current_section: Optional[Dict[str, Any]] = Field(
-        default_factory=lambda: {
-            "number": 1,
-            "content": None,
-            "choices": []
-        }
-    )
-    error: Optional[str] = None
-    source: Optional[str] = None
-    is_welcome_section: bool = False
-
-class NarratorConfig(BaseModel):
-    """Configuration for NarratorAgent"""
-    llm: Optional[BaseChatModel] = Field(
-        default_factory=lambda: ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-        )
-    )
-    system_message: str = Field(
-        default="""Tu es un narrateur de livre-jeu.
-        Tu dois présenter le contenu des sections de manière engageante."""
-    )
-    content_directory: str = Field(default="data/sections")
-    cache_directory: str = Field(default="data/sections/cache")
-    welcome_message: str = Field(
-        default="""# Bienvenue dans Casys RPG !"""
-    )
-    
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
-    @computed_field
-    def cache_path(self) -> str:
-        return os.path.join(self.content_directory, "cache")
-
-class NarratorAgent(BaseAgent):
-    """Agent responsible for narration"""
-
-    def __init__(self, event_bus: Optional[EventBus] = None, config: Optional[NarratorConfig] = None):
-        """Initialize the agent with Pydantic configuration"""
-        self.event_bus = event_bus
-        self.config = config or NarratorConfig()
-        self.llm = self.config.llm
-        self._logger = logging.getLogger(__name__)
+    def __init__(self, config: NarratorConfig, cache_manager: CacheManager):
+        """Initialize NarratorAgent.
         
-        # Create necessary directories
-        os.makedirs(self.config.content_directory, exist_ok=True)
-        os.makedirs(self.config.cache_directory, exist_ok=True)
+        Args:
+            config: Configuration for the agent
+            cache_manager: Cache manager instance
+        """
+        super().__init__(config=config, cache_manager=cache_manager)
+        self.current_section = 1
+        self.logger = logger
 
-    async def _load_section_content(self, section_number: int) -> Optional[SectionContent]:
-        """Load section content from file with caching"""
+    async def _read_section(self, section_number: int) -> NarratorModel:
+        """Lit une section du livre.
+        
+        Args:
+            section_number: Numéro de la section à lire
+            
+        Returns:
+            NarratorModel: Section lue
+        """
         try:
-            cache_path = os.path.join(self.config.cache_directory, f"{section_number}_cached.md")
-            
-            # Check cache first
-            if os.path.exists(cache_path):
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    return SectionContent(
-                        raw_content=content,
-                        formatted_content=content,
-                        cache_path=cache_path,
-                        last_modified=datetime.fromtimestamp(os.path.getmtime(cache_path))
-                    )
-            
-            # Load from source
-            content_path = os.path.join(self.config.content_directory, f"{section_number}.md")
-            if not os.path.exists(content_path):
-                return None
-                
-            with open(content_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                return SectionContent(
-                    raw_content=content,
-                    cache_path=cache_path
+            # Try to get from cache first if source is "cache"
+            cached_content = self.cache_manager.get_section_from_cache(section_number)
+            if cached_content and isinstance(cached_content, NarratorModel):
+                self.logger.info(f"[NarratorAgent] Section {section_number} trouvée en cache")
+                return cached_content
+
+            # Load raw content from file
+            raw_content = self.cache_manager.load_raw_section_content(section_number)
+            if not raw_content:
+                self.logger.error(f"[NarratorAgent] Section {section_number} non trouvée")
+                return NarratorModel(
+                    section_number=section_number,
+                    content="",
+                    source_type=SourceType.RAW,
+                    error="Section not found"
                 )
                 
+            # Format content with LLM
+            formatted_content = await self._format_content(raw_content)
+            
+            # Create and save section content
+            section_content = NarratorModel(
+                section_number=section_number,
+                content=formatted_content,
+                source_type=SourceType.RAW
+            )
+            
+            # Save to cache
+            self.cache_manager.save_section_to_cache(section_number, section_content)
+            
+            return section_content
+            
         except Exception as e:
-            self._logger.error(f"Error loading section {section_number}: {str(e)}")
-            return None
+            self.logger.error(f"[NarratorAgent] Error reading section {section_number}: {str(e)}")
+            return NarratorModel(
+                section_number=section_number,
+                content="",
+                source_type=SourceType.RAW,
+                error=f"Error reading section: {str(e)}"
+            )
 
-    async def _format_content(self, content: SectionContent) -> SectionContent:
-        """Format section content using LLM"""
+    async def _format_content(self, content: str) -> str:
+        """Formate le contenu avec le LLM et Markdown.
+        
+        Args:
+            content: Contenu brut à formater
+            
+        Returns:
+            str: Contenu formaté
+        """
         try:
             messages = [
                 SystemMessage(content=self.config.system_message),
-                HumanMessage(content="""Format this game book section content using Markdown:
-                - Use '**' for important elements
-                - Use '#' for section titles
-                - Surround section numbers with [[ ]] (e.g. [[1]], [[2]], etc.)
-                - Keep the section content engaging and immersive
-
-Here's the content to format:"""),
-                HumanMessage(content=content.raw_content)
+                HumanMessage(content=content)
             ]
             
-            response = await self.llm.ainvoke(messages)
-            content.formatted_content = response.content
+            # Call LLM for formatting
+            response = await self.config.llm.ainvoke(messages)
             
-            # Save to cache if path is set
-            if content.cache_path:
-                try:
-                    with open(content.cache_path, "w", encoding="utf-8") as f:
-                        f.write(content.formatted_content)
-                    content.last_modified = datetime.now()
-                except Exception as e:
-                    self._logger.error(f"Error saving to cache: {str(e)}")
-            
-            return content
+            if not response or not response.content:
+                raise ValueError("Empty response from LLM")
+                
+            return response.content
             
         except Exception as e:
-            self._logger.error(f"Error formatting content: {str(e)}")
-            content.formatted_content = content.raw_content
-            return content
+            self.logger.error(f"[NarratorAgent] Erreur formatage contenu: {e}")
+            return content  # Return raw content if formatting fails
 
-    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
-        """Process a section asynchronously"""
+    async def format_content(self, content: str) -> str:
+        """Format the content using the LLM.
+        
+        Args:
+            content: Raw content to format
+            
+        Returns:
+            str: Formatted content
+        """
+        return await self._format_content(content)
+
+    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+        """Invoque l'agent narrateur.
+        
+        Args:
+            input_data: Données d'entrée contenant l'état du jeu
+            
+        Yields:
+            Dict[str, Any]: État du jeu mis à jour
+        """
         try:
-            # Convert input to NarratorState
-            state = NarratorState(**input_data.get("state", {}))
+            # Validation des données d'entrée
+            game_state = GameState(**input_data)
             
-            # Handle welcome section
-            if state.is_welcome_section:
-                content = SectionContent(raw_content=self.config.welcome_message)
-                formatted = await self._format_content(content)
-                state.content = formatted.formatted_content
-                state.needs_content = False
-                state.source = "welcome"
-                yield {"state": state.model_dump()}
-                return
+            # Lecture de la section
+            content = await self._read_section(game_state.section_number)
+            game_state.narrative = content
             
-            # Load and format section content
-            content = await self._load_section_content(state.section_number)
-            if not content:
-                state.error = f"Section {state.section_number} not found"
-                state.source = "not_found"
-                yield {"state": state.model_dump()}
-                return
-            
-            # Format content if needed
-            if not content.formatted_content:
-                content = await self._format_content(content)
-            
-            # Update state
-            state.content = content.formatted_content
-            state.needs_content = False
-            state.source = "loaded" if not content.is_cached else "cache"
-            if state.current_section:
-                state.current_section["content"] = content.formatted_content
-            
-            yield {"state": state.model_dump()}
+            # Retourne l'état sous forme de dictionnaire
+            yield {"state": game_state.model_dump()}
             
         except Exception as e:
-            self._logger.error(f"Error in NarratorAgent.ainvoke: {str(e)}")
-            yield {
-                "state": NarratorState(
-                    section_number=input_data.get("state", {}).get("section_number", 1),
-                    error=str(e)
-                ).model_dump()
-            }
-
-    async def invoke(self, state: Dict) -> Dict:
-        """Synchronous version of ainvoke"""
-        async for result in self.ainvoke(state):
-            return result
+            self.logger.error(f"[NarratorAgent] Error in NarratorAgent.ainvoke: {str(e)}")
+            raise

@@ -1,13 +1,22 @@
+"""Test module for DecisionAgent"""
 import pytest
 import pytest_asyncio
-from agents.decision_agent import DecisionAgent, DecisionConfig
+from typing import List, Dict, Any
+from unittest.mock import Mock, AsyncMock
+from langchain.chat_models.base import BaseChatModel
+from langchain.schema import BaseMessage, HumanMessage, AIMessage
+from agents.decision_agent import DecisionAgent
+from config.agent_config import DecisionConfig
 from agents.rules_agent import RulesAgent
 from event_bus import EventBus, Event
 from langchain_openai import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from typing import List
+from models.game_state import GameState
+from models.decision_model import DecisionModel
+from models.rules_model import RulesModel
+from models.narrator_model import NarratorModel
 
 class MockRulesAgent:
     """Mock pour RulesAgent"""
@@ -114,7 +123,7 @@ async def test_decision_agent_basic(decision_agent):
     result = await decision_agent.invoke({
         "state": {
             "section_number": 1,
-            "user_response": "Option 1"
+            "player_input": "Option 1"
         }
     })
     assert isinstance(result, dict)
@@ -135,7 +144,7 @@ async def test_decision_agent_with_rules(decision_agent, rules_agent):
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
-            "user_response": "Option 1",
+            "player_input": "Option 1",
             "rules": rules
         }
     })
@@ -149,7 +158,7 @@ async def test_decision_agent_state_handling(decision_agent):
     # Préparer l'état initial
     initial_state = {
         "section_number": 1,
-        "user_response": "Option 1",
+        "player_input": "Option 1",
         "rules": {
             "choices": ["Option 1", "Option 2"],
             "next_sections": [2, 3],
@@ -205,7 +214,7 @@ async def test_decision_agent_dice_handling(decision_agent, rules_agent):
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
-            "user_response": "Option 1",
+            "player_input": "Option 1",
             "dice_result": {"value": 6, "type": "combat"},
             "rules": rules
         }
@@ -284,7 +293,7 @@ async def test_decision_agent_full_sequence(decision_agent, rules_agent, event_b
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
-            "user_response": "Option 1",
+            "player_input": "Option 1",
             "rules": rules
         }
     })
@@ -295,7 +304,7 @@ async def test_decision_agent_full_sequence(decision_agent, rules_agent, event_b
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
-            "user_response": "Option 1",
+            "player_input": "Option 1",
             "dice_result": {"value": 6, "type": "combat"},
             "rules": rules
         }
@@ -339,7 +348,7 @@ async def test_decision_agent_uses_rules(decision_agent, rules_agent, event_bus)
     result = await decision_agent.invoke({
         "state": {
             "section_number": section,
-            "user_response": "Aller à gauche",
+            "player_input": "Aller à gauche",
             "rules": rules
         }
     })

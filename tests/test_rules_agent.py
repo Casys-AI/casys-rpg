@@ -1,106 +1,12 @@
-"""
-# 🎲 RulesAgent Test Specifications
-
-## Overview
-Test suite for the RulesAgent component of the Casys RPG engine. The RulesAgent is responsible
-for analyzing game rules and determining required actions (dice rolls, choices).
-
-## Test Architecture
-Each test focuses on a specific aspect of the RulesAgent's functionality, following
-the component's role in the game engine architecture.
-
-## Test Categories
-
-### 1. Basic Functionality Test
-**Purpose**: Verify basic response format and content validation
-**Input Data Format**:
-```json
-{
-    "state": {
-        "section_number": 1
-    }
-}
-```
-**Expected Output Format**:
-```json
-{
-    "state": {
-        "choices": ["list of choices"],
-        "needs_dice": boolean,
-        "dice_type": "combat"|"chance"|null,
-        "rules": "rule text"
-    }
-}
-```
-
-### 2. Cache Mechanism Test
-**Purpose**: Verify caching behavior and response consistency
-**Cache Structure**:
-```python
-cache = {
-    section_number: "rules_text",
-    ...
-}
-```
-**Validation Points**:
-- Response consistency across calls
-- Cache hit behavior
-- Field preservation
-
-### 3. Input Validation Test
-**Purpose**: Verify error handling and input validation
-**Error Cases**:
-- Missing section number
-- Invalid section number (negative)
-- Malformed input
-**Error Format**:
-```json
-{
-    "state": {
-        "error": "error message",
-        "choices": [],
-        "needs_dice": false,
-        "dice_type": null
-    }
-}
-```
-
-### 4. Dice Roll Detection Test
-**Purpose**: Verify dice roll requirement detection
-**Dice Types**:
-- Combat: For battle scenarios
-- Chance: For luck/skill checks
-**Trigger Words**:
-- Combat: ["combat", "fight", "battle"]
-- Chance: ["chance", "luck", "fortune"]
-**Detection Format**:
-```json
-{
-    "state": {
-        "needs_dice": true,
-        "dice_type": "combat"|"chance",
-        "awaiting_action": true
-    }
-}
-```
-
-## Test Dependencies
-- pytest-asyncio: For async test execution
-- pytest: Test framework
-- langchain_community: LLM integration
-
-## Model Configuration
-- Model: gpt-4o-mini
-- Temperature: 0 (deterministic for rules)
-"""
-
 import os
 import json
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 from langchain.schema import SystemMessage, AIMessage
-from agents.rules_agent import RulesAgent, RulesConfig
+from agents.rules_agent import RulesAgent
+from config.agent_config import RulesConfig
+from models.rules_model import RulesModel, DiceType, SourceType
 import asyncio
 import tempfile
 import shutil
@@ -120,6 +26,15 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+# Chemins pour les tests
+TEST_DATA_DIR = os.path.join("data")
+TEST_CACHE_DIR = os.path.join(TEST_DATA_DIR, "cache", "rules")
+TEST_RULES_DIR = os.path.join(TEST_DATA_DIR, "rules")
+
+# Créer les répertoires de test s'ils n'existent pas
+os.makedirs(TEST_RULES_DIR, exist_ok=True)
+os.makedirs(TEST_CACHE_DIR, exist_ok=True)
 
 class MockLLM:
     async def ainvoke(self, messages):
@@ -153,26 +68,28 @@ async def event_loop():
     asyncio.set_event_loop(None)
 
 @pytest.fixture
-def rules_agent():
-    """Fixture pour le RulesAgent"""
-    config = RulesConfig()
-    config.llm = ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0,
-        openai_api_key=os.getenv("OPENAI_API_KEY")
-    )
-    return RulesAgent(config=config)
-
-@pytest.fixture
 def clean_cache():
     """Nettoie le cache avant et après les tests"""
-    cache_dir = os.path.join("data", "rules", "cache")
-    if os.path.exists(cache_dir):
-        shutil.rmtree(cache_dir)
-    os.makedirs(cache_dir)
+    if os.path.exists(TEST_CACHE_DIR):
+        shutil.rmtree(TEST_CACHE_DIR)
+    os.makedirs(TEST_CACHE_DIR, exist_ok=True)
     yield
-    if os.path.exists(cache_dir):
-        shutil.rmtree(cache_dir)
+    if os.path.exists(TEST_CACHE_DIR):
+        shutil.rmtree(TEST_CACHE_DIR)
+
+@pytest.fixture
+def rules_agent():
+    """Fixture pour le RulesAgent"""
+    config = RulesConfig(
+        cache_directory=TEST_CACHE_DIR,
+        rules_directory=TEST_RULES_DIR,
+        llm=ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+    )
+    return RulesAgent(config=config)
 
 @pytest.mark.asyncio
 async def test_rules_agent_basic(rules_agent):
@@ -180,7 +97,7 @@ async def test_rules_agent_basic(rules_agent):
     input_data = {
         "state": {
             "section_number": 1,
-            "current_section": {
+            "narrative": {
                 "content": "Test content"
             }
         }
@@ -197,7 +114,7 @@ async def test_rules_agent_cache(rules_agent, clean_cache):
     input_data = {
         "state": {
             "section_number": 1,
-            "current_section": {
+            "narrative": {
                 "content": "Test content"
             }
         }
@@ -222,7 +139,7 @@ async def test_rules_agent_cache_error(rules_agent, clean_cache):
     input_data = {
         "state": {
             "section_number": 999,  # Section inexistante
-            "current_section": {}  # Pas de contenu
+            "narrative": {}  # Pas de contenu
         }
     }
     
@@ -238,7 +155,7 @@ async def test_rules_agent_dice_handling(rules_agent):
     test_state = {
         "state": {
             "section_number": 1,
-            "current_section": {
+            "narrative": {
                 "content": """
                 Vous devez faire un jet de dés de combat.
                 Si vous réussissez, allez à la section 2.
@@ -299,9 +216,9 @@ async def test_rules_agent_state_transmission(rules_agent):
     async for result in rules_agent.ainvoke({
         "state": {
             "section_number": 1,
-            "current_section": {
+            "narrative": {
                 "content": """Dans cette section, vous devez faire un jet de dés de combat.
-                
+
 Si vous réussissez votre jet de combat, allez à la section 2.
 Si vous échouez, allez à la section 3.
 

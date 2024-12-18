@@ -1,105 +1,168 @@
+"""
+Agent responsable des décisions.
+"""
 from typing import Dict, Optional, Any, List, AsyncGenerator, Union
 from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, ConfigDict, Field
-from agents.models import GameState
+from pydantic import BaseModel, Field, model_validator, ConfigDict
+from models.game_state import GameState
+from models.decision_model import DecisionModel
+from models.rules_model import RulesModel
+from models.narrator_model import NarratorModel
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from agents.rules_agent import RulesAgent
-import logging
-import json
 from agents.base_agent import BaseAgent
+from config.agent_config import DecisionConfig
+from config.logging_config import get_logger
+from managers.cache_manager import CacheManager
+from agents.protocols import DecisionAgentProtocol
+import json
 
 # Type pour les agents de règles (réel ou mock)
 RulesAgentType = Union[RulesAgent, Any]
 
-class DecisionConfig(BaseModel):
-    """Configuration pour DecisionAgent."""
-    llm: Optional[BaseChatModel] = Field(default_factory=lambda: ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0.7,
-        model_kwargs={
-            "system_message": """Tu es un agent de décision pour un livre-jeu.
-            Tu dois analyser les réponses du joueur et déterminer les actions à effectuer."""
-        }
-    ))
-    rules_agent: Optional[RulesAgentType] = None
-    system_prompt: str = Field(default="""Tu es un agent qui analyse les réponses de l'utilisateur.
-Détermine la prochaine section en fonction de la réponse.""")
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-class DecisionAgent(BaseAgent):
-    """
-    Agent responsable des décisions.
-    """
+class DecisionAgent(BaseAgent, DecisionAgentProtocol):
+    """Agent responsable des décisions."""
     
-    def __init__(self, config: Optional[DecisionConfig] = None, event_bus: Optional[Any] = None, **kwargs):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    def __init__(self, config: DecisionConfig, cache_manager: CacheManager):
         """
-        Initialise l'agent avec une configuration Pydantic.
+        Initialise l'agent avec une configuration.
         
         Args:
-            config: Configuration Pydantic (optionnel)
-            event_bus: Bus d'événements pour la communication entre agents
-            **kwargs: Arguments supplémentaires pour la configuration
+            config: Configuration de l'agent
+            cache_manager: Gestionnaire de cache
         """
-        super().__init__(event_bus=event_bus)  # Appel au constructeur parent avec event_bus
-        self.config = config or DecisionConfig(**kwargs)
+        super().__init__(config=config, cache_manager=cache_manager)
         self.llm = self.config.llm
-        self.rules_agent = self.config.rules_agent
-        self.system_prompt = self.config.system_prompt
-        self.cache = {}
-        self._logger: logging.Logger
+        self.rules_agent = self.config.dependencies.get("rules_agent")
+        self.system_prompt = self.config.system_message
+        self.cache = {} if self.config.cache_enabled else None
+        self._logger = get_logger("decision_agent")
+        
+        if self.config.debug:
+            self._logger.setLevel("DEBUG")
 
-    async def invoke(self, input_data: Dict) -> Dict:
+    async def invoke(self, input_data: Dict) -> Dict[str, GameState]:
         """
         Méthode principale appelée par le graph.
         
         Args:
-            input_data (Dict): Dictionnaire contenant le state avec section_number, user_response, rules, etc.
+            input_data (Dict): Dictionnaire contenant le state
             
         Returns:
-            Dict: État mis à jour avec la décision
+            Dict[str, GameState]: État mis à jour avec la décision validée
         """
         try:
-            state = input_data.get("state", {})
-            if isinstance(state, GameState):
-                state = state.dict()
-            
-            section_number = state.get("section_number")
-            user_response = state.get("user_response")
-            rules = state.get("rules", {})
+            # Validation de l'état d'entrée avec Pydantic
+            if not isinstance(input_data.get("state"), GameState):
+                state = GameState.model_validate(input_data.get("state", {}))
+            else:
+                state = input_data["state"]
 
-            if not section_number:
+            if not state.section_number:
                 return {
-                    "state": {
-                        "error": "Section number required",
-                        "awaiting_action": None,
-                        "analysis": None
-                    }
+                    "state": GameState(
+                        section_number=1,
+                        error="Section number required"
+                    )
                 }
 
-            # Si les règles ne sont pas dans le state, les demander au RulesAgent
-            if not rules and self.rules_agent:
+            # Obtention des règles via RulesAgent si nécessaire
+            if not state.rules and self.rules_agent:
                 rules_result = await self.rules_agent.invoke({
-                    "state": {
-                        "section_number": section_number,
-                        "current_section": state.get("current_section", {})
-                    }
+                    "state": GameState(
+                        section_number=state.section_number,
+                        narrative=state.narrative
+                    ).model_dump()
                 })
-                rules = rules_result.get("state", {}).get("rules", {})
-                state["rules"] = rules
+                
+                if isinstance(rules_result.get("state"), dict):
+                    rules = RulesModel.model_validate(rules_result["state"].get("rules", {}))
+                    state.rules = rules
 
-            return await self._analyze_decision(state)
+            # Analyse de la décision
+            analysis_result = await self._analyze_decision(state)
+            
+            # Construction et validation de la décision
+            if analysis_result.get("next_section"):
+                decision = DecisionModel(
+                    section_number=analysis_result["next_section"],
+                    awaiting_action=analysis_result.get("needs_action", False),
+                    conditions=analysis_result.get("conditions", [])
+                )
+                
+                # Mise à jour de l'état avec la nouvelle décision
+                updated_state = GameState(
+                    section_number=state.section_number,
+                    narrative=state.narrative,
+                    rules=state.rules,
+                    trace=state.trace,
+                    character=state.character,
+                    dice_roll=state.dice_roll,
+                    decision=decision,
+                    player_input=state.player_input
+                )
+                
+                if self.config.debug:
+                    self._logger.debug(f"Decision made: {decision.model_dump_json(indent=2)}")
+                
+                return {"state": updated_state}
+            
+            # En cas d'erreur d'analyse
+            return {
+                "state": GameState(
+                    section_number=state.section_number,
+                    error="Could not determine next section"
+                )
+            }
 
         except Exception as e:
             self._logger.error(f"Error in DecisionAgent.invoke: {str(e)}")
-            return {"state": {"error": str(e)}}
+            return {
+                "state": GameState(
+                    section_number=state.section_number if state else 1,
+                    error=str(e)
+                )
+            }
 
-    async def ainvoke(
-        self, input_data: Dict, config: Optional[Dict] = None
-    ) -> Dict:
-        """Version asynchrone de invoke."""
-        return await self.invoke(input_data)
+    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
+        """Méthode pour l'interface asynchrone."""
+        try:
+            state = GameState.model_validate(input_data.get("state", {}))
+            analysis_result = await self._analyze_decision(state)
+            
+            if analysis_result.get("next_section"):
+                decision = DecisionModel(
+                    section_number=analysis_result["next_section"],
+                    awaiting_action=analysis_result.get("needs_action", False),
+                    conditions=analysis_result.get("conditions", [])
+                )
+                
+                # Mise à jour de l'état avec la nouvelle décision
+                updated_state = GameState(
+                    section_number=state.section_number,
+                    narrative=state.narrative,
+                    rules=state.rules,
+                    trace=state.trace,
+                    character=state.character,
+                    dice_roll=state.dice_roll,
+                    decision=decision,
+                    player_input=state.player_input
+                )
+                
+                if self.config.debug:
+                    self._logger.debug(f"Decision made: {decision.model_dump_json(indent=2)}")
+                
+                yield {"state": updated_state.model_dump()}
+            else:
+                yield {"error": "No valid next section found"}
+            
+        except Exception as e:
+            self._logger.error(f"[DecisionAgent] Error during invocation: {e}")
+            yield {"error": f"Error during invocation: {str(e)}"}
 
     async def _analyze_response(self, section_number: int, user_response: str, rules: Dict = None) -> Dict:
         """
@@ -191,7 +254,7 @@ class DecisionAgent(BaseAgent):
                 "next_section": None
             }
 
-    async def _analyze_decision(self, state: Dict) -> Dict:
+    async def _analyze_decision(self, state: GameState) -> Dict:
         """
         Analyse la décision en fonction de l'état.
         
@@ -202,75 +265,65 @@ class DecisionAgent(BaseAgent):
             Dict: Décision
         """
         try:
-            section_number = state.get("section_number")
-            user_response = state.get("user_response")
-            dice_result = state.get("dice_result")
-            rules = state.get("rules", {})
+            section_number = state.section_number
+            player_input = state.player_input
+            dice_roll = state.dice_roll
+            rules = state.rules
 
             if not rules:
                 return {"state": {"error": f"Règles non trouvées pour la section {section_number}"}}
 
             # Vérifier si on a besoin d'un jet de dés
-            needs_dice = rules.get("needs_dice", False)
-            next_action = rules.get("next_action")  # Optionnel: force l'ordre ("user_first", "dice_first")
+            needs_dice = rules.needs_dice
+            next_action = rules.next_action  # Optionnel: force l'ordre ("user_first", "dice_first")
 
             # Si un ordre est spécifié
-            if next_action == "user_first" and not user_response:
-                updated_state = state.copy()
-                updated_state.update({
-                    "section_number": section_number,
-                    "awaiting_action": "user_response",
-                    "choices": rules.get("choices", []),
-                    "analysis": "En attente de la réponse de l'utilisateur"
-                })
+            if next_action == "user_first" and not player_input:
+                updated_state = state.model_copy()
+                updated_state.section_number = section_number
+                updated_state.awaiting_action = "user_response"
+                updated_state.choices = rules.choices
+                updated_state.analysis = "En attente de la réponse de l'utilisateur"
                 return {"state": updated_state}
-            elif next_action == "dice_first" and not dice_result:
-                updated_state = state.copy()
-                updated_state.update({
-                    "section_number": section_number,
-                    "awaiting_action": "dice_roll",
-                    "dice_type": rules.get("dice_type", "normal"),
-                    "analysis": "En attente du jet de dés"
-                })
+            elif next_action == "dice_first" and not dice_roll:
+                updated_state = state.model_copy()
+                updated_state.section_number = section_number
+                updated_state.awaiting_action = "dice_roll"
+                updated_state.dice_type = rules.dice_type
+                updated_state.analysis = "En attente du jet de dés"
                 return {"state": updated_state}
 
             # Sinon vérifier ce qui manque
             # Vérifier d'abord les dés car c'est plus prioritaire
-            if needs_dice and not dice_result:
-                updated_state = state.copy()
-                updated_state.update({
-                    "section_number": section_number,
-                    "awaiting_action": "dice_roll",
-                    "dice_type": rules.get("dice_type", "normal"),
-                    "analysis": "En attente du jet de dés"
-                })
+            if needs_dice and not dice_roll:
+                updated_state = state.model_copy()
+                updated_state.section_number = section_number
+                updated_state.awaiting_action = "dice_roll"
+                updated_state.dice_type = rules.dice_type
+                updated_state.analysis = "En attente du jet de dés"
                 return {"state": updated_state}
 
             # Ensuite vérifier la réponse utilisateur
-            needs_user_response = rules.get("needs_user_response", True)
-            if needs_user_response and not user_response:
-                updated_state = state.copy()
-                updated_state.update({
-                    "section_number": section_number,
-                    "awaiting_action": "user_response",
-                    "choices": rules.get("choices", []),
-                    "analysis": "En attente de la réponse de l'utilisateur"
-                })
+            needs_user_response = rules.needs_user_response
+            if needs_user_response and not player_input:
+                updated_state = state.model_copy()
+                updated_state.section_number = section_number
+                updated_state.awaiting_action = "user_response"
+                updated_state.choices = rules.choices
+                updated_state.analysis = "En attente de la réponse de l'utilisateur"
                 return {"state": updated_state}
 
             # Si on a tout ce dont on a besoin, analyser avec le LLM
             analysis_result = await self._analyze_response(
                 section_number, 
-                self._format_response(user_response, dice_result),
-                rules
+                self._format_response(player_input, dice_roll),
+                rules.model_dump()
             )
 
-            updated_state = state.copy()
-            updated_state.update({
-                "next_section": analysis_result.get("next_section"),
-                "analysis": analysis_result["analysis"],
-                "awaiting_action": None
-            })
+            updated_state = state.model_copy()
+            updated_state.next_section = analysis_result.get("next_section")
+            updated_state.analysis = analysis_result["analysis"]
+            updated_state.awaiting_action = None
             return {"state": updated_state}
 
         except Exception as e:

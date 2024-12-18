@@ -1,86 +1,44 @@
-import { component$, useSignal, useTask$, useStore, useStyles$, $ } from '@builder.io/qwik';
-import { GameState } from '~/types/game';
+import { component$, useSignal, $, useStyles$ } from '@builder.io/qwik';
 import { CharacterSheet } from '../character/CharacterSheet';
 import { StoryContent } from '../story/StoryContent';
 import { GameControls } from '../controls/GameControls';
 import { FeedbackPanel } from '../feedback/FeedbackPanel';
 import { DiceRoller } from '../dice/DiceRoller';
 import { useStoryNavigation } from '~/hooks/useStoryNavigation';
-
-const API_BASE_URL = 'http://127.0.0.1:8000';
+import { useGameState } from '~/hooks/useGameState';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 export const GameBook = component$(() => {
-  const gameState = useStore<GameState>({
-    section_number: 1,
-    current_section: {
-      number: 1,
-      content: '',
-      choices: []
-    },
-    needs_content: true,
-    trace: {
-      stats: {
-        Caractéristiques: {
-          Habileté: 10,
-          Endurance: 20,
-          Chance: 8
-        },
-        Ressources: {
-          Or: 100,
-          Gemme: 5
-        },
-        Inventaire: {
-          Objets: ['Épée', 'Bouclier']
-        }
-      },
-      history: []
-    },
-    action_message: ''
-  });
-
+  const { gameState, error: wsError, isConnected, reconnect } = useGameState();
   const loading = useSignal(true);
-  const error = useSignal<string | null>(null);
-  const mounted = useSignal(false);
-
   const { navigating, navigateToSection, error: navigationError } = useStoryNavigation();
 
   const handleNavigate$ = $(async (sectionNumber: string) => {
     try {
-      const result = await navigateToSection(sectionNumber);
-      if (result?.state) {
-        Object.assign(gameState, result.state);
-        // Si nous avons un message d'action, l'afficher via la boîte de dialogue
-        if (result.state.action_message) {
-          showDialog(result.state.action_message);
-        }
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Une erreur est survenue';
+      await navigateToSection(sectionNumber);
+    } catch (err) {
+      console.error('Navigation error:', err);
     }
   });
 
-  const handleAction$ = $(async (action: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/game/action`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_response: action }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'envoi de l\'action');
-      }
-
-      const result = await response.json();
-      if (result?.state) {
-        Object.assign(gameState, result.state);
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Une erreur est survenue';
+  // Afficher un message d'erreur si la connexion WebSocket est perdue
+  const renderError = () => {
+    if (wsError) {
+      return (
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong class="font-bold">Erreur de connexion!</strong>
+          <span class="block sm:inline"> {wsError}</span>
+          <button
+            class="bg-red-500 text-white px-4 py-2 rounded ml-4"
+            onClick$={reconnect}
+          >
+            Reconnecter
+          </button>
+        </div>
+      );
     }
-  });
+    return null;
+  };
 
   useStyles$(`
     .game-book {
@@ -160,66 +118,46 @@ export const GameBook = component$(() => {
     }
   `);
 
-  // Charger l'état initial du jeu
-  useTask$(async () => {
-    if (!mounted.value) {
-      mounted.value = true;
-      loading.value = true;
-      try {
-        console.log('Fetching initial game state...');
-        const response = await fetch(`${API_BASE_URL}/game/state`);
-        console.log('Initial state response status:', response.status);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch initial game state');
-        }
-
-        const data = await response.json();
-        console.log('Initial state data:', data);
-        
-        if (data.state) {
-          Object.assign(gameState, data.state);
-        }
-      } catch (e) {
-        console.error('Error fetching initial state:', e);
-        error.value = e instanceof Error ? e.message : 'Failed to initialize game';
-      } finally {
-        loading.value = false;
-      }
-    }
-  });
-
   return (
-    <div class="game-book">
-      <div class="game-layout">
-        <div class="character-panel">
-          <CharacterSheet stats={gameState.trace.stats} />
-        </div>
-        <div class="story-panel">
-          {loading.value ? (
-            <div class="loading">
-              <div class="loading-spinner" />
-              <div class="loading-text">Chargement...</div>
+    <ErrorBoundary>
+      <div class="game-book">
+        {!isConnected.value ? (
+          <div class="flex items-center justify-center h-screen">
+            <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+          </div>
+        ) : (
+          <div class="container mx-auto px-4 py-8">
+            {renderError()}
+            {navigationError.value && (
+              <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
+                {navigationError.value}
+              </div>
+            )}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div class="md:col-span-2">
+                <StoryContent
+                  content={gameState.value?.current_section.content || ''}
+                  choices={gameState.value?.current_section.choices || []}
+                  onNavigate$={handleNavigate$}
+                  loading={navigating.value}
+                />
+                <GameControls
+                  gameState={gameState.value}
+                  onAction$={handleNavigate$}
+                />
+                <FeedbackPanel
+                  gameState={gameState.value}
+                  sectionNumber={gameState.value?.section_number || 1}
+                />
+              </div>
+              <div>
+                <CharacterSheet stats={gameState.value?.trace.stats} />
+                <DiceRoller />
+              </div>
             </div>
-          ) : error.value ? (
-            <div class="error">{error.value}</div>
-          ) : (
-            <>
-              <StoryContent
-                content={gameState.current_section.content}
-                choices={gameState.current_section.choices}
-                onNavigate$={handleNavigate$}
-                actionMessage={gameState.action_message}
-                onAction$={handleAction$}
-              />
-              <GameControls gameState={gameState} />
-            </>
-          )}
-        </div>
-        <div class="feedback-panel">
-          <FeedbackPanel />
-        </div>
+          </div>
+        )}
       </div>
-    </div>
+    </ErrorBoundary>
   );
 });

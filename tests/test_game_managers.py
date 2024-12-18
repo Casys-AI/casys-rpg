@@ -7,21 +7,20 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 import os
-from managers.game_managers import StateManager, AgentManager, CacheManager, EventManager
-from event_bus import EventBus, Event
-from agents.models import GameState
+from managers.state_manager import StateManager
+from managers.agent_manager import AgentManager
+from managers.cache_manager import CacheManager
+from managers.character_manager import CharacterManager
+from models.game_state import GameState
+from config.game_config import GameConfig
 
 # Fixtures
 @pytest.fixture
-def event_bus():
-    mock = Mock(spec=EventBus)
-    mock.emit = AsyncMock()
-    mock.update_state = AsyncMock()
-    mock.get_state = AsyncMock()
-    return mock
+def game_config():
+    return GameConfig()
 
 @pytest.fixture
-def state_manager(event_bus):
+def state_manager(game_config):
     mock = Mock(spec=StateManager)
     initial_state = {
         'section_number': 1,
@@ -44,28 +43,28 @@ def state_manager(event_bus):
             'history': []
         }
     }
-    mock.initialize_state = AsyncMock(return_value=initial_state)
+    mock.create_initial_state = AsyncMock(return_value=initial_state)
     mock._get_default_trace = Mock(return_value=initial_state['trace'])
     mock.update_section_state = AsyncMock()
     mock.get_state = AsyncMock(return_value=initial_state)
     return mock
 
 @pytest.fixture
-def cache_manager():
-    return CacheManager(cache_dir="test_cache")
+def cache_manager(game_config):
+    return CacheManager(config=game_config.options["cache_manager_config"])
 
 @pytest.fixture
-def event_manager(event_bus):
-    return EventManager(event_bus)
+def character_manager(game_config):
+    return CharacterManager(config=game_config.options["character_manager_config"])
 
 class AsyncIterator:
     """Helper class to simulate async iterators in tests"""
     def __init__(self, items):
         self.items = items.copy()  # Make a copy of items
-
+    
     def __aiter__(self):
         return self
-
+        
     async def __anext__(self):
         if not self.items:
             raise StopAsyncIteration
@@ -73,64 +72,55 @@ class AsyncIterator:
 
 @pytest.fixture
 def mock_agents():
-    # Narrator mock setup
-    narrator = AsyncMock()
-    narrator.ainvoke = AsyncMock()  # On laisse le return_value être configuré par le test
-    
-    # Rules mock setup
-    rules = AsyncMock()
-    rules.ainvoke = AsyncMock(return_value={
-        "state": {
-            "initial": "state",
-            "rules": {
-                "needs_dice": True,
-                "dice_type": None,
-                "conditions": [],
-                "next_sections": [],
-                "rules_summary": None,
-                "raw_content": "",
-                "choices": []
-            }
-        }
-    })
-    
-    # Decision mock setup
-    decision = AsyncMock()
-    decision.ainvoke = AsyncMock(return_value={
-        "decision": {
-            "choice": "A",
-            "awaiting_action": "choice"
-        }
-    })
-    
-    # Trace mock
-    trace = AsyncMock()
-    
+    """Create mock agents for testing"""
+    narrator = Mock()
+    narrator.process_content = AsyncMock()
+    narrator.process_content.return_value = AsyncIterator([{
+        'content': '# Section 1\nTest content',
+        'error': None
+    }])
+
+    rules = Mock()
+    rules.process_rules = AsyncMock()
+    rules.process_rules.return_value = AsyncIterator([{
+        'needs_dice': False,
+        'dice_type': None,
+        'conditions': [],
+        'next_sections': [2],
+        'error': None
+    }])
+
+    decision = Mock()
+    decision.process_decision = AsyncMock()
+    decision.process_decision.return_value = AsyncIterator([{
+        'choices': ['Option 1', 'Option 2'],
+        'error': None
+    }])
+
     return {
         'narrator': narrator,
         'rules': rules,
-        'decision': decision,
-        'trace': trace
+        'decision': decision
     }
 
 @pytest.fixture
-def agent_manager(mock_agents, event_bus, state_manager):
+def agent_manager(mock_agents, game_config, state_manager):
+    """Create AgentManager instance with mock dependencies"""
     return AgentManager(
-        mock_agents['narrator'],
-        mock_agents['rules'],
-        mock_agents['decision'],
-        mock_agents['trace'],
-        event_bus,
-        state_manager
+        config=game_config.options["agent_manager_config"],
+        narrator=mock_agents['narrator'],
+        rules=mock_agents['rules'],
+        decision=mock_agents['decision'],
+        state_manager=state_manager
     )
 
 # StateManager Tests
 class TestStateManager:
     
     @pytest.mark.asyncio
-    async def test_initialize_state(self, state_manager):
-        """Test that initialize_state returns a valid initial state"""
-        state = await state_manager.initialize_state()
+    async def test_create_initial_state(self, state_manager):
+        """Test that create_initial_state returns a valid initial state"""
+        state = await state_manager.create_initial_state()
         
         # Verify state structure
         assert isinstance(state, dict)
@@ -175,14 +165,17 @@ class TestAgentManager:
             }
         }
         print(f"\nMock configured to return: {mock_result}")
-        mock_agents['narrator'].ainvoke.return_value = mock_result
+        mock_agents['narrator'].process_content.return_value = AsyncIterator([{
+            'content': '# Section 1\nTest content',
+            'error': None
+        }])
         
         # Process state
         result = await agent_manager.process_narrator(initial_state)
         print(f"Actual result: {result}")
         
         # Verify the call was made with initial state
-        mock_agents['narrator'].ainvoke.assert_called_once_with(initial_state)
+        mock_agents['narrator'].process_content.assert_called_once_with(initial_state)
         
         # Verify result contains both initial state and new content
         assert result["state"]["initial"] == "state"
@@ -192,7 +185,7 @@ class TestAgentManager:
     async def test_process_narrator_error(self, agent_manager, mock_agents):
         """Test narrator processing with error"""
         # Setup mock to raise exception
-        mock_agents['narrator'].ainvoke.side_effect = Exception("Test error")
+        mock_agents['narrator'].process_content.side_effect = Exception("Test error")
         
         # Test
         state = {'initial': 'state'}
@@ -203,7 +196,7 @@ class TestAgentManager:
         assert str(exc_info.value) == "Test error"
         
         # Verify the call was attempted
-        mock_agents['narrator'].ainvoke.assert_called_once_with(state)
+        mock_agents['narrator'].process_content.assert_called_once_with(state)
 
     @pytest.mark.asyncio
     async def test_process_rules(self, agent_manager, mock_agents):
@@ -215,17 +208,17 @@ class TestAgentManager:
         result = await agent_manager.process_rules(initial_state)
         
         # Verify the call was made with initial state
-        mock_agents['rules'].ainvoke.assert_called_once_with(initial_state)
+        mock_agents['rules'].process_rules.assert_called_once_with(initial_state)
         
         # Verify result contains both initial state and new rules
         assert result['state']['initial'] == 'state'
-        assert result['state']['rules']['needs_dice'] is True
+        assert result['state']['rules']['needs_dice'] is False
 
     @pytest.mark.asyncio
     async def test_process_rules_error(self, agent_manager, mock_agents):
         """Test rules processing with error"""
         # Setup mock to raise exception
-        mock_agents['rules'].ainvoke.side_effect = Exception("Rules error")
+        mock_agents['rules'].process_rules.side_effect = Exception("Rules error")
         
         # Test
         state = {'initial': 'state'}
@@ -236,7 +229,7 @@ class TestAgentManager:
         assert str(exc_info.value) == "Rules error"
         
         # Verify the call was attempted
-        mock_agents['rules'].ainvoke.assert_called_once_with(state)
+        mock_agents['rules'].process_rules.assert_called_once_with(state)
 
     @pytest.mark.asyncio
     async def test_process_decision(self, agent_manager, mock_agents):
@@ -250,18 +243,16 @@ class TestAgentManager:
             }
         }
         
-        mock_agents['decision'].ainvoke.return_value = {
-            "decision": {
-                "choice": "A",
-                "awaiting_action": "choice"
-            }
-        }
+        mock_agents['decision'].process_decision.return_value = AsyncIterator([{
+            'choices': ['Option 1', 'Option 2'],
+            'error': None
+        }])
         
         # Process state
         result = await agent_manager.process_decision(initial_state)
         
         # Verify the call was made with correct rules
-        mock_agents['decision'].ainvoke.assert_called_once_with({
+        mock_agents['decision'].process_decision.assert_called_once_with({
             "state": {
                 "rules": {
                     "some": "rules"
@@ -270,14 +261,13 @@ class TestAgentManager:
         })
         
         # Verify result contains decision with awaiting_action
-        assert result['decision']['choice'] == 'A'
-        assert result['decision']['awaiting_action'] == 'choice'
+        assert result['decision']['choices'] == ['Option 1', 'Option 2']
 
     @pytest.mark.asyncio
     async def test_process_decision_error(self, agent_manager, mock_agents):
         """Test decision processing with error"""
         # Setup mock to raise exception
-        mock_agents['decision'].ainvoke.side_effect = Exception("Decision error")
+        mock_agents['decision'].process_decision.side_effect = Exception("Decision error")
         
         # Test
         state = {'initial': 'state'}
@@ -288,7 +278,7 @@ class TestAgentManager:
         assert str(exc_info.value) == "Decision error"
         
         # Verify the call was attempted
-        mock_agents['decision'].ainvoke.assert_called_once_with(state)
+        mock_agents['decision'].process_decision.assert_called_once_with(state)
 
     @pytest.mark.asyncio
     async def test_process_section(self, agent_manager, mock_agents, state_manager):
@@ -298,30 +288,21 @@ class TestAgentManager:
         content = "test content"
         
         # Configure mocks
-        mock_agents['narrator'].ainvoke.return_value = {
-            "state": {
-                "content": "formatted test content"
-            }
-        }
-        mock_agents['rules'].ainvoke.return_value = {
-            "state": {
-                "rules": {
-                    "needs_dice": True,
-                    "dice_type": None,
-                    "conditions": [],
-                    "next_sections": [],
-                    "rules_summary": None
-                }
-            }
-        }
-        mock_agents['decision'].ainvoke.return_value = {
-            "state": {
-                "decision": {
-                    "awaiting_action": "choice",
-                    "choices": []
-                }
-            }
-        }
+        mock_agents['narrator'].process_content.return_value = AsyncIterator([{
+            'content': '# Section 1\nTest content',
+            'error': None
+        }])
+        mock_agents['rules'].process_rules.return_value = AsyncIterator([{
+            'needs_dice': False,
+            'dice_type': None,
+            'conditions': [],
+            'next_sections': [2],
+            'error': None
+        }])
+        mock_agents['decision'].process_decision.return_value = AsyncIterator([{
+            'choices': ['Option 1', 'Option 2'],
+            'error': None
+        }])
         
         # Execute
         result = await agent_manager.process_section(section_number, content)
@@ -329,7 +310,7 @@ class TestAgentManager:
         # Verify the base state was created correctly
         expected_base_state = GameState(
             section_number=section_number,
-            current_section={
+            narrative={
                 "number": section_number,
                 "content": content,
                 "choices": [],
@@ -339,27 +320,27 @@ class TestAgentManager:
         ).model_dump()
         
         # Verify narrator and rules were called with the base state
-        mock_agents['narrator'].ainvoke.assert_called_once()
-        call_args = mock_agents['narrator'].ainvoke.call_args[0][0]
+        mock_agents['narrator'].process_content.assert_called_once()
+        call_args = mock_agents['narrator'].process_content.call_args[0][0]
         assert call_args["section_number"] == expected_base_state["section_number"]
-        assert call_args["current_section"]["content"] == expected_base_state["current_section"]["content"]
+        assert call_args["narrative"]["content"] == expected_base_state["narrative"]["content"]
         
-        mock_agents['rules'].ainvoke.assert_called_once()
-        call_args = mock_agents['rules'].ainvoke.call_args[0][0]
+        mock_agents['rules'].process_rules.assert_called_once()
+        call_args = mock_agents['rules'].process_rules.call_args[0][0]
         assert call_args["section_number"] == expected_base_state["section_number"]
         
         # Verify decision was called with combined state
-        mock_agents['decision'].ainvoke.assert_called_once()
-        decision_call_args = mock_agents['decision'].ainvoke.call_args[0][0]
+        mock_agents['decision'].process_decision.assert_called_once()
+        decision_call_args = mock_agents['decision'].process_decision.call_args[0][0]
         assert "rules" in decision_call_args
-        assert decision_call_args["rules"]["needs_dice"] is True
+        assert decision_call_args["rules"]["needs_dice"] is False
         
         # Verify final result structure
         assert isinstance(result, dict)
         assert result["section_number"] == section_number
-        assert "current_section" in result
+        assert "narrative" in result
         assert "rules" in result
-        assert result["rules"]["needs_dice"] is True
+        assert result["rules"]["needs_dice"] is False
 
 # CacheManager Tests
 class TestCacheManager:
@@ -389,33 +370,17 @@ class TestCacheManager:
         path = cache_manager.get_cache_path(1)
         assert path == os.path.join("test_cache", "1_cached.md")
 
-# EventManager Tests
-class TestEventManager:
+# CharacterManager Tests
+class TestCharacterManager:
     
     @pytest.mark.asyncio
-    async def test_emit_game_event(self, event_manager, event_bus):
-        """Test game event emission"""
-        # Setup mock
-        event_bus.emit = AsyncMock()
-        
+    async def test_character_manager(self, character_manager):
+        """Test character manager"""
         # Test
-        await event_manager.emit_game_event("test_event", {"data": "test"})
+        result = await character_manager.get_character_stats()
         
-        # Verify
-        event_bus.emit.assert_called_once()
-        call_args = event_bus.emit.call_args[0][0]
-        assert isinstance(call_args, Event)
-        assert call_args.type == "test_event"
-        assert call_args.data == {"data": "test"}
-    
-    def test_truncate_for_log(self, event_manager):
-        """Test log truncation"""
-        # Test short content
-        short = "short content"
-        assert event_manager.truncate_for_log(short) == short
-        
-        # Test long content
-        long = "x" * 150
-        truncated = event_manager.truncate_for_log(long)
-        assert len(truncated) == 103  # 100 chars + "..."
-        assert truncated.endswith("...")
+        # Verify result
+        assert isinstance(result, dict)
+        assert 'Caractéristiques' in result
+        assert result['Caractéristiques']['Habileté'] == 10
+        assert result['Caractéristiques']['Chance'] == 5

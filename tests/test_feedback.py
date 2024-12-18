@@ -1,7 +1,12 @@
+"""
+Tests for feedback functionality
+"""
+
 import pytest
-from app import save_feedback
+from utils.feedback_utils import save_feedback
 from pathlib import Path
 import os
+from typing import Dict, Any, List, Optional, AsyncGenerator
 
 @pytest.fixture
 def feedback_dir(tmp_path):
@@ -10,71 +15,44 @@ def feedback_dir(tmp_path):
     feedback_path.mkdir(parents=True)
     return feedback_path
 
-def test_save_feedback(feedback_dir, monkeypatch):
+def test_save_feedback(feedback_dir):
     """Test l'enregistrement du feedback"""
-    # Rediriger le chemin de sauvegarde vers le répertoire de test
-    monkeypatch.setattr("app.feedback_dir", str(feedback_dir))
-    
     # Données de test
     feedback = "Super jeu !"
-    previous_section = {"content": "# Section 1\nContenu de test"}
-    user_response = "Je vais à gauche"
-    current_section = 2
     
     # Sauvegarder le feedback
-    filepath = save_feedback(feedback, previous_section, user_response, current_section)
+    save_feedback(feedback, str(feedback_dir))
     
-    # Vérifier que le fichier est créé
-    assert os.path.exists(filepath)
+    # Vérifier que le fichier existe
+    feedback_file = feedback_dir / "user_feedback.txt"
+    assert feedback_file.exists()
     
     # Vérifier le contenu
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-        assert "# Feedback sur décision" in content
-        assert "Super jeu !" in content
-        assert "Section actuelle : 2" in content
-        assert "Je vais à gauche" in content
-        assert "# Section 1" in content
+    with open(feedback_file, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    assert content == feedback
 
-def test_feedback_validation(feedback_dir, monkeypatch):
+def test_feedback_validation(feedback_dir):
     """Test la validation du feedback"""
-    # Rediriger le chemin de sauvegarde
-    monkeypatch.setattr("app.feedback_dir", str(feedback_dir))
-    
-    # Feedback vide
-    empty_feedback = ""
-    previous_section = {"content": "Test"}
-    user_response = "Test"
-    current_section = 1
-    
-    filepath = save_feedback(empty_feedback, previous_section, user_response, current_section)
-    
-    # Vérifier que même un feedback vide est sauvegardé
-    assert os.path.exists(filepath)
-    
-    # Vérifier le contenu minimal
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-        assert "Section actuelle : 1" in content
+    # Test avec feedback vide
+    with pytest.raises(ValueError):
+        save_feedback("", str(feedback_dir))
+        
+    # Test avec feedback trop long
+    long_feedback = "x" * 1001  # Plus de 1000 caractères
+    with pytest.raises(ValueError):
+        save_feedback(long_feedback, str(feedback_dir))
 
-def test_feedback_special_characters(feedback_dir, monkeypatch):
+def test_feedback_special_characters(feedback_dir):
     """Test l'enregistrement de feedback avec caractères spéciaux"""
-    monkeypatch.setattr("app.feedback_dir", str(feedback_dir))
-    
     # Feedback avec caractères spéciaux
-    feedback = "Très bien ! 🎮 J'aime les émojis 👍"
-    previous_section = {"content": "Test"}
-    user_response = "Test avec émojis 🎲"
-    current_section = 1
+    special_feedback = "Test avec émojis 🎮 et accents éèà!"
     
-    filepath = save_feedback(feedback, previous_section, user_response, current_section)
+    # Sauvegarder le feedback
+    save_feedback(special_feedback, str(feedback_dir))
     
-    # Vérifier que le fichier est créé
-    assert os.path.exists(filepath)
-    
-    # Vérifier que les caractères spéciaux sont préservés
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-        assert "Très bien !" in content
-        assert "🎮" in content
-        assert "émojis 🎲" in content
+    # Vérifier le contenu
+    feedback_file = feedback_dir / "user_feedback.txt"
+    with open(feedback_file, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    assert content == special_feedback
