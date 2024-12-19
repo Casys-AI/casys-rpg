@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 from models.decision_model import DiceResult, DecisionModel
 from models.character_model import CharacterModel
 from models.narrator_model import NarratorModel, SourceType as NarratorSourceType
-from models.rules_model import RulesModel, SourceType as RulesSourceType
+from models.rules_model import RulesModel, DiceType, SourceType as RulesSourceType
 from models.trace_model import TraceModel
 
 class GameState(BaseModel):
@@ -60,7 +60,7 @@ class GameState(BaseModel):
             ),
             rules=RulesModel(
                 section_number=1,
-                dice_type=RulesModel.DiceType.NONE,
+                dice_type=DiceType.NONE,
                 needs_dice=False,
                 conditions=[],
                 next_sections=[],

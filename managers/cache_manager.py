@@ -4,51 +4,41 @@ Handles caching of game sections and related data.
 """
 
 from typing import Dict, Optional, Any, ClassVar
+from typing import TYPE_CHECKING
 from datetime import datetime
 import logging
 import os
 import json
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from config.core_config import ComponentConfig
-from models.game_state import GameState
-from models.narrator_model import NarratorModel, SourceType
-from models.rules_model import RulesModel, DiceType
+
+from config.component_config import ComponentConfig
+from config.managers.cache_manager_config import CacheManagerConfig
 from models.trace_model import TraceModel
+from models.narrator_model import NarratorModel
+from models.rules_model import RulesModel
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+
+if TYPE_CHECKING:
+    from models.game_state import GameState
+    from models.narrator_model import NarratorModel, SourceType
+    from models.rules_model import RulesModel, DiceType
+
 import shutil
 
-class CacheManagerConfig(ComponentConfig):
-    """Configuration for CacheManager."""
-    cache_dir: str = Field(default="data/cache")
-    trace_dir: str = Field(default="data/trace")
-    content_dir: str = Field(default="data/content")
-    rules_cache_dir: str = Field(default="data/rules_cache")
-
-# Forward references pour éviter les imports circulaires
-RulesModel = Dict[str, Any]
-DiceType = str
-
-class CacheManager(BaseModel):
+class CacheManager(ComponentConfig[CacheManagerConfig], CacheManagerProtocol):
     """
     Manages caching of game sections, rules, and trace data.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     config: CacheManagerConfig
+
     _section_cache: Dict[int, Any] = {}
     _current_session: Optional[Path] = None
     logger: ClassVar[logging.Logger] = logging.getLogger(__name__)
     
-    def __init__(self, **data):
-        """Initialize CacheManager with config."""
-        if isinstance(data.get('config'), dict):
-            data['config'] = CacheManagerConfig(**data['config'])
-        elif 'config' not in data:
-            data['config'] = CacheManagerConfig()
-            
-        super().__init__(**data)
-        
-        # Create necessary directories
+    def initialize(self) -> None:
+        """Initialize cache directories."""
         os.makedirs(self.config.cache_dir, exist_ok=True)
         os.makedirs(self.config.content_dir, exist_ok=True)
         os.makedirs(self.config.rules_cache_dir, exist_ok=True)
@@ -56,7 +46,7 @@ class CacheManager(BaseModel):
         
         # Initialize session directory
         self._current_session = self.create_session_dir()
-    
+
     def create_session_dir(self) -> Path:
         """Create a new session directory."""
         trace_dir = Path(self.config.trace_dir)
