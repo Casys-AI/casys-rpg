@@ -3,30 +3,45 @@ Character Manager Module
 Manages character attributes and game statistics.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 import json
 import logging
 from pathlib import Path
-from config.core_config import ComponentConfig
+from pydantic import ConfigDict
 
-class CharacterManagerConfig(ComponentConfig):
-    """Configuration for CharacterManager"""
-    cache_manager: Optional[Any] = None
+from config.component_config import ComponentConfig
+from config.managers.character_manager_config import CharacterManagerConfig
 
-class CharacterManager:
-    """
-    Manages character attributes and game statistics.
-    This includes character stats, inventory, resources, etc.
-    Does NOT handle game state or action history (handled by TraceManager).
-    """
-    
-    def __init__(self, config: Optional[CharacterManagerConfig] = None):
-        """Initialize CharacterManager with config."""
-        self.config = config or CharacterManagerConfig()
+class CharacterManager(ComponentConfig[CharacterManagerConfig]):
+    """Manages character attributes and game statistics."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    config: CharacterManagerConfig
+    _current_stats: Dict[str, Any] = {}
+
+    def initialize(self) -> None:
+        """
+        Initialize character manager with static configuration.
+        This is called once at startup.
+        """
         self.logger = logging.getLogger(__name__)
+        self._current_stats = {}
         self.cache_manager = self.config.cache_manager
-        self._current_stats: Dict[str, Any] = {}
+
+    async def start_session(self) -> None:
+        """
+        Start a new character session.
+        This loads or creates fresh character stats.
+        Can be called multiple times to start new sessions.
+        """
+        # Reset current stats
+        self._current_stats = {}
+        
+        # Load stats from cache if they exist
+        if self.cache_manager:
+            loaded_stats = self.load_stats()
+            if loaded_stats:
+                self._current_stats = loaded_stats
 
     def update_stats(self, stats: Dict[str, Any]) -> None:
         """

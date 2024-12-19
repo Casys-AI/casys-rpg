@@ -27,6 +27,87 @@ class BaseAgentProtocol(Protocol):
         ...
 
 @runtime_checkable
+class AgentManagerProtocol(Protocol):
+    """Protocol for agent manager."""
+    
+    async def initialize_game_session(self) -> None:
+        """Initialize a new game session."""
+        ...
+    
+    async def get_current_game_state(self) -> GameState:
+        """Get the current state of the game."""
+        ...
+    
+    async def stream_game_updates(self) -> AsyncGenerator[GameState, None]:
+        """Stream game state updates."""
+        ...
+    
+    async def handle_user_section_request(self, section_number: int) -> GameState:
+        """Process a user's request to move to a specific section."""
+        ...
+    
+    async def handle_user_response(self, response: str) -> GameState:
+        """Process a user's response or decision."""
+        ...
+    
+    async def handle_user_action(self, action: Dict[str, Any]) -> GameState:
+        """Process a user's game action."""
+        ...
+    
+    def create_error_response(self, error: str) -> GameState:
+        """Create an error state response."""
+        ...
+    
+    async def get_user_feedback(self) -> str:
+        """Get feedback about the current game state."""
+        ...
+
+@runtime_checkable
+class StoryGraphProtocol(Protocol):
+    """Protocol for story graph."""
+    
+    async def start_session(self) -> None:
+        ...
+    
+    async def execute_game_workflow(self, state: GameState) -> GameState:
+        """Execute the main game workflow for a given state."""
+        ...
+    
+    async def validate_state_transition(self, from_state: GameState, to_state: GameState) -> bool:
+        """Validate if a state transition is legal."""
+        ...
+    
+    async def process_game_section(self, section_number: int) -> GameState:
+        """Process a complete game section."""
+        ...
+    
+    async def apply_section_rules(self, state: GameState) -> GameState:
+        """Apply game rules to the current state."""
+        ...
+    
+    async def merge_agent_results(self, results: Dict[str, Any]) -> GameState:
+        """Merge results from multiple agents into a single state."""
+        ...
+    
+    async def _process_workflow(self, state: Dict, stream: bool = False) -> Union[Dict, AsyncGenerator[Dict, None]]:
+        ...
+    
+    async def stream_game_state(self) -> AsyncGenerator[Dict, None]:
+        ...
+    
+    async def _process_narrative(self, state: Dict) -> Dict:
+        ...
+    
+    async def _process_rules(self, state: Dict) -> Dict:
+        ...
+    
+    async def _process_decision(self, state: Dict) -> Dict:
+        ...
+    
+    async def _process_trace(self, state: Dict) -> Dict:
+        ...
+
+@runtime_checkable
 class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol for decision agent."""
     
@@ -49,37 +130,12 @@ class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
         Analyze player response with LLM considering rules.
         
         Args:
-            section_number: Current section number
-            player_input: Player input or dice result
-            rules: Rules to apply for analysis
+            section_number: Section number
+            player_input: Player's response text
+            rules: Optional rules to consider
             
         Returns:
-            Dict: Analysis result with next_section and analysis
-        """
-        ...
-        
-    async def _analyze_decision(self, state: GameState) -> Dict:
-        """
-        Analyze decision based on state.
-        
-        Args:
-            state: Current state
-            
-        Returns:
-            Dict: Decision
-        """
-        ...
-        
-    def _format_response(self, player_input: Optional[str], dice_roll: Optional[int]) -> str:
-        """
-        Format complete response with dice roll if present.
-        
-        Args:
-            player_input: Optional player input
-            dice_roll: Optional dice roll
-            
-        Returns:
-            str: Formatted response
+            Dict: Analysis results
         """
         ...
 
@@ -87,7 +143,9 @@ class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
 class RulesAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol for rules agent."""
     
-    async def process_section_rules(self, section_number: int, content: str) -> RulesModel:
+    async def process_section_rules(
+        self, section_number: int, content: str
+    ) -> RulesModel:
         """
         Process and analyze rules for a game section.
         
@@ -104,7 +162,7 @@ class RulesAgentProtocol(BaseAgentProtocol, Protocol):
 class NarratorAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol for narrator agent."""
     
-    async def read_section(self, section_number: int) -> str:
+    async def read_section(self, section_number: int) -> NarratorModel:
         """
         Read a section from the book.
         
@@ -112,62 +170,26 @@ class NarratorAgentProtocol(BaseAgentProtocol, Protocol):
             section_number: Section number to read
             
         Returns:
-            str: Section content
+            NarratorModel: Section content and metadata
         """
-        ...
-        
-    async def _format_content(self, content: str) -> str:
-        """
-        Format section content for display.
-        
-        Args:
-            content: Raw section content
-            
-        Returns:
-            str: Formatted content
-        """
-        ...
-
-@runtime_checkable
-class StoryGraphProtocol(BaseAgentProtocol, Protocol):
-    """Protocol for StoryGraph class."""
-    
-    async def process_section(self, section_number: int) -> NarratorModel:
-        """Process a section and return its content."""
-        ...
-        
-    async def process_user_input(self, user_input: str) -> Union[NarratorModel, None]:
-        """Process user input and return next section if applicable."""
-        ...
-
-@runtime_checkable
-class NarratorProtocol(BaseAgentProtocol, Protocol):
-    """Protocol for narrator agent."""
-    
-    async def read_section(self, section_number: int, input_data: Dict) -> NarratorModel:
-        """Read section content."""
-        ...
-        
-    async def format_content(self, content: str) -> str:
-        """Format content with LLM and Markdown."""
         ...
 
 @runtime_checkable
 class TraceAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol for trace agent."""
     
-    async def analyze_state(self, state: GameState) -> GameState:
+    async def analyze_state(self, state: GameState) -> TraceModel:
         """
-        Analyze the current game state and make decisions.
+        Analyze the current game state.
         
         Args:
             state: Current game state
             
         Returns:
-            GameState: Updated game state with decisions
+            TraceModel: Analysis results and history
         """
         ...
-        
+    
     async def get_feedback(self, state: GameState) -> str:
         """
         Get feedback about the current game state.
@@ -176,34 +198,6 @@ class TraceAgentProtocol(BaseAgentProtocol, Protocol):
             state: Current game state
             
         Returns:
-            str: Feedback about the current state
-        """
-        ...
-
-@runtime_checkable
-class StoryGraphProtocol(BaseAgentProtocol, Protocol):
-    """Protocol for story graph."""
-    
-    async def process_section(self, section_number: int) -> Dict[str, Any]:
-        """
-        Process a complete section through the workflow.
-        
-        Args:
-            section_number: Section number to process
-            
-        Returns:
-            Dict[str, Any]: Processed game state
-        """
-        ...
-        
-    async def process_user_input(self, user_input: str) -> Dict[str, Any]:
-        """
-        Process user input and update game state accordingly.
-        
-        Args:
-            user_input: User's response or decision
-            
-        Returns:
-            Dict[str, Any]: Updated game state
+            str: Feedback message
         """
         ...

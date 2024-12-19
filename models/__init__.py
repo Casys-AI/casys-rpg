@@ -6,6 +6,7 @@ from models.narrator_model import NarratorModel, SourceType as NarratorSourceTyp
 from models.trace_model import TraceAction, TraceModel
 from models.game_state import GameState
 
+
 __all__ = [
     'DiceType', 'RulesSourceType', 'NarratorSourceType', 'DiceResult',
     'Stats', 'Item', 'Inventory',

@@ -2,50 +2,80 @@
 Manages game state persistence and validation.
 """
 
-from typing import Dict, Optional, Any
-from pydantic import BaseModel, ValidationError
+from typing import Dict, Optional, Any, List
+from pydantic import BaseModel, ValidationError, ConfigDict
 import json
 import logging
 from datetime import datetime
+
+from config.component_config import ComponentConfig
+from config.managers.state_manager_config import StateManagerConfig
 from models.game_state import GameState
-from models.narrator_model import NarratorModel
-from models.rules_model import RulesModel
-from models.decision_model import DecisionModel, DiceResult
-from models.trace_model import TraceModel
 
-class StateManagerConfig(BaseModel):
-    """Configuration for StateManager"""
-    cache_manager: Optional[Any] = None
-    stats_manager: Optional[Any] = None
-
-class StateManager(BaseModel):
-    """Manages game state and persistence."""
+class StateManager(ComponentConfig[StateManagerConfig]):
+    """Manages game state persistence and validation."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    config: StateManagerConfig
     current_state: Optional[GameState] = None
-    config: StateManagerConfig = StateManagerConfig()
+    state_history: List[GameState] = []
     logger: logging.Logger = logging.getLogger(__name__)
 
-    class Config:
-        arbitrary_types_allowed = True
+    def initialize(self) -> None:
+        """Initialize state manager."""
+        self.logger = logging.getLogger(__name__)
+        self.current_state = None
+        self.state_history = []
 
-    async def get_state(self) -> Optional[Dict]:
-        """Get current state."""
+    async def save_state(self, state: GameState) -> bool:
+        """
+        Sauvegarde l'état actuel.
+        
+        Args:
+            state: État à sauvegarder
+            
+        Returns:
+            bool: True si la sauvegarde a réussi
+        """
         try:
-            if not self.current_state:
-                self.current_state = GameState.create_initial_state()
-                
-            # Mise à jour des stats si nécessaire
-            if self.config.stats_manager and not self.current_state.stats:
-                self.current_state.stats = await self.config.stats_manager.get_stats()
-                
-            return self.current_state.model_dump()
+            # Valider l'état
+            validated_state = GameState.model_validate(state)
+            
+            # Ajouter à l'historique
+            self.state_history.append(validated_state)
+            
+            # Sauvegarder dans un fichier si configuré
+            if self.config.save_to_file:
+                state_dict = validated_state.model_dump()
+                with open(self.config.state_file_path, 'w') as f:
+                    json.dump(state_dict, f)
+                    
+            return True
             
         except Exception as e:
-            self.logger.error(f"Error getting state: {str(e)}")
+            self.logger.error(f"Error saving state: {str(e)}")
+            return False
+
+    async def load_state(self) -> Optional[GameState]:
+        """
+        Charge le dernier état sauvegardé.
+        
+        Returns:
+            Optional[GameState]: État chargé ou None si erreur
+        """
+        try:
+            if self.config.save_to_file and self.config.state_file_path.exists():
+                with open(self.config.state_file_path, 'r') as f:
+                    state_dict = json.load(f)
+                return GameState.model_validate(state_dict)
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error loading state: {str(e)}")
             return None
 
     async def update_state(self, new_state: Dict) -> bool:
         """
-        Update current state.
+        Met à jour l'état actuel avec validation.
         
         Args:
             new_state: Nouvel état à appliquer
@@ -54,23 +84,37 @@ class StateManager(BaseModel):
             bool: True si la mise à jour a réussi
         """
         try:
-            # Valider et créer le nouvel état
-            updated_state = GameState.model_validate(new_state)
+            # Valider le nouvel état
+            validated_state = GameState.model_validate(new_state)
+            
+            # Sauvegarder l'ancien état dans l'historique
+            if self.current_state:
+                self.state_history.append(self.current_state)
+                
+            # Mettre à jour l'état courant
+            self.current_state = validated_state
             
             # Mettre à jour les stats si nécessaire
-            if self.config.stats_manager and updated_state.stats:
-                await self.config.stats_manager.update_stats(updated_state.stats)
+            if self.config.stats_manager and validated_state.stats:
+                await self.config.stats_manager.update_stats(validated_state.stats)
                 
             # Mettre en cache les règles si nécessaire
             if (self.config.cache_manager and 
-                updated_state.rules and 
-                updated_state.rules.source == "analysis"):
+                validated_state.rules and 
+                validated_state.rules.source == "analysis"):
                 await self.config.cache_manager.cache_rules(
-                    updated_state.rules.section_number,
-                    updated_state.rules
+                    validated_state.rules.section_number,
+                    validated_state.rules
                 )
                 
-            self.current_state = updated_state
+            # Mettre à jour la trace si nécessaire
+            if self.config.trace_manager and validated_state.trace:
+                await self.config.trace_manager.add_trace(validated_state.trace)
+                
+            # Sauvegarder si configuré
+            if self.config.save_to_file:
+                await self.save_state(validated_state)
+                
             return True
             
         except ValidationError as e:
@@ -80,106 +124,98 @@ class StateManager(BaseModel):
             self.logger.error(f"Error updating state: {str(e)}")
             return False
 
-    def should_continue(self, state: Dict) -> bool:
+    async def get_cached_rules(self, section_number: int) -> Optional[Dict]:
         """
-        Détermine si le jeu doit continuer.
+        Récupère les règles en cache pour une section.
         
         Args:
-            state: État actuel du jeu
+            section_number: Numéro de la section
             
         Returns:
-            bool: True si le jeu doit continuer
+            Optional[Dict]: Règles en cache ou None
         """
         try:
-            game_state = GameState.model_validate(state)
-            
-            # Stop si erreur
-            if game_state.error:
-                self.logger.info(f"Game stopped due to error: {game_state.error}")
-                return False
-                
-            # Stop si fin de jeu
-            if getattr(game_state, 'end_game', False):
-                self.logger.info("Game ended normally")
-                return False
-                
-            # Stop si pas de section valide
-            if not game_state.section_number:
-                self.logger.error("No valid section number")
-                return False
-                
-            return True
-            
+            if self.config.cache_manager:
+                return await self.config.cache_manager.get_cached_rules(section_number)
+            return None
         except Exception as e:
-            self.logger.error(f"Error in should_continue: {str(e)}")
+            self.logger.error(f"Error getting cached rules: {str(e)}")
+            return None
+
+    async def get_trace_history(self) -> List[Dict]:
+        """
+        Récupère l'historique des traces.
+        
+        Returns:
+            List[Dict]: Liste des traces
+        """
+        try:
+            if self.config.trace_manager:
+                return await self.config.trace_manager.get_trace_history()
+            return []
+        except Exception as e:
+            self.logger.error(f"Error getting trace history: {str(e)}")
+            return []
+
+    async def get_stats(self) -> Optional[Dict]:
+        """
+        Récupère les statistiques actuelles.
+        
+        Returns:
+            Optional[Dict]: Statistiques ou None
+        """
+        try:
+            if self.config.stats_manager:
+                return await self.config.stats_manager.get_stats()
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting stats: {str(e)}")
+            return None
+
+    async def clear_cache(self) -> bool:
+        """
+        Vide le cache.
+        
+        Returns:
+            bool: True si le cache a été vidé
+        """
+        try:
+            if self.config.cache_manager:
+                await self.config.cache_manager.clear_cache()
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"Error clearing cache: {str(e)}")
             return False
 
-    def create_error_state(self, error_message: str, current_state: Optional[GameState] = None) -> Dict:
+    def create_error_state(self, error_message: str) -> Dict:
         """
-        Create an error state from the current state.
+        Crée un état d'erreur.
         
         Args:
-            error_message: Message d'erreur à ajouter
-            current_state: État actuel optionnel à partir duquel créer l'état d'erreur
+            error_message: Message d'erreur
             
         Returns:
             Dict: État avec l'erreur
         """
         try:
-            if current_state is None:
-                state = GameState.create_initial_state()
-            else:
-                # Utiliser model_validate pour créer un nouvel état
-                state = GameState.model_validate(
-                    {"error": error_message},
-                    update=current_state
-                )
-                
-            return state.model_dump()
+            error_state = GameState.model_validate({
+                "error": error_message,
+                "timestamp": datetime.now().isoformat()
+            })
+            return error_state.model_dump()
             
         except Exception as e:
             self.logger.error(f"Error creating error state: {str(e)}")
-            # En cas d'erreur, créer un état initial avec l'erreur
-            return GameState.model_validate(
-                {"error": f"{error_message} (Error creating error state: {str(e)})"},
-                update=GameState.create_initial_state()
-            ).model_dump()
+            return GameState.model_validate({
+                "error": f"Error creating error state: {str(e)}"
+            }).model_dump()
 
-    async def handle_decision(self, user_response: str, state: Optional[Dict] = None) -> Dict:
+    async def get_state_history(self) -> List[GameState]:
         """
-        Gère la décision de l'utilisateur.
+        Récupère l'historique des états.
         
-        Args:
-            user_response: Réponse de l'utilisateur
-            state: État optionnel
-            
         Returns:
-            Dict: État mis à jour
+            List[GameState]: Liste des états précédents
         """
-        try:
-            if not state:
-                state = await self.get_state()
-                
-            # Valider l'état actuel    
-            current_state = GameState.model_validate(state)
-            
-            # Mettre à jour avec la réponse utilisateur
-            updates = {
-                "user_response": user_response,
-                "decision": DecisionType.USER_INPUT
-            }
-            
-            # Appliquer les mises à jour
-            updated_state = await self.update_state(
-                {**current_state.model_dump(), **updates}
-            )
-            
-            # Mettre à jour le cache si nécessaire
-            if self.config.cache_manager:
-                await self.config.cache_manager.update_cache(updated_state)
-            
-            return updated_state
-            
-        except Exception as e:
-            self.logger.error(f"Error handling decision: {str(e)}")
-            return self.create_error_state(str(e), state or {})
+        return self.state_history.copy()

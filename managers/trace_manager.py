@@ -4,38 +4,45 @@ Handles game trace persistence and history management.
 """
 
 from typing import Dict, Optional, Any, List
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from datetime import datetime
 import logging
 import os
 import json
 from pathlib import Path
-from config.core_config import ComponentConfig
+
+from config.core_config import BaseComponent
 from models.game_state import GameState
 from models.trace_model import TraceModel
 from models.character_model import CharacterModel
 from config.agent_config import TraceConfig
 
-class TraceManager:
-    """
-    Manages game trace persistence and history.
-    Responsible for:
-    1. Saving game state (history.json)
-    2. Managing adventure sheet (adventure_sheet.json)
-    3. Tracking game progression
-    4. Providing state feedback
-    """
 
-    def __init__(self, trace_config: TraceConfig):
-        """Initialize TraceManager with directory path."""
+class TraceManager(BaseComponent[TraceConfig]):
+    """Manages game trace persistence and history."""
+    
+    def initialize(self) -> None:
+        """
+        Initialize trace manager with static configuration.
+        This is called once at startup.
+        """
         self.logger = logging.getLogger(__name__)
-        self.trace_directory = Path(trace_config.trace_dir)
+        self.current_trace = None
+        
+        # Setup directories and file paths
+        self.trace_directory = Path(self.config.trace_dir)
         self.trace_directory.mkdir(parents=True, exist_ok=True)
         
         # File paths
         self.history_file = self.trace_directory / "history.json"
         self.adventure_sheet = self.trace_directory / "adventure_sheet.json"
-        
+
+    async def start_session(self) -> None:
+        """
+        Start a new trace session.
+        This loads or creates a fresh trace.
+        Can be called multiple times to start new sessions.
+        """
         # Initialize current state
         self.current_trace = self._load_or_create_trace()
 

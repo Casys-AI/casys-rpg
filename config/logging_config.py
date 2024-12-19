@@ -1,10 +1,12 @@
 """Logging configuration for the entire application."""
 import logging.config
 import os
-from config.constants import LOG_FORMAT
 
 # Get log level from environment or use INFO as default
 DEFAULT_LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
+# Logging format
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 LOGGING_CONFIG = {
     'version': 1,

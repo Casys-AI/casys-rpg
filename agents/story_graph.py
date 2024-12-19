@@ -1,211 +1,317 @@
 """
 Story Graph Module
-Handles game workflow and progression.
+Handles game workflow and state transitions.
 """
 
-from typing import Dict, Optional, AsyncGenerator, Any
-from pydantic import Field, ConfigDict
+from typing import Dict, Optional, AsyncGenerator, Any, Union
+from pydantic import BaseModel, ConfigDict, Field
+from langgraph.graph import StateGraph, END
 
 from agents.base_agent import BaseAgent
-from models.game_state import GameState
-from models.narrator_model import NarratorModel
-from models.rules_model import RulesModel
-from models.trace_model import TraceModel
-from models.decision_model import DecisionModel
-from config.agent_config import AgentConfig
-from config.logging_config import get_logger
-from agents.protocols import StoryGraphProtocol
 from agents.narrator_agent import NarratorAgent
 from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
 from agents.trace_agent import TraceAgent
 from managers.state_manager import StateManager
 from managers.trace_manager import TraceManager
-from langgraph.graph import StateGraph, END
-from managers.cache_manager import CacheManager
+from config.agents.base import AgentConfig
+from config.logging_config import get_logger
+from agents.protocols import StoryGraphProtocol
+
+# Import GameState en dehors de TYPE_CHECKING car on en a besoin pour l'exécution
+from models.game_state import GameState
+
 
 logger = get_logger('story_graph')
 
 class StoryGraph(BaseAgent, StoryGraphProtocol):
-    """Agent responsible for managing game workflow and progression."""
+    """Manages the game workflow and state transitions."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
-    # Configuration de base
-    config: AgentConfig = Field(default_factory=AgentConfig)
-    
-    # Composants requis
-    narrator: NarratorAgent
-    rules: RulesAgent
-    decision: DecisionAgent
-    trace: TraceAgent
+    config: AgentConfig
     state_manager: StateManager
-    trace_manager: TraceManager
-    
-    # État interne
     _graph: Optional[StateGraph] = None
+    _current_section: int = 1
 
     def __init__(
         self,
         config: AgentConfig,
-        cache_manager: CacheManager,
-        narrator: NarratorAgent,
-        rules: RulesAgent,
-        decision: DecisionAgent,
-        trace: TraceAgent,
-        state_manager: StateManager,
-        trace_manager: TraceManager,
-        **data
-    ):
-        """Initialize StoryGraph with all required components."""
-        super().__init__(config=config, cache_manager=cache_manager)
-        self.narrator = narrator
-        self.rules = rules
-        self.decision = decision
-        self.trace = trace
-        self.state_manager = state_manager
-        self.trace_manager = trace_manager
-
-    async def _process_with_agent(self, agent: Any, state: Dict) -> AsyncGenerator[Dict, None]:
-        """Process state with an agent."""
-        result = await agent.process(state)
-        yield result
-
-    def _merge_parallel_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge results from parallel agent executions."""
-        try:
-            section = results.get("narrator", {})
-            rules = results.get("rules", {})
-            return {
-                "section": section,
-                "rules": rules,
-                "state": GameState(
-                    current_section=section,
-                    current_rules=rules
-                )
-            }
-        except Exception as e:
-            logger.error(f"Error merging results: {e}")
-            raise
-
-    async def _initialize_state(self, state: Dict) -> Dict:
-        """Initialize and validate game state.
+        narrator_agent: NarratorAgent,
+        rules_agent: RulesAgent,
+        decision_agent: DecisionAgent,
+        trace_agent: TraceAgent,
+        state_manager: StateManager
+    ) -> None:
+        """
+        Initialize StoryGraph.
         
         Args:
-            state: Initial state dict
+            config: Configuration for the agent
+            narrator_agent: Agent for narrative content
+            rules_agent: Agent for rules analysis
+            decision_agent: Agent for decision processing
+            trace_agent: Agent for game history
+            state_manager: Manager for game state
+        """
+        super().__init__(config)
+        self.narrator_agent = narrator_agent
+        self.rules_agent = rules_agent
+        self.decision_agent = decision_agent
+        self.trace_agent = trace_agent
+        self.state_manager = state_manager
+        self._graph = None
+        self._current_section = 1
+
+    async def execute_game_workflow(self, state: GameState) -> GameState:
+        """
+        Execute the main game workflow for a given state.
+        
+        Args:
+            state: Current game state
             
         Returns:
-            Validated GameState
+            GameState: Updated state after workflow execution
         """
-        logger.debug("Initializing game state")
-        
         try:
+            # Setup workflow if not initialized
+            if not self._graph:
+                await self._setup_workflow()
+            
+            # Execute workflow
+            result = await self._process_workflow(state.model_dump())
+            return GameState(**result)
+        except Exception as e:
+            logger.error(f"Error executing game workflow: {e}")
+            return self.state_manager.create_error_state(str(e))
+
+    async def validate_state_transition(self, from_state: GameState, to_state: GameState) -> bool:
+        """
+        Validate if a state transition is legal.
+        
+        Args:
+            from_state: Current state
+            to_state: Target state
+            
+        Returns:
+            bool: True if transition is valid
+        """
+        try:
+            # Get rules for current section
+            rules = await self.rules_agent.analyze_rules(
+                from_state.section_number,
+                from_state.narrative.content if from_state.narrative else ""
+            )
+            
+            # Check if transition is allowed
+            return to_state.section_number in rules.next_sections
+        except Exception as e:
+            logger.error(f"Error validating state transition: {e}")
+            return False
+
+    async def process_game_section(self, section_number: int) -> GameState:
+        """
+        Process a complete game section.
+        
+        Args:
+            section_number: Section to process
+            
+        Returns:
+            GameState: Processed game state
+        """
+        try:
+            # Read section content
+            narrative = await self.narrator_agent.read_section(section_number)
+            
+            # Process rules
+            rules = await self.rules_agent.analyze_rules(
+                section_number,
+                narrative.content if narrative else ""
+            )
+            
             # Create initial state
-            initial_state = GameState.create_initial_state()
+            state = GameState(
+                section_number=section_number,
+                narrative=narrative,
+                rules=rules
+            )
             
-            # Process with agents
-            narrator_result = await self.narrator.process(initial_state.model_dump())
-            rules_result = await self.rules.process(initial_state.model_dump())
+            # Execute workflow
+            return await self.execute_game_workflow(state)
+        except Exception as e:
+            logger.error(f"Error processing game section: {e}")
+            return self.state_manager.create_error_state(str(e))
+
+    async def apply_section_rules(self, state: GameState) -> GameState:
+        """
+        Apply game rules to the current state.
+        
+        Args:
+            state: Current game state
             
-            # Merge results
-            merged = self._merge_parallel_results({
-                "narrator": narrator_result,
-                "rules": rules_result
-            })
+        Returns:
+            GameState: State with rules applied
+        """
+        try:
+            # Process rules
+            rules = await self.rules_agent.analyze_rules(
+                state.section_number,
+                state.narrative.content if state.narrative else ""
+            )
             
-            return merged
+            # Update state with rules
+            state.rules = rules
+            return state
+        except Exception as e:
+            logger.error(f"Error applying section rules: {e}")
+            return self.state_manager.create_error_state(str(e))
+
+    async def merge_agent_results(self, results: Dict[str, Any]) -> GameState:
+        """
+        Merge results from multiple agents into a single state.
+        
+        Args:
+            results: Dictionary of agent results
+            
+        Returns:
+            GameState: Merged game state
+        """
+        try:
+            narrative = results.get("narrator")
+            rules = results.get("rules")
+            decision = results.get("decision")
+            trace = results.get("trace")
+            
+            return GameState(
+                section_number=narrative.section_number if narrative else self._current_section,
+                narrative=narrative,
+                rules=rules,
+                decision=decision,
+                trace=trace
+            )
+        except Exception as e:
+            logger.error(f"Error merging agent results: {e}")
+            return self.state_manager.create_error_state(str(e))
+
+    async def start_session(self) -> None:
+        """Démarre une nouvelle session de jeu."""
+        try:
+            logger.info("Starting story graph session...")
+            
+            # Configurer le workflow
+            await self._setup_workflow()
+            
+            # Démarrer le workflow avec un état vide
+            # Le noeud start se chargera de l'initialisation
+            await self._process_workflow({})
+            
+            logger.info("Story graph session started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start story graph session: {e}")
+            raise
+
+    async def _setup_workflow(self) -> None:
+        """Configure le workflow langgraph."""
+        try:
+            # Créer le graph
+            self._graph = StateGraph()
+            
+            # Ajouter les noeuds
+            self._graph.add_node("start", self._initialize_state)
+            self._graph.add_node("narrator", self._process_narrative)
+            self._graph.add_node("rules", self._process_rules)
+            self._graph.add_node("decision", self._process_decision)
+            self._graph.add_node("trace", self._process_trace)
+            
+            # Définir le flux
+            self._graph.add_edge("start", "narrator")
+            self._graph.add_edge("narrator", "rules")
+            self._graph.add_edge("rules", "decision")
+            self._graph.add_edge("decision", "trace")
+            self._graph.add_edge("trace", END)
+            
+            # Compiler
+            self._graph.compile()
+            
+        except Exception as e:
+            logger.error(f"Error setting up workflow: {e}")
+            raise
+            
+    async def _initialize_state(self, state: Dict) -> Dict:
+        """Noeud d'initialisation dans le workflow."""
+        try:
+            # Créer l'état initial si nécessaire
+            if not state:
+                state = await self.state_manager.create_initial_state()
+                state = state.model_dump()
+            
+            # S'assurer que les champs requis sont présents
+            state.setdefault('section_number', self._current_section)
+            state.setdefault('content', None)
+            state.setdefault('rules', None)
+            state.setdefault('decision', None)
+            state.setdefault('trace', None)
+            
+            return state
             
         except Exception as e:
             logger.error(f"Error initializing state: {e}")
-            return self.state_manager.create_error_state(str(e))
-
-    def _setup_workflow(self) -> None:
-        """Setup the story graph workflow."""
-        if self._graph is not None:
-            return
-
-        logger.debug("Setting up story graph workflow")
-        workflow = StateGraph({})
-
-        # Add start node for initialization
-        workflow.add_node("start", self._initialize_state)
-
-        # Add nodes for each agent
-        workflow.add_node("narrator", lambda x: self._process_with_agent(self.narrator, x))
-        workflow.add_node("rules", lambda x: self._process_with_agent(self.rules, x))
-        workflow.add_node("decision", lambda x: self._process_with_agent(self.decision, x))
-        workflow.add_node("trace", lambda x: self._process_with_agent(self.trace, x))
-
-        # Configure parallel execution
-        workflow.add_node("merge", self._merge_parallel_results)
-        
-        # Define workflow edges
-        workflow.add_edge("start", "narrator")  # Start -> Narrator
-        workflow.add_edge("narrator", "rules")  # Narrator -> Rules
-        workflow.add_edge("rules", "decision")  # Rules -> Decision
-        workflow.add_edge("decision", "trace")  # Decision -> Trace
-        workflow.add_edge("trace", END)         # Trace -> End
-
-        self._graph = workflow
-
-    async def _process_workflow(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """Process state through the workflow."""
-        if not self._graph:
-            self._setup_workflow()
-        
-        async for output in self._graph.astream(state):
-            if output:
-                return output
-        return state
-
-    async def process_section(self, section_number: int) -> Dict[str, Any]:
-        """Process a complete section through the workflow.
-        
-        Args:
-            section_number: Section number to process
-            
-        Returns:
-            Dict[str, Any]: Processed game state
-        """
-        try:
-            # Create initial state
-            state = await self.state_manager.create_initial_state()
-            state["section_number"] = section_number
-            
-            # Process through workflow
-            return await self._process_workflow(state)
-            
-        except Exception as e:
-            logger.error(f"Error processing section {section_number}: {str(e)}")
-            return self.state_manager.create_error_state(str(e))
-
-    async def process_user_input(self, user_input: str) -> Dict[str, Any]:
-        """Process user input and update game state accordingly.
-        
-        Args:
-            user_input: User's response or decision
-            
-        Returns:
-            Dict[str, Any]: Updated game state
-        """
-        try:
-            # Get current state and update with user input
-            current_state = await self.trace_manager.get_state()
-            updated_state = await self.state_manager.handle_decision(user_input, current_state)
-            
-            # Process through workflow
-            return await self._process_workflow(updated_state)
-            
-        except Exception as e:
-            logger.error(f"Error processing user input: {str(e)}")
-            return self.state_manager.create_error_state(str(e))
-
-    async def initialize(self) -> None:
-        """Initialize the story graph and its initial state."""
-        logger.debug("Initializing story graph")
-        try:
-            initial_state = {}
-            await self._initialize_state(initial_state)
-            logger.info("Story graph initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize story graph: {e}")
             raise
+
+    async def _process_workflow(self, state: Dict, stream: bool = False) -> Union[Dict, AsyncGenerator[Dict, None]]:
+        """Process the workflow with optional streaming."""
+        try:
+            if stream:
+                async for step_state in self._graph.astream(state):
+                    # Mise à jour du state manager à chaque étape
+                    await self.state_manager.update_state(step_state)
+                    yield step_state
+            else:
+                final_state = await self._graph.arun(state)
+                await self.state_manager.update_state(final_state)
+                return final_state
+                
+        except Exception as e:
+            logger.error(f"Error in workflow processing: {e}")
+            error_state = await self.state_manager.create_error_state(str(e))
+            return error_state
+
+    async def stream_game_state(self) -> AsyncGenerator[Dict, None]:
+        """Stream l'état du jeu à chaque étape du workflow."""
+        try:
+            # Démarrer avec un état vide, le noeud start l'initialisera
+            async for state in self._process_workflow({}, stream=True):
+                yield state
+        except Exception as e:
+            logger.error(f"Error streaming game state: {e}")
+            yield await self.state_manager.create_error_state(str(e))
+
+    async def _process_narrative(self, state: Dict) -> Dict:
+        """Process narrative node in workflow."""
+        try:
+            return await self.narrator_agent.process_section(state)
+        except Exception as e:
+            logger.error(f"Error in narrative processing: {e}")
+            return await self.state_manager.create_error_state(str(e))
+
+    async def _process_rules(self, state: Dict) -> Dict:
+        """Process rules node in workflow."""
+        try:
+            return await self.rules_agent.analyze_rules(state)
+        except Exception as e:
+            logger.error(f"Error in rules processing: {e}")
+            return await self.state_manager.create_error_state(str(e))
+
+    async def _process_decision(self, state: Dict) -> Dict:
+        """Process decision node in workflow."""
+        try:
+            return await self.decision_agent.process_decision(state)
+        except Exception as e:
+            logger.error(f"Error in decision processing: {e}")
+            return await self.state_manager.create_error_state(str(e))
+
+    async def _process_trace(self, state: Dict) -> Dict:
+        """Process trace node in workflow."""
+        try:
+            return await self.trace_agent.record_state(state)
+        except Exception as e:
+            logger.error(f"Error in trace processing: {e}")
+            return await self.state_manager.create_error_state(str(e))

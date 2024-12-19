@@ -1,22 +1,23 @@
-"""Agent de base avec gestion d'état."""
-from typing import Dict, Optional, Any, AsyncGenerator, ClassVar
+"""Base agent class for all game agents."""
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, ClassVar, AsyncGenerator
 from pydantic import Field, ConfigDict
-from managers.cache_manager import CacheManager
-from config.agent_config import AgentConfig
+
+from config.agents.agent_config_base import AgentConfigBase
 from config.logging_config import get_logger
 from agents.protocols import BaseAgentProtocol
-from models.game_state import GameState
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 import logging
 
 class BaseAgent(BaseAgentProtocol):
     """Classe de base pour tous les agents."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    config: AgentConfig = Field(default_factory=AgentConfig)
-    cache_manager: Optional[CacheManager] = None
+    config: AgentConfigBase = Field(default_factory=AgentConfigBase)
+    cache_manager: Optional[CacheManagerProtocol] = None
     logger: ClassVar = get_logger(__name__)
 
-    def __init__(self, config: AgentConfig, cache_manager: CacheManager):
+    def __init__(self, config: AgentConfigBase, cache_manager: CacheManagerProtocol):
         """Initialize BaseAgent.
         
         Args:
@@ -44,7 +45,7 @@ class BaseAgent(BaseAgentProtocol):
         """
         raise NotImplementedError("Subclasses must implement ainvoke")
 
-    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict[str, GameState]:
+    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict[str, 'GameState']:
         """
         Invoke sync.
         

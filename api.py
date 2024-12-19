@@ -7,30 +7,29 @@ from typing import AsyncGenerator, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from datetime import datetime
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.models import OpenAPI
+
 from models.game_state import GameState
 from models.feedback_model import FeedbackRequest
 from models.character_model import CharacterModel
 from models.trace_model import TraceModel
 from models.decision_model import DecisionModel, DiceResult
 
-from agents.story_graph import StoryGraph
-from config.game_config import GameConfig, GameFactory
-from config.agent_config import AgentConfig
+from config.game_config import GameConfig
+from managers.agent_manager import AgentManager
 from utils.game_utils import roll_dice
-from utils.feedback_utils import save_feedback as save_feedback_util
+from utils.logger import get_logger
 
-import logging
-import os
-from datetime import datetime
+logger = get_logger('api')
 
 # Configuration
-API_HOST = os.getenv("API_HOST", "127.0.0.1")
-API_PORT = int(os.getenv("API_PORT", "8000"))
+API_HOST = "127.0.0.1"
+API_PORT = 8000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Logging
-logger = logging.getLogger(__name__)
 
 # Classes de réponse
 class ActionResponse(BaseModel):
@@ -73,7 +72,7 @@ class ConnectionManager:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     try:
-        await init_components()
+        await startup_event()
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Failed to initialize components: {e}")
@@ -93,7 +92,9 @@ app = FastAPI(
     title="Casys RPG API",
     description="API pour le jeu de rôle interactif Casys",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None,  # Disable default docs
+    redoc_url=None  # Disable default redoc
 )
 
 # CORS
@@ -105,19 +106,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Instances globales
-agent_manager = None
 manager = ConnectionManager()
 
-# Dépendances
-async def get_agent_manager():
-    if agent_manager is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Agent manager not initialized"
-        )
-    return agent_manager
+def get_agent_manager():
+    """Get or create AgentManager instance."""
+    if not hasattr(get_agent_manager, "_instance"):
+        config = GameConfig()
+        manager = AgentManager(config)
+        manager.initialize()
+        get_agent_manager._instance = manager
+    return get_agent_manager._instance
 
+# Dépendances
 async def get_current_state(
     agent_mgr = Depends(get_agent_manager)
 ) -> GameState:
@@ -131,47 +135,71 @@ async def get_current_state(
         )
 
 # Initialisation
-async def init_components():
-    """Initialize all game components."""
-    global agent_manager
-    
+async def startup_event():
+    """Initialize components on startup."""
     try:
-        # Configuration
-        config = GameConfig()
-        factory = GameFactory(config=config)
-        
-        # Initialize managers
-        agent_manager = factory.agent_manager
-        await agent_manager.initialize()
-        
-        logger.info("Components initialized successfully")
-        
+        agent_mgr = get_agent_manager()
+        await agent_mgr.initialize_game()
+        logger.info("Game components initialized")
     except Exception as e:
-        logger.error(f"Error during initialization: {e}")
+        logger.error(f"Failed to initialize game: {e}")
         raise
 
+# Documentation configuration
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Swagger UI",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_js_url="/static/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.png",
+        init_oauth=None,
+        swagger_ui_parameters={
+            "websocket": True,  # Enable WebSocket support
+            "syntaxHighlight": True,
+            "tryItOutEnabled": True
+        }
+    )
+
 # WebSocket endpoint
-@app.websocket("/ws/game")
+@app.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
     agent_mgr = Depends(get_agent_manager)
 ):
-    await manager.connect(websocket)
+    """
+    WebSocket endpoint for real-time game state updates.
+    
+    The WebSocket connection will stream game state updates in the following format:
+    ```json
+    {
+        "type": "state_update",
+        "data": {
+            "section_number": 1,
+            "narrative": {...},
+            "rules": {...},
+            "decision": {...},
+            "trace": {...}
+        }
+    }
+    ```
+    """
+    manager = ConnectionManager()
     try:
-        # Send initial state
-        initial_state = await agent_mgr.get_state()
-        await websocket.send_json(initial_state.model_dump())
-        
-        # Stream state updates
-        async for state in agent_mgr.stream_state():
-            await websocket.send_json(state.model_dump())
-            
+        await manager.connect(websocket)
+        async for state in agent_mgr.subscribe_to_updates():
+            await manager.broadcast({
+                "type": "state_update",
+                "data": state.model_dump()
+            })
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         if websocket in manager.active_connections:
-            manager.disconnect(websocket)
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
 
 # Routes REST
 @app.post("/game/action", response_model=ActionResponse)
@@ -196,7 +224,7 @@ async def process_action(
 @app.post("/feedback")
 async def save_feedback(feedback: FeedbackRequest):
     try:
-        save_feedback_util(feedback)
+        # save_feedback_util(feedback)
         return {"status": "success", "message": "Feedback saved successfully"}
     except Exception as e:
         logger.error(f"Error saving feedback: {e}")
@@ -236,6 +264,105 @@ async def roll_game_dice(dice_type: str):
             detail=str(e)
         )
 
+@app.get("/game/state", response_model=ActionResponse)
+async def get_game_state(agent_mgr = Depends(get_agent_manager)) -> ActionResponse:
+    """Get current game state."""
+    try:
+        state = await agent_mgr.get_state()
+        return ActionResponse(
+            success=True,
+            message="State retrieved successfully",
+            state=state
+        )
+    except Exception as e:
+        logger.error(f"Error getting game state: {e}")
+        return ActionResponse(
+            success=False,
+            message=str(e),
+            state=None
+        )
+
+@app.get("/game/updates")
+async def subscribe_to_game_updates(agent_mgr = Depends(get_agent_manager)):
+    """Subscribe to game state updates."""
+    try:
+        return await agent_mgr.subscribe_to_updates()
+    except Exception as e:
+        logger.error(f"Error streaming updates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/game/section/{section_number}", response_model=ActionResponse)
+async def navigate_to_section(
+    section_number: int,
+    agent_mgr = Depends(get_agent_manager)
+) -> ActionResponse:
+    """Navigate to a specific section."""
+    try:
+        state = await agent_mgr.navigate_to_section(section_number)
+        return ActionResponse(
+            success=True,
+            message=f"Navigated to section {section_number}",
+            state=state
+        )
+    except Exception as e:
+        logger.error(f"Error navigating to section {section_number}: {e}")
+        return ActionResponse(
+            success=False,
+            message=str(e),
+            state=None
+        )
+
+@app.post("/game/response", response_model=ActionResponse)
+async def submit_response(
+    response: str,
+    agent_mgr = Depends(get_agent_manager)
+) -> ActionResponse:
+    """Submit a user response."""
+    try:
+        state = await agent_mgr.submit_response(response)
+        return ActionResponse(
+            success=True,
+            message="Response processed successfully",
+            state=state
+        )
+    except Exception as e:
+        logger.error(f"Error processing response: {e}")
+        return ActionResponse(
+            success=False,
+            message=str(e),
+            state=None
+        )
+
+@app.post("/game/action", response_model=ActionResponse)
+async def perform_action(
+    action: Dict[str, Any],
+    agent_mgr = Depends(get_agent_manager)
+) -> ActionResponse:
+    """Perform a game action."""
+    try:
+        state = await agent_mgr.perform_action(action)
+        return ActionResponse(
+            success=True,
+            message="Action processed successfully",
+            state=state
+        )
+    except Exception as e:
+        logger.error(f"Error performing action: {e}")
+        return ActionResponse(
+            success=False,
+            message=str(e),
+            state=None
+        )
+
+@app.get("/game/feedback")
+async def get_feedback(agent_mgr = Depends(get_agent_manager)) -> str:
+    """Get feedback about current game state."""
+    try:
+        return await agent_mgr.get_user_feedback()
+    except Exception as e:
+        logger.error(f"Error getting feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Exception handler global
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -256,5 +383,5 @@ if __name__ == "__main__":
         host=API_HOST,
         port=API_PORT,
         reload=True,
-        log_level="info"
+        log_level="debug"
     )
