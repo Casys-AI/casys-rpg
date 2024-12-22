@@ -37,3 +37,8 @@ ruff>=0.1.6
 # Outils
 streamlit>=1.28.0
 python-dotenv>=1.0.0
+
+#docs
+mkdocs
+mkdocs-material
+mkdocs-material[imaging]

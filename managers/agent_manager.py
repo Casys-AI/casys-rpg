@@ -23,6 +23,7 @@ from config.managers.agent_manager_config import AgentManagerConfig
 from config.storage_config import StorageConfig
 
 from managers.rules_manager import RulesManager
+from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
 
 import logging
 
@@ -66,9 +67,6 @@ class AgentManager(AgentManagerProtocol):
         Returns:
             StoryGraphProtocol: Configured story graph instance
         """
-        # Import local pour éviter l'importation circulaire
-        from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
-        
         factory = GameFactory()
         agents = GameAgents(
             narrator_agent=self.narrator_agent,
