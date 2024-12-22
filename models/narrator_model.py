@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 class SourceType(str, Enum):
     """Type de source pour le contenu."""
     RAW = "raw"      # Contenu chargé depuis le fichier source
-    CACHED = "cache" # Contenu chargé depuis le cache
-    SECTION = "section" # Contenu d'une section
+    PROCESSED = "processed" # Contenu traité par l'agent
+    ERROR = "error"  # État d'erreur
 
 class NarratorModel(BaseModel):
     """Modèle pour une section narrative."""
@@ -21,4 +21,3 @@ class NarratorModel(BaseModel):
 
     class Config:
         """Configuration du modèle."""
-        from_attributes = True

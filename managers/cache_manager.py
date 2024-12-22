@@ -1,321 +1,261 @@
 """
 Cache Manager Module
-Handles caching of game sections and related data.
+Handles caching and persistence of game data through a unified interface.
 """
 
-from typing import Dict, Optional, Any, ClassVar
-from typing import TYPE_CHECKING
-from datetime import datetime
+from typing import Dict, Optional, Any, Union, Type, TypeVar
+from datetime import datetime, timedelta
 import logging
-import os
-import json
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+import json
+from pydantic import BaseModel
 
-from config.component_config import ComponentConfig
-from config.managers.cache_manager_config import CacheManagerConfig
-from models.trace_model import TraceModel
-from models.narrator_model import NarratorModel
-from models.rules_model import RulesModel
+from config.storage_config import StorageConfig, StorageFormat
+from managers.filesystem_adapter import FileSystemAdapter
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 
-if TYPE_CHECKING:
-    from models.game_state import GameState
-    from models.narrator_model import NarratorModel, SourceType
-    from models.rules_model import RulesModel, DiceType
+T = TypeVar('T', bound=BaseModel)
 
-import shutil
+def _json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime, timedelta)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
 
-class CacheManager(ComponentConfig[CacheManagerConfig], CacheManagerProtocol):
+class CacheEntry:
+    """Represents a cached item with TTL."""
+    def __init__(self, value: Any, ttl_seconds: Optional[int]):
+        self.value = value
+        self.expiry = datetime.now() + timedelta(seconds=ttl_seconds) if ttl_seconds else None
+        
+    def is_expired(self) -> bool:
+        return self.expiry and datetime.now() > self.expiry
+
+class CacheManager(CacheManagerProtocol):
     """
-    Manages caching of game sections, rules, and trace data.
+    Manages caching and persistence of game data.
+    Provides a unified interface for other managers to store and retrieve data.
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    config: CacheManagerConfig
-
-    _section_cache: Dict[int, Any] = {}
-    _current_session: Optional[Path] = None
-    logger: ClassVar[logging.Logger] = logging.getLogger(__name__)
     
-    def initialize(self) -> None:
-        """Initialize cache directories."""
-        os.makedirs(self.config.cache_dir, exist_ok=True)
-        os.makedirs(self.config.content_dir, exist_ok=True)
-        os.makedirs(self.config.rules_cache_dir, exist_ok=True)
-        os.makedirs(self.config.trace_dir, exist_ok=True)
-        
-        # Initialize session directory
-        self._current_session = self.create_session_dir()
+    def __init__(self, config: StorageConfig):
+        """Initialize CacheManager with configuration."""
+        self.config = config
+        self.logger = logging.getLogger(__name__)
+        self._fs_adapter = FileSystemAdapter(config)
+        self._memory_cache: Dict[str, CacheEntry] = {}
+        self._current_session: Optional[Path] = None
 
-    def create_session_dir(self) -> Path:
-        """Create a new session directory."""
-        trace_dir = Path(self.config.trace_dir)
-        
-        # Clean old sessions if they exist
-        if trace_dir.exists():
-            for old_dir in trace_dir.glob("session_*"):
-                if old_dir.is_dir():
-                    try:
-                        shutil.rmtree(old_dir)
-                    except Exception as e:
-                        self.logger.warning(f"Could not delete old directory {old_dir}: {e}")
-        
-        # Create new session directory
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_dir = trace_dir / f"session_{timestamp}"
-        session_dir.mkdir(parents=True, exist_ok=True)
-        return session_dir
+    def _get_cache_key(self, key: str, namespace: str) -> str:
+        """Generate a unique cache key."""
+        return f"{namespace}:{key}"
 
-    async def save_trace(self, trace: TraceModel) -> None:
-        """
-        Save current trace state.
+    def _get_file_extension(self, namespace: str) -> str:
+        """Get file extension for namespace."""
+        format = self.config.namespaces[namespace].format
+        return f".{format.value}"
+
+    def _serialize_data(self, data: Any, namespace: str) -> str:
+        """Serialize data according to namespace format."""
+        format = self.config.namespaces[namespace].format
         
-        Args:
-            trace: Current trace state to save
-        """
+        if format == StorageFormat.JSON:
+            if isinstance(data, BaseModel):
+                data_dict = data.model_dump()
+                return json.dumps(data_dict, default=_json_serial)
+            return json.dumps(data, default=_json_serial)
+        elif format == StorageFormat.MARKDOWN:
+            if hasattr(data, 'to_markdown'):
+                return data.to_markdown()
+            elif isinstance(data, BaseModel):
+                return self._model_to_markdown(data)
+            else:
+                return str(data)
+        else:  # RAW
+            return str(data)
+
+    def _deserialize_data(self, data: str, namespace: str, model_type: Optional[Type[T]] = None) -> Any:
+        """Deserialize data according to namespace format."""
+        format = self.config.namespaces[namespace].format
+        
+        if format == StorageFormat.JSON:
+            json_data = json.loads(data)
+            if model_type:
+                return model_type.model_validate(json_data)
+            return json_data
+        elif format == StorageFormat.MARKDOWN:
+            if model_type and hasattr(model_type, 'from_markdown'):
+                return model_type.from_markdown(data)
+            return data
+        else:  # RAW
+            return data
+
+    def _model_to_markdown(self, model: BaseModel) -> str:
+        """Convert a Pydantic model to markdown format."""
+        lines = [f"# {model.__class__.__name__}"]
+        
+        for field_name, field_value in model.model_dump().items():
+            if isinstance(field_value, (list, dict)):
+                lines.append(f"\n## {field_name}")
+                if isinstance(field_value, list):
+                    for item in field_value:
+                        lines.append(f"- {item}")
+                else:
+                    for key, value in field_value.items():
+                        lines.append(f"- {key}: {value}")
+            else:
+                lines.append(f"- {field_name}: {field_value}")
+        
+        return "\n".join(lines)
+
+    async def save_cached_data(self, key: str, namespace: str, data: Any) -> None:
+        """Save data to both cache and persistent storage."""
         try:
-            if not self._current_session:
-                self._current_session = self.create_session_dir()
-            
-            # Save history
-            history_file = self._current_session / "history.json"
-            with open(history_file, "w", encoding="utf-8") as f:
-                json.dump(trace.history, f, ensure_ascii=False, indent=2)
-            
-            # Save stats
-            stats_file = self._current_session / "adventure_stats.json"
-            with open(stats_file, "w", encoding="utf-8") as f:
-                json.dump(trace.stats, f, ensure_ascii=False, indent=2)
-            
-            # Save full trace state
-            trace_file = self._current_session / "trace_state.json"
-            with open(trace_file, "w", encoding="utf-8") as f:
-                json.dump(trace.model_dump(), f, ensure_ascii=False, indent=2)
+            if namespace not in self.config.namespaces:
+                raise KeyError(f"Unknown namespace: {namespace}")
                 
-            self.logger.debug(f"Saved trace state to {self._current_session}")
+            ns_config = self.config.namespaces[namespace]
+            cache_key = self._get_cache_key(key, namespace)
+            
+            # Only cache if enabled for namespace
+            if ns_config.cache_enabled:
+                self._memory_cache[cache_key] = CacheEntry(
+                    data,
+                    ns_config.ttl_seconds
+                )
+            
+            # Serialize and save to storage
+            serialized_data = self._serialize_data(data, namespace)
+            file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
+            await self._fs_adapter.write_file_async(file_path, serialized_data)
             
         except Exception as e:
-            self.logger.error(f"Error saving trace: {e}")
+            self.logger.error(f"Error saving data for {namespace}:{key}: {e}")
+            raise
 
-    async def load_trace(self) -> Optional[TraceModel]:
-        """
-        Load trace from current session.
-        
-        Returns:
-            Optional[TraceModel]: Loaded trace state or None if not found
-        """
+    async def get_cached_data(self, key: str, namespace: str, model_type: Optional[Type[T]] = None) -> Optional[Any]:
+        """Get data from cache or persistent storage."""
         try:
-            if not self._current_session:
-                return None
-            
-            trace_file = self._current_session / "trace_state.json"
-            if not trace_file.exists():
-                return None
-            
-            with open(trace_file, "r", encoding="utf-8") as f:
-                trace_data = json.load(f)
-                return TraceModel.model_validate(trace_data)
+            if namespace not in self.config.namespaces:
+                raise KeyError(f"Unknown namespace: {namespace}")
                 
-        except Exception as e:
-            self.logger.error(f"Error loading trace: {e}")
-            return None
-
-    async def save_stats(self, stats: Dict[str, Any]) -> None:
-        """
-        Save game statistics.
-        
-        Args:
-            stats: Statistics to save
-        """
-        try:
-            if not self._current_session:
-                self._current_session = self.create_session_dir()
+            ns_config = self.config.namespaces[namespace]
+            cache_key = self._get_cache_key(key, namespace)
             
-            stats_file = self._current_session / "adventure_stats.json"
-            with open(stats_file, "w", encoding="utf-8") as f:
-                json.dump(stats, f, ensure_ascii=False, indent=2)
+            # Try memory cache if enabled
+            if ns_config.cache_enabled:
+                cache_entry = self._memory_cache.get(cache_key)
+                if cache_entry and not cache_entry.is_expired():
+                    return cache_entry.value
+            
+            # Try persistent storage
+            file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
+            data = await self._fs_adapter.read_file_async(file_path)
+            
+            if data is not None:
+                # Deserialize according to format
+                deserialized_data = self._deserialize_data(data, namespace, model_type)
                 
-            self.logger.debug(f"Saved stats to {stats_file}")
-            
-        except Exception as e:
-            self.logger.error(f"Error saving stats: {e}")
-
-    async def load_stats(self) -> Optional[Dict[str, Any]]:
-        """
-        Load game statistics.
-        
-        Returns:
-            Optional[Dict[str, Any]]: Loaded statistics or None if not found
-        """
-        try:
-            if not self._current_session:
-                return None
-            
-            stats_file = self._current_session / "adventure_stats.json"
-            if not stats_file.exists():
-                return None
-            
-            with open(stats_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                # Cache if enabled
+                if ns_config.cache_enabled:
+                    self._memory_cache[cache_key] = CacheEntry(
+                        deserialized_data,
+                        ns_config.ttl_seconds
+                    )
                 
-        except Exception as e:
-            self.logger.error(f"Error loading stats: {e}")
-            return None
-
-    def get_cache_path(self, section_number: int) -> str:
-        return os.path.join(self.config.cache_dir, f"{section_number}_cached.md")
-    
-    def get_content_path(self, section_number: int) -> str:
-        return os.path.join(self.config.content_dir, f"{section_number}.md")
-        
-    def get_rules_cache_path(self, section_number: int) -> str:
-        return os.path.join(self.config.rules_cache_dir, f"{section_number}_rules_cached.md")
-    
-    def get_section_cache_path(self, section_number: int) -> str:
-        """Get the cache file path for a section.
-        
-        Args:
-            section_number: Section number
+                return deserialized_data
             
-        Returns:
-            str: Path to the cache file
-        """
-        return os.path.join(self.config.cache_dir, f"{section_number}_cached.md")
-
-    def save_section_to_cache(self, section_number: int, section: NarratorModel) -> None:
-        """Save section content to cache.
-        
-        Args:
-            section_number: Section number to save
-            section: Section content to save
-        """
-        try:
-            # Prepare data for serialization
-            section_data = section.model_dump()
-            
-            # Convert datetime to string
-            if "timestamp" in section_data:
-                section_data["timestamp"] = section_data["timestamp"].isoformat()
-            
-            cache_file = self.get_section_cache_path(section_number)
-            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-            
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(section_data, f, ensure_ascii=False, indent=2)
-                
-        except Exception as e:
-            self.logger.error(f"[CacheManager] Error saving section {section_number} to cache: {str(e)}")
-
-    def get_section_from_cache(self, section_number: int) -> Optional[NarratorModel]:
-        """Get section content from cache.
-        
-        Args:
-            section_number: Section number to get
-            
-        Returns:
-            Optional[NarratorModel]: Cached section content if found
-        """
-        try:
-            cache_file = self.get_section_cache_path(section_number)
-            if os.path.exists(cache_file):
-                with open(cache_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                # Convert string back to datetime
-                if "timestamp" in data:
-                    data["timestamp"] = datetime.fromisoformat(data["timestamp"])
-                    
-                return NarratorModel(**data)
-                
             return None
             
         except Exception as e:
-            self.logger.error(f"[CacheManager] Error loading section {section_number} from cache: {str(e)}")
+            self.logger.error(f"Error loading data for {namespace}:{key}: {e}")
             return None
 
-    def exists_raw_section(self, section_number: int) -> bool:
-        """Check if raw section file exists.
+    async def clear_namespace_cache(self, namespace: str) -> None:
+        """Clear all cached data for a specific namespace."""
+        if namespace not in self.config.namespaces:
+            raise KeyError(f"Unknown namespace: {namespace}")
+            
+        # Clear memory cache
+        prefix = f"{namespace}:"
+        self._memory_cache = {
+            k: v for k, v in self._memory_cache.items()
+            if not k.startswith(prefix)
+        }
+        
+        # Clear storage
+        try:
+            directory = self.config.get_absolute_path(namespace)
+            pattern = f"*{self._get_file_extension(namespace)}"
+            files = await self._fs_adapter.list_files(directory, pattern)
+            for file in files:
+                await self._fs_adapter.delete_file_async(file)
+        except Exception as e:
+            self.logger.error(f"Error clearing namespace {namespace}: {e}")
+            raise
+
+    async def save_cached_content(self, key: str, namespace: str, data: Any) -> bool:
+        """Save content to cache."""
+        try:
+            await self.save_cached_data(key, namespace, data)
+            return True
+        except Exception as e:
+            self.logger.error(f"Error saving content for {namespace}:{key}: {e}")
+            return False
+
+    def get_cached_content(self, key: str, namespace: str) -> Optional[Any]:
+        """Get content from cache."""
+        try:
+            return self.get_cached_data(key, namespace)
+        except Exception as e:
+            self.logger.error(f"Error getting content for {namespace}:{key}: {e}")
+            return None
+
+    def exists_raw_content(self, section_number: int, namespace: str) -> bool:
+        """
+        Check if raw content exists.
         
         Args:
             section_number: Section number to check
+            namespace: Namespace to check in
             
         Returns:
-            bool: True if file exists
+            bool: True if exists
         """
-        content_path = os.path.join(self.config.content_dir, f"{section_number}.md")
-        return os.path.exists(content_path)
+        try:
+            raw_path = self.config.get_absolute_path(namespace) / f"{section_number}.md"
+            return raw_path.exists()
+        except Exception as e:
+            self.logger.error(f"Error checking content {section_number} in {namespace}: {e}")
+            return False
 
-    def load_raw_section_content(self, section_number: int) -> Optional[str]:
-        """Load raw section content from file.
+    def load_raw_content(self, section_number: int, namespace: str) -> Optional[str]:
+        """
+        Load raw content.
         
         Args:
             section_number: Section number to load
+            namespace: Namespace to load from
             
         Returns:
-            Optional[str]: Raw section content if found
+            Optional[str]: Raw content if found
         """
         try:
-            content_path = os.path.join(self.config.content_dir, f"{section_number}.md")
-            if os.path.exists(content_path):
-                with open(content_path, "r", encoding="utf-8") as f:
-                    return f.read()
-            return None
+            raw_path = self.config.get_absolute_path(namespace) / f"{section_number}.md"
+            return self._fs_adapter.read_file(raw_path)
         except Exception as e:
-            self.logger.error(f"[CacheManager] Error loading section {section_number}: {str(e)}")
+            self.logger.error(f"Error loading content {section_number} from {namespace}: {e}")
             return None
 
-    def get_rules_from_cache(self, section_number: int) -> Optional[RulesModel]:
-        """Récupère les règles du cache pour une section donnée."""
+    async def delete_cached_content(self, key: str, namespace: str) -> bool:
+        """Delete content from cache."""
         try:
-            cache_file = os.path.join(self.config.rules_cache_dir, f"section_{section_number}_rules.md")
-            if os.path.exists(cache_file):
-                with open(cache_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    # Convertir le dice_type en enum
-                    dice_type = data.get("dice_type", "none").upper()
-                    data["dice_type"] = getattr(DiceType, dice_type, DiceType.NONE)
-                    return RulesModel(**data)
-            return None
-        except Exception as e:
-            self.logger.error(f"[CacheManager] Erreur lecture cache règles: {e}")
-            return None
-
-    def save_rules_to_cache(self, rules: RulesModel) -> None:
-        """Sauvegarde les règles dans le cache."""
-        try:
-            if not os.path.exists(self.config.rules_cache_dir):
-                os.makedirs(self.config.rules_cache_dir)
+            cache_key = self._get_cache_key(key, namespace)
+            if cache_key in self._memory_cache:
+                del self._memory_cache[cache_key]
             
-            cache_file = os.path.join(self.config.rules_cache_dir, f"section_{rules.section_number}_rules.md")
-            
-            # Convert model to dict for serialization
-            rules_data = rules.model_dump()
-            
-            # Convert datetime to string
-            if "last_update" in rules_data:
-                rules_data["last_update"] = rules_data["last_update"].isoformat()
-            
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(rules_data, f, ensure_ascii=False, indent=2)
-                
+            file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
+            await self._fs_adapter.delete_file_async(file_path)
+            return True
         except Exception as e:
-            self.logger.error(f"[CacheManager] Erreur sauvegarde règles: {e}")
-
-    def clear_rules_cache(self) -> None:
-        """Vide le cache des règles."""
-        try:
-            if os.path.exists(self.config.rules_cache_dir):
-                for file in os.listdir(self.config.rules_cache_dir):
-                    os.remove(os.path.join(self.config.rules_cache_dir, file))
-            self.logger.info("[CacheManager] Cache des règles vidé")
-        except Exception as e:
-            self.logger.error(f"[CacheManager] Erreur nettoyage cache règles: {e}")
-
-    def initialize_cache_dirs(self) -> None:
-        """Initialise les répertoires de cache."""
-        try:
-            os.makedirs(self.config.cache_dir, exist_ok=True)
-            os.makedirs(self.config.rules_cache_dir, exist_ok=True)
-            self.logger.info("[CacheManager] Répertoires de cache initialisés")
-        except Exception as e:
-            self.logger.error(f"[CacheManager] Erreur initialisation répertoires cache: {e}")
+            self.logger.error(f"Error deleting content for {namespace}:{key}: {e}")
+            return False

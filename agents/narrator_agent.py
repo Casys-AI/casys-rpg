@@ -1,149 +1,163 @@
 """NarratorAgent Module
-Handles reading and presenting game sections.
+Handles content processing and formatting.
 """
 
-from typing import Dict, Optional, AsyncGenerator, Any
+from typing import Dict, Optional, AsyncGenerator, Any, Union
 from datetime import datetime
-from pydantic import Field, ValidationError, BaseModel
+import json
+from pydantic import Field
 from langchain_core.messages import SystemMessage, HumanMessage
-import re
 
 from agents.base_agent import BaseAgent
 from models.game_state import GameState
 from models.narrator_model import NarratorModel, SourceType
-from managers.cache_manager import CacheManager
-from config.agent_config import NarratorConfig
+from models.errors_model import NarratorError
+from config.agents.narrator_agent_config import NarratorAgentConfig
 from config.logging_config import get_logger
 from agents.protocols import NarratorAgentProtocol
+from managers.protocols.narrator_manager_protocol import NarratorManagerProtocol
 
 logger = get_logger('narrator_agent')
 
 class NarratorAgent(BaseAgent, NarratorAgentProtocol):
-    """Agent responsable de la lecture et présentation des sections."""
+    """Agent responsable du traitement et de la présentation du contenu."""
     
-    config: NarratorConfig = Field(default_factory=NarratorConfig)
-    current_section: int = Field(default=1, description="Current section number")
+    config: NarratorAgentConfig = Field(default_factory=lambda: NarratorAgentConfig())
 
-    def __init__(self, config: NarratorConfig, cache_manager: CacheManager):
+    def __init__(self, config: NarratorAgentConfig, narrator_manager: NarratorManagerProtocol):
         """Initialize NarratorAgent.
         
         Args:
             config: Configuration for the agent
-            cache_manager: Cache manager instance
+            narrator_manager: Narrator manager instance
         """
-        super().__init__(config=config, cache_manager=cache_manager)
-        self.current_section = 1
+        super().__init__(config=config)
+        self.narrator_manager = narrator_manager
         self.logger = logger
 
-    async def _read_section(self, section_number: int) -> NarratorModel:
-        """Lit une section du livre.
+    async def process_section(self, section_number: int, raw_content: Optional[str] = None) -> Union[NarratorModel, NarratorError]:
+        """Process and format a section.
         
         Args:
-            section_number: Numéro de la section à lire
+            section_number: Section number to process
+            raw_content: Optional raw content to process
             
         Returns:
-            NarratorModel: Section lue
+            Union[NarratorModel, NarratorError]: Processed section or error
         """
         try:
-            # Try to get from cache first if source is "cache"
-            cached_content = self.cache_manager.get_section_from_cache(section_number)
-            if cached_content and isinstance(cached_content, NarratorModel):
-                self.logger.info(f"[NarratorAgent] Section {section_number} trouvée en cache")
-                return cached_content
+            # Check cache first
+            existing_content = await self.narrator_manager.get_section_content(section_number)
+            if not isinstance(existing_content, NarratorError):
+                self.logger.info(f"Content found in cache for section {section_number}")
+                return existing_content
 
-            # Load raw content from file
-            raw_content = self.cache_manager.load_raw_section_content(section_number)
-            if not raw_content:
-                self.logger.error(f"[NarratorAgent] Section {section_number} non trouvée")
-                return NarratorModel(
-                    section_number=section_number,
-                    content="",
-                    source_type=SourceType.RAW,
-                    error="Section not found"
-                )
-                
+            # Get content if not provided
+            if raw_content is None:
+                raw_content = await self.narrator_manager.get_raw_section_content(section_number)
+                if not raw_content:
+                    return NarratorError(
+                        section_number=section_number,
+                        message=f"Section {section_number} not found"
+                    )
+
             # Format content with LLM
-            formatted_content = await self._format_content(raw_content)
+            narrator_model = await self._format_content(section_number, raw_content)
             
-            # Create and save section content
-            section_content = NarratorModel(
-                section_number=section_number,
-                content=formatted_content,
-                source_type=SourceType.RAW
-            )
+            # Save to cache if processing successful
+            if not narrator_model.error:
+                save_result = await self.narrator_manager.save_section_content(narrator_model)
+                if isinstance(save_result, NarratorError):
+                    self.logger.error(f"Failed to save content: {save_result.message}")
             
-            # Save to cache
-            self.cache_manager.save_section_to_cache(section_number, section_content)
-            
-            return section_content
-            
+            return narrator_model
+
         except Exception as e:
-            self.logger.error(f"[NarratorAgent] Error reading section {section_number}: {str(e)}")
+            self.logger.error(f"Error processing section {section_number}: {str(e)}")
             return NarratorModel(
                 section_number=section_number,
-                content="",
-                source_type=SourceType.RAW,
-                error=f"Error reading section: {str(e)}"
+                content=raw_content,
+                error=f"Error processing section: {str(e)}",
+                source_type=SourceType.ERROR,
+                timestamp=datetime.now()
             )
 
-    async def _format_content(self, content: str) -> str:
-        """Formate le contenu avec le LLM et Markdown.
+    async def _format_content(self, section_number: int, content: str) -> NarratorModel:
+        """Format content using LLM.
         
         Args:
-            content: Contenu brut à formater
+            section_number: Section number
+            content: Raw content to format
             
         Returns:
-            str: Contenu formaté
+            NarratorModel: Formatted content model
         """
         try:
             messages = [
                 SystemMessage(content=self.config.system_message),
-                HumanMessage(content=content)
+                HumanMessage(content=f"Format this content for section {section_number}:\n\n{content}")
             ]
             
-            # Call LLM for formatting
             response = await self.config.llm.ainvoke(messages)
+            formatted_content = response.content
             
-            if not response or not response.content:
-                raise ValueError("Empty response from LLM")
-                
-            return response.content
+            return NarratorModel(
+                section_number=section_number,
+                content=formatted_content,
+                source_type=SourceType.RAW,
+                timestamp=datetime.now()
+            )
             
         except Exception as e:
-            self.logger.error(f"[NarratorAgent] Erreur formatage contenu: {e}")
-            return content  # Return raw content if formatting fails
-
-    async def format_content(self, content: str) -> str:
-        """Format the content using the LLM.
-        
-        Args:
-            content: Raw content to format
-            
-        Returns:
-            str: Formatted content
-        """
-        return await self._format_content(content)
+            self.logger.error(f"Error formatting content: {str(e)}")
+            return NarratorModel(
+                section_number=section_number,
+                content=content,
+                error=f"Error formatting content: {str(e)}",
+                source_type=SourceType.ERROR,
+                timestamp=datetime.now()
+            )
 
     async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-        """Invoque l'agent narrateur.
+        """Process game state and update narrative.
         
         Args:
-            input_data: Données d'entrée contenant l'état du jeu
+            input_data: Input data containing game state
             
         Yields:
-            Dict[str, Any]: État du jeu mis à jour
+            Dict[str, Any]: Updated game state with narrative
         """
         try:
-            # Validation des données d'entrée
-            game_state = GameState(**input_data)
+            game_state = GameState.model_validate(input_data)
             
-            # Lecture de la section
-            content = await self._read_section(game_state.section_number)
-            game_state.narrative = content
+            # Process current section
+            section_result = await self.process_section(game_state.section_number)
             
-            # Retourne l'état sous forme de dictionnaire
-            yield {"state": game_state.model_dump()}
+            if isinstance(section_result, NarratorError):
+                self.logger.error(f"Error processing section: {section_result.message}")
+                error_model = NarratorModel(
+                    section_number=game_state.section_number,
+                    content="",
+                    error=section_result.message,
+                    source_type=SourceType.ERROR,
+                    timestamp=datetime.now()
+                )
+                yield {"narrative": error_model.model_dump()}
+                return
+                
+            # Update game state with processed content
+            game_state.narrative_content = section_result.content
+            game_state.last_update = datetime.now()
+            
+            yield {"narrative": section_result.model_dump()}
             
         except Exception as e:
-            self.logger.error(f"[NarratorAgent] Error in NarratorAgent.ainvoke: {str(e)}")
-            raise
+            self.logger.error(f"Error in ainvoke: {str(e)}")
+            error_model = NarratorModel(
+                section_number=input_data.get("section_number", 1),
+                content="",
+                error=f"Error in agent invocation: {str(e)}",
+                source_type=SourceType.ERROR,
+                timestamp=datetime.now()
+            )
+            yield {"narrative": error_model.model_dump()}

@@ -2,16 +2,18 @@
 API FastAPI pour le jeu interactif
 """
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from datetime import datetime
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.models import OpenAPI
+from pathlib import Path
 
 from models.game_state import GameState
 from models.feedback_model import FeedbackRequest
@@ -20,16 +22,17 @@ from models.trace_model import TraceModel
 from models.decision_model import DecisionModel, DiceResult
 
 from config.game_config import GameConfig
+from config.storage_config import StorageConfig, StorageFormat, NamespaceConfig
 from managers.agent_manager import AgentManager
 from utils.game_utils import roll_dice
-from utils.logger import get_logger
+from config.logging_config import get_logger
 
 logger = get_logger('api')
 
 # Configuration
 API_HOST = "127.0.0.1"
 API_PORT = 8000
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # Classes de réponse
 class ActionResponse(BaseModel):
@@ -57,47 +60,39 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
 
     async def broadcast(self, message: Dict[str, Any]):
-        disconnected = []
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
             except WebSocketDisconnect:
-                disconnected.append(connection)
-        
-        for conn in disconnected:
-            self.disconnect(conn)
+                self.disconnect(connection)
+
+manager = ConnectionManager()
+
+# Configuration globale
+def get_storage_config() -> StorageConfig:
+    """Get storage configuration."""
+    return StorageConfig.get_default_config(BASE_DIR / "data")
 
 # Gestionnaire de l'application
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan."""
     # Startup
-    try:
-        await startup_event()
-        logger.info("Application startup complete")
-    except Exception as e:
-        logger.error(f"Failed to initialize components: {e}")
-        raise
-    
+    logger.info("Starting up...")
+    await startup_event()
     yield
-    
     # Shutdown
-    try:
-        # Cleanup resources
-        logger.info("Application shutdown complete")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+    logger.info("Shutting down...")
 
 # Création de l'application
 app = FastAPI(
     title="Casys RPG API",
     description="API pour le jeu de rôle interactif Casys",
-    version="2.0.0",
-    lifespan=lifespan,
-    docs_url=None,  # Disable default docs
-    redoc_url=None  # Disable default redoc
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -106,20 +101,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Instance unique de l'AgentManager
+_agent_manager: AgentManager | None = None
 
-# Instances globales
-manager = ConnectionManager()
-
-def get_agent_manager():
+def get_agent_manager() -> AgentManager:
     """Get or create AgentManager instance."""
-    if not hasattr(get_agent_manager, "_instance"):
-        config = GameConfig()
-        manager = AgentManager(config)
-        manager.initialize()
-        get_agent_manager._instance = manager
-    return get_agent_manager._instance
+    global _agent_manager
+    if not _agent_manager:
+        from agents.factories.game_factory import GameFactory
+        factory = GameFactory(
+            game_config=GameConfig(),
+            storage_config=StorageConfig(base_path=BASE_DIR / "data")
+        )
+        _agent_manager = factory.agent_manager
+    return _agent_manager
 
 # Dépendances
 async def get_current_state(
@@ -184,9 +179,7 @@ async def websocket_endpoint(
             "trace": {...}
         }
     }
-    ```
     """
-    manager = ConnectionManager()
     try:
         await manager.connect(websocket)
         async for state in agent_mgr.subscribe_to_updates():
@@ -311,6 +304,21 @@ async def navigate_to_section(
             message=str(e),
             state=None
         )
+
+@app.post("/game/section/{section_number}/stream")
+async def navigate_to_section_with_updates(
+    section_number: int,
+    agent_mgr = Depends(get_agent_manager)
+):
+    """Navigate to a section with streaming updates."""
+    try:
+        return StreamingResponse(
+            agent_mgr.process_section_with_updates(section_number),
+            media_type="application/x-ndjson"
+        )
+    except Exception as e:
+        logger.error(f"Error streaming section updates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/game/response", response_model=ActionResponse)
 async def submit_response(

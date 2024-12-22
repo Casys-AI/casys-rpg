@@ -1,221 +1,187 @@
-"""State Manager
+"""
+State Manager Module
 Manages game state persistence and validation.
 """
 
-from typing import Dict, Optional, Any, List
-from pydantic import BaseModel, ValidationError, ConfigDict
+from typing import Dict, Optional, Any, List, Union
+from pydantic import BaseModel, ValidationError
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
+import uuid
 
-from config.component_config import ComponentConfig
-from config.managers.state_manager_config import StateManagerConfig
 from models.game_state import GameState
+from config.storage_config import StorageConfig
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from managers.protocols.state_manager_protocol import StateManagerProtocol
+from models.errors_model import StateError
 
-class StateManager(ComponentConfig[StateManagerConfig]):
+def _json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+class StateManager(StateManagerProtocol):
     """Manages game state persistence and validation."""
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    config: StateManagerConfig
-    current_state: Optional[GameState] = None
-    state_history: List[GameState] = []
-    logger: logging.Logger = logging.getLogger(__name__)
-
-    def initialize(self) -> None:
-        """Initialize state manager."""
+    
+    def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol):
+        """Initialize StateManager with configuration."""
+        self.config = config
+        self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
-        self.current_state = None
-        self.state_history = []
+        self._current_state: Optional[GameState] = None
+        self._state_history: List[GameState] = []
+        self._game_id: Optional[str] = None
 
-    async def save_state(self, state: GameState) -> bool:
-        """
-        Sauvegarde l'état actuel.
-        
-        Args:
-            state: État à sauvegarder
-            
-        Returns:
-            bool: True si la sauvegarde a réussi
-        """
+    async def initialize(self) -> None:
+        """Initialize the state manager and generate game_id."""
         try:
-            # Valider l'état
-            validated_state = GameState.model_validate(state)
+            self._game_id = str(uuid.uuid4())
+            self.config.game_id = self._game_id
+            self.logger.info(f"Initialized state manager with game ID: {self._game_id}")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize state manager: {e}")
+            raise StateError(f"Failed to initialize state manager: {str(e)}")
+
+    @property
+    def game_id(self) -> str:
+        """Get current game ID."""
+        if not self._game_id:
+            raise StateError("State manager not initialized. Call initialize() first.")
+        return self._game_id
+
+    @property
+    def current_state(self) -> Optional[GameState]:
+        """Get current game state."""
+        return self._current_state
+
+    @property
+    def state_history(self) -> List[GameState]:
+        """Get state history."""
+        return self._state_history.copy()
+
+    def _serialize_state(self, state: GameState) -> str:
+        """Serialize state to JSON."""
+        try:
+            state_dict = state.model_dump()
+            return json.dumps(state_dict, default=_json_serial)
+        except Exception as e:
+            self.logger.error(f"Error serializing state: {e}")
+            raise StateError(f"Failed to serialize state: {str(e)}")
+
+    def _deserialize_state(self, json_data: str) -> GameState:
+        """Deserialize JSON to state."""
+        try:
+            state_dict = json.loads(json_data)
+            return GameState.model_validate(state_dict)
+        except Exception as e:
+            self.logger.error(f"Error deserializing state: {e}")
+            raise StateError(f"Failed to deserialize state: {str(e)}")
+
+    async def save_state(self, state: GameState) -> GameState:
+        """Save current state."""
+        try:
+            if not self._game_id:
+                raise StateError("State manager not initialized. Call initialize() first.")
+                
+            json_data = self._serialize_state(state)
             
-            # Ajouter à l'historique
-            self.state_history.append(validated_state)
+            await self.cache.save_cached_content(
+                key=f"section_{state.section_number}",
+                namespace="state",
+                data=json_data
+            )
             
-            # Sauvegarder dans un fichier si configuré
-            if self.config.save_to_file:
-                state_dict = validated_state.model_dump()
-                with open(self.config.state_file_path, 'w') as f:
-                    json.dump(state_dict, f)
-                    
+            self._current_state = state
+            if not self._state_history or self._state_history[-1] != state:
+                self._state_history.append(state)
+                
+            return state
+            
+        except Exception as e:
+            self.logger.error(f"Error saving state: {e}")
+            raise StateError(f"Failed to save state: {str(e)}")
+
+    async def load_state(self, section_number: int) -> Optional[GameState]:
+        """Load state for a specific section."""
+        try:
+            if not self._game_id:
+                raise StateError("State manager not initialized. Call initialize() first.")
+                
+            json_data = await self.cache.get_cached_content(
+                key=f"section_{section_number}",
+                namespace="state"
+            )
+            
+            if not json_data:
+                return None
+                
+            state = self._deserialize_state(json_data)
+            self._current_state = state
+            return state
+            
+        except Exception as e:
+            self.logger.error(f"Error loading state: {e}")
+            raise StateError(f"Failed to load state: {str(e)}")
+
+    def get_current_state(self) -> Optional[GameState]:
+        """Get current game state."""
+        return self._current_state
+
+    def get_state_history(self) -> List[GameState]:
+        """Get state history."""
+        return self._state_history.copy()
+
+    async def clear_state(self) -> None:
+        """Clear current state."""
+        self._current_state = None
+        self._state_history.clear()
+
+    def validate_state(self, state: GameState) -> bool:
+        """Validate game state."""
+        try:
+            # Basic validation
+            if not state:
+                return False
+            if state.section_number < 1:
+                return False
             return True
-            
         except Exception as e:
-            self.logger.error(f"Error saving state: {str(e)}")
+            self.logger.error(f"Error validating state: {e}")
             return False
 
-    async def load_state(self) -> Optional[GameState]:
-        """
-        Charge le dernier état sauvegardé.
-        
-        Returns:
-            Optional[GameState]: État chargé ou None si erreur
-        """
-        try:
-            if self.config.save_to_file and self.config.state_file_path.exists():
-                with open(self.config.state_file_path, 'r') as f:
-                    state_dict = json.load(f)
-                return GameState.model_validate(state_dict)
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error loading state: {str(e)}")
-            return None
+    async def create_initial_state(self) -> GameState:
+        """Create and return an initial game state."""
+        if not self._game_id:
+            await self.initialize()
+        initial_state = GameState(section_number=1)
+        return await self.save_state(initial_state)
 
-    async def update_state(self, new_state: Dict) -> bool:
-        """
-        Met à jour l'état actuel avec validation.
-        
-        Args:
-            new_state: Nouvel état à appliquer
-            
-        Returns:
-            bool: True si la mise à jour a réussi
-        """
+    async def create_error_state(self, error_message: str) -> GameState:
+        """Create an error state with the given message."""
+        if not self._game_id:
+            await self.initialize()
+        error_state = GameState(
+            section_number=self._current_state.section_number if self._current_state else 1,
+            error=error_message
+        )
+        return await self.save_state(error_state)
+
+    async def update_state(self, new_state: Dict | GameState) -> bool:
+        """Update current game state with validation."""
         try:
-            # Valider le nouvel état
-            validated_state = GameState.model_validate(new_state)
-            
-            # Sauvegarder l'ancien état dans l'historique
-            if self.current_state:
-                self.state_history.append(self.current_state)
-                
-            # Mettre à jour l'état courant
-            self.current_state = validated_state
-            
-            # Mettre à jour les stats si nécessaire
-            if self.config.stats_manager and validated_state.stats:
-                await self.config.stats_manager.update_stats(validated_state.stats)
-                
-            # Mettre en cache les règles si nécessaire
-            if (self.config.cache_manager and 
-                validated_state.rules and 
-                validated_state.rules.source == "analysis"):
-                await self.config.cache_manager.cache_rules(
-                    validated_state.rules.section_number,
-                    validated_state.rules
-                )
-                
-            # Mettre à jour la trace si nécessaire
-            if self.config.trace_manager and validated_state.trace:
-                await self.config.trace_manager.add_trace(validated_state.trace)
-                
-            # Sauvegarder si configuré
-            if self.config.save_to_file:
-                await self.save_state(validated_state)
-                
+            if isinstance(new_state, dict):
+                state = GameState.model_validate(new_state)
+            else:
+                state = new_state
+
+            if not self.validate_state(state):
+                return False
+
+            await self.save_state(state)
             return True
-            
-        except ValidationError as e:
-            self.logger.error(f"State validation error: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error updating state: {e}")
             return False
-        except Exception as e:
-            self.logger.error(f"Error updating state: {str(e)}")
-            return False
-
-    async def get_cached_rules(self, section_number: int) -> Optional[Dict]:
-        """
-        Récupère les règles en cache pour une section.
-        
-        Args:
-            section_number: Numéro de la section
-            
-        Returns:
-            Optional[Dict]: Règles en cache ou None
-        """
-        try:
-            if self.config.cache_manager:
-                return await self.config.cache_manager.get_cached_rules(section_number)
-            return None
-        except Exception as e:
-            self.logger.error(f"Error getting cached rules: {str(e)}")
-            return None
-
-    async def get_trace_history(self) -> List[Dict]:
-        """
-        Récupère l'historique des traces.
-        
-        Returns:
-            List[Dict]: Liste des traces
-        """
-        try:
-            if self.config.trace_manager:
-                return await self.config.trace_manager.get_trace_history()
-            return []
-        except Exception as e:
-            self.logger.error(f"Error getting trace history: {str(e)}")
-            return []
-
-    async def get_stats(self) -> Optional[Dict]:
-        """
-        Récupère les statistiques actuelles.
-        
-        Returns:
-            Optional[Dict]: Statistiques ou None
-        """
-        try:
-            if self.config.stats_manager:
-                return await self.config.stats_manager.get_stats()
-            return None
-        except Exception as e:
-            self.logger.error(f"Error getting stats: {str(e)}")
-            return None
-
-    async def clear_cache(self) -> bool:
-        """
-        Vide le cache.
-        
-        Returns:
-            bool: True si le cache a été vidé
-        """
-        try:
-            if self.config.cache_manager:
-                await self.config.cache_manager.clear_cache()
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"Error clearing cache: {str(e)}")
-            return False
-
-    def create_error_state(self, error_message: str) -> Dict:
-        """
-        Crée un état d'erreur.
-        
-        Args:
-            error_message: Message d'erreur
-            
-        Returns:
-            Dict: État avec l'erreur
-        """
-        try:
-            error_state = GameState.model_validate({
-                "error": error_message,
-                "timestamp": datetime.now().isoformat()
-            })
-            return error_state.model_dump()
-            
-        except Exception as e:
-            self.logger.error(f"Error creating error state: {str(e)}")
-            return GameState.model_validate({
-                "error": f"Error creating error state: {str(e)}"
-            }).model_dump()
-
-    async def get_state_history(self) -> List[GameState]:
-        """
-        Récupère l'historique des états.
-        
-        Returns:
-            List[GameState]: Liste des états précédents
-        """
-        return self.state_history.copy()

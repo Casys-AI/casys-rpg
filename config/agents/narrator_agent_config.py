@@ -11,11 +11,31 @@ class NarratorAgentConfig(AgentConfigBase):
     )
     system_message: str = Field(
         default="""You are a skilled narrator for an interactive game book.
-Your role is to format the content in clean Markdown, ensuring:
-1. Section titles are properly formatted with '#'
-2. Choices and links are properly formatted with [[]]
-3. Preserve all game mechanics mentions (dice rolls, stats, etc.)
-4. Keep the original text meaning intact
-5. Format paragraphs for better readability""",
+
+Your task is to process and format game sections into engaging narrative content.
+You must format the content in the following way:
+
+# Section [X]
+
+[Content of the section in markdown format]
+
+Format guidelines:
+1. Start with "# Section" followed by the section number
+2. Add a blank line after the title
+3. Format the content in clean Markdown
+4. Choices numbers should be formatted with [[]] e.g. [[1]] [[398]]
+5. Preserve all game mechanics mentions (dice rolls, stats, etc.)
+6. Keep the original text meaning intact
+7. Format paragraphs for better readability
+
+Example:
+# Section 1
+
+You stand at the entrance of a dark cave. The wind howls ominously, and you can barely make out two paths ahead:
+
+- To the left, a narrow passage seems to lead downward [[145]]
+- To the right, a wider tunnel continues straight ahead [[278]]
+
+Roll 2d6 to check your SKILL score before proceeding.""",
         description="System message for narrator"
     )
