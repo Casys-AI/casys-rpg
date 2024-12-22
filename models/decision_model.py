@@ -18,6 +18,18 @@ class DiceResult(BaseModel):
             raise ValueError("Dice value must be between 1 and 6")
         return v
 
+class AnalysisResult(BaseModel):
+    """Result of decision analysis."""
+    next_section: int
+    conditions: List[str] = Field(default_factory=list)
+    analysis: str = ""
+    
+    @field_validator('next_section')
+    def validate_next_section(cls, v):
+        if v < 1:
+            raise ValueError("Next section must be positive")
+        return v
+
 class DecisionModel(BaseModel):
     """A decision made in the game."""
     section_number: int

@@ -1,174 +1,129 @@
 """
 Trace Manager Module
-Handles game trace persistence and history management.
+Manages game trace persistence and history.
 """
 
 from typing import Dict, Optional, Any, List
-from pydantic import BaseModel, Field
 from datetime import datetime
 import logging
-import os
 import json
 from pathlib import Path
 
-from config.core_config import BaseComponent
 from models.game_state import GameState
-from models.trace_model import TraceModel
-from models.character_model import CharacterModel
-from config.agent_config import TraceConfig
+from models.trace_model import TraceModel, TraceAction, ActionType
+from config.storage_config import StorageConfig
+from managers.protocols.trace_manager_protocol import TraceManagerProtocol
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from models.errors_model import TraceError
 
-
-class TraceManager(BaseComponent[TraceConfig]):
-    """Manages game trace persistence and history."""
+class TraceManager(TraceManagerProtocol):
+    """Manages game traces and history."""
     
-    def initialize(self) -> None:
-        """
-        Initialize trace manager with static configuration.
-        This is called once at startup.
-        """
+    def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol):
+        """Initialize TraceManager with configuration."""
+        self.config = config
+        self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
-        self.current_trace = None
-        
-        # Setup directories and file paths
-        self.trace_directory = Path(self.config.trace_dir)
-        self.trace_directory.mkdir(parents=True, exist_ok=True)
-        
-        # File paths
-        self.history_file = self.trace_directory / "history.json"
-        self.adventure_sheet = self.trace_directory / "adventure_sheet.json"
+        self._current_trace = None
 
     async def start_session(self) -> None:
-        """
-        Start a new trace session.
-        This loads or creates a fresh trace.
-        Can be called multiple times to start new sessions.
-        """
-        # Initialize current state
-        self.current_trace = self._load_or_create_trace()
+        """Start a new game session."""
+        self._current_trace = TraceModel(
+            session_id=str(datetime.now().timestamp()),
+            start_time=datetime.now(),
+            history=[]
+        )
+        # Save only the current trace, not in history yet
+        await self.cache.save_cached_content(
+            key=self._current_trace.session_id,
+            namespace="trace",
+            data=self._current_trace.model_dump()
+        )
 
-    def _load_or_create_trace(self) -> TraceModel:
-        """Load existing trace or create new one."""
-        try:
-            if self.history_file.exists():
-                with open(self.history_file, 'r') as f:
-                    data = json.load(f)
-                    return TraceModel.model_validate(data)
-            return TraceModel()
-        except Exception as e:
-            self.logger.error(f"Error loading trace: {e}")
-            return TraceModel()
-
-    def process_trace(self, state: GameState, action: Dict[str, Any]) -> None:
-        """
-        Process and record game trace from current state.
-        Updates history.json with new actions and adventure_sheet.json with stats changes.
+    async def process_trace(self, state: GameState, action: Dict[str, Any]) -> None:
+        """Process and store a game trace."""
+        if not self._current_trace:
+            await self.start_session()
+            
+        trace_action = TraceAction(
+            timestamp=datetime.now(),
+            section=state.section_number,
+            action_type=action.get("type", ActionType.ERROR),
+            details=action
+        )
         
-        Args:
-            state: Current game state containing potential stat changes
-            action: Action data created by TraceAgent
-        """
-        try:
-            # Update current trace section
-            self.current_trace.section_number = state.section_number
-            
-            # Add action to history
-            self.current_trace.add_action(action)
-            
-            # Save updated history
-            self._save_history()
-            
-            # Update adventure sheet if stats changed
-            if state.trace and state.trace.stats:
-                self._update_adventure_sheet(state.trace.stats)
-                
-        except Exception as e:
-            self.logger.error(f"Error processing game trace: {e}")
-            raise
+        self._current_trace.history.append(trace_action)
+        await self.save_trace()
 
-    def _save_history(self) -> None:
-        """Save current trace to history file."""
+    async def save_trace(self) -> None:
+        """Save current trace to storage."""
+        if not self._current_trace:
+            return
+            
         try:
-            with open(self.history_file, 'w') as f:
-                json.dump(self.current_trace.model_dump(), f, indent=2)
-        except Exception as e:
-            self.logger.error(f"Error saving history: {e}")
-            raise
-
-    def _update_adventure_sheet(self, stats: Dict[str, Any]) -> None:
-        """Update adventure sheet with new stats."""
-        try:
-            current_sheet = {}
-            if self.adventure_sheet.exists():
-                with open(self.adventure_sheet, 'r') as f:
-                    current_sheet = json.load(f)
+            # Save current trace
+            await self.cache.save_cached_content(
+                key=self._current_trace.session_id,
+                namespace="trace",
+                data=self._current_trace.model_dump()
+            )
             
-            # Update sheet with new stats
-            current_sheet.update(stats)
-            
-            # Save updated sheet
-            with open(self.adventure_sheet, 'w') as f:
-                json.dump(current_sheet, f, indent=2)
-                
-        except Exception as e:
-            self.logger.error(f"Error updating adventure sheet: {e}")
-            raise
-
-    def get_state_feedback(self, state: GameState) -> str:
-        """
-        Get feedback about current game state.
-        
-        Args:
-            state: Current game state
-            
-        Returns:
-            str: Feedback message
-        """
-        try:
-            action_count = len(self.current_trace.actions)
-            current_section = state.section_number
-            return f"Section {current_section} - Actions taken: {action_count}"
-        except Exception as e:
-            self.logger.error(f"Error getting feedback: {e}")
-            return "Unable to provide state feedback"
-
-    def save_trace(self, trace: Any) -> None:
-        """
-        Save trace data.
-        
-        Args:
-            trace: Trace data to save
-        """
-        try:
-            if not self._current_session:
-                self._current_session = self.create_session_dir()
-            
-            trace_file = self._current_session / "trace_state.json"
-            with open(trace_file, "w", encoding="utf-8") as f:
-                json.dump(trace.model_dump(), f, ensure_ascii=False, indent=2)
-                
-            self.logger.debug(f"Saved trace to {trace_file}")
-            
+            # Only save to history if we have actions
+            if self._current_trace.history:
+                await self.cache.save_cached_content(
+                    key=f"history/{self._current_trace.session_id}",
+                    namespace="trace",
+                    data=self._current_trace.model_dump()
+                )
         except Exception as e:
             self.logger.error(f"Error saving trace: {e}")
+            raise TraceError(f"Failed to save trace: {e}")
 
-    def load_trace(self) -> Optional[Dict[str, Any]]:
-        """
-        Load trace data.
-        
-        Returns:
-            Optional[Dict[str, Any]]: Loaded trace data or None if not found
-        """
+    async def get_current_trace(self) -> Optional[TraceModel]:
+        """Get current trace if exists."""
+        return self._current_trace
+
+    async def get_trace_history(self) -> List[TraceModel]:
+        """Get all traces from storage."""
         try:
-            if not self._current_session:
-                return None
+            # Récupérer toutes les traces de l'historique
+            traces = await self.cache.get_cached_content(
+                key="history/*",
+                namespace="traces",
+                model_type=TraceModel
+            )
             
-            trace_file = self._current_session / "trace_state.json"
-            if not trace_file.exists():
-                return None
-            
-            with open(trace_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+            if not traces:
+                return []
                 
+            return [trace for trace in traces if isinstance(trace, TraceModel)]
         except Exception as e:
-            self.logger.error(f"Error loading trace: {e}")
-            return None
+            self.logger.error(f"Error loading traces: {e}")
+            raise TraceError(f"Failed to load traces: {e}")
+
+    def get_state_feedback(self, state: GameState) -> str:
+        """Get feedback about the current game state."""
+        try:
+            if not state or not state.trace:
+                return "No state information available"
+                
+            last_action = state.trace.get_last_action()
+            if not last_action:
+                return "No actions recorded yet"
+                
+            # Format feedback based on action type
+            action_type = last_action.get("action_type", "unknown")
+            details = last_action.get("details", {})
+            
+            if action_type == "dice_roll":
+                return f"Dice roll result: {details.get('result')} ({details.get('dice_type', 'unknown')})"
+            elif action_type == "user_input":
+                return f"Player response recorded: {details.get('response', 'No response')}"
+            elif action_type == "decision":
+                return f"Decision made: Moving to section {details.get('next_section', 'unknown')}"
+            
+            return "Game state processed successfully"
+            
+        except Exception as e:
+            self.logger.error(f"Error getting state feedback: {e}")
+            return f"Error getting feedback: {str(e)}"

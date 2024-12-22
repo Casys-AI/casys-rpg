@@ -1,23 +1,41 @@
 # config/managers/agent_manager_config.py
 """Agent Manager configuration."""
 from dataclasses import dataclass
-from agents.narrator_agent import NarratorAgent
-from agents.rules_agent import RulesAgent
-from agents.decision_agent import DecisionAgent
-from agents.trace_agent import TraceAgent
-from managers.state_manager import StateManager
-from managers.cache_manager import CacheManager
-from managers.character_manager import CharacterManager
-from managers.trace_manager import TraceManager
+from typing import TYPE_CHECKING
 
-@dataclass
+if TYPE_CHECKING:
+    from agents.protocols.narrator_agent_protocol import NarratorAgentProtocol
+    from agents.protocols.rules_agent_protocol import RulesAgentProtocol
+    from agents.protocols.decision_agent_protocol import DecisionAgentProtocol
+    from agents.protocols.trace_agent_protocol import TraceAgentProtocol
+    from managers.protocols.state_manager_protocol import StateManagerProtocol
+    from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+    from managers.protocols.character_manager_protocol import CharacterManagerProtocol
+    from managers.protocols.trace_manager_protocol import TraceManagerProtocol
+    from managers.protocols.rules_manager_protocol import RulesManagerProtocol
+
 class AgentManagerConfig:
     """Configuration for AgentManager."""
-    narrator_agent: NarratorAgent
-    rules_agent: RulesAgent
-    decision_agent: DecisionAgent
-    trace_agent: TraceAgent
-    state_manager: StateManager
-    cache_manager: CacheManager
-    character_manager: CharacterManager
-    trace_manager: TraceManager
+    
+    def __init__(
+        self,
+        narrator_agent: 'NarratorAgentProtocol',
+        rules_agent: 'RulesAgentProtocol',
+        decision_agent: 'DecisionAgentProtocol',
+        trace_agent: 'TraceAgentProtocol',
+        state_manager: 'StateManagerProtocol',
+        cache_manager: 'CacheManagerProtocol',
+        character_manager: 'CharacterManagerProtocol',
+        trace_manager: 'TraceManagerProtocol',
+        rules_manager: 'RulesManagerProtocol'
+    ) -> None:
+        """Initialize AgentManager configuration."""
+        self.narrator_agent = narrator_agent
+        self.rules_agent = rules_agent
+        self.decision_agent = decision_agent
+        self.trace_agent = trace_agent
+        self.state_manager = state_manager
+        self.cache_manager = cache_manager
+        self.character_manager = character_manager
+        self.trace_manager = trace_manager
+        self.rules_manager = rules_manager

@@ -6,11 +6,11 @@ from functools import cached_property
 import os
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
-from config.component_config import ComponentConfig
+from models.config_models import ConfigModel
 from config.game_constants import ModelType, DEFAULT_TEMPERATURE
 from config.logging_config import get_logger
 
-class AgentConfigBase(ComponentConfig):
+class AgentConfigBase(ConfigModel):
     """Base configuration for all agents."""
     model_name: str = Field(
         default=os.getenv("LLM_MODEL_NAME", ModelType.NARRATOR),

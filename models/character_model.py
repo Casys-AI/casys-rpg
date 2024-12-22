@@ -2,7 +2,7 @@
 from typing import Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-class Stats(BaseModel):
+class CharacterStats(BaseModel):
     """Character's base statistics."""
     health: int = 100
     max_health: int = 100
@@ -63,7 +63,7 @@ class Inventory(BaseModel):
 
 class CharacterModel(BaseModel):
     """Current state of the character."""
-    stats: Stats = Field(default_factory=Stats)
+    stats: CharacterStats = Field(default_factory=CharacterStats)
     inventory: Inventory = Field(default_factory=Inventory)
     
     def update_stats(self, new_stats: Dict[str, Any]):

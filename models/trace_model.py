@@ -37,6 +37,7 @@ class TraceAction(BaseModel):
 
 class TraceModel(BaseModel):
     """Current state of the game trace."""
+    session_id: str = Field(default="", description="Unique session identifier")
     section_number: int = 0
     history: List[TraceAction] = Field(default_factory=list)
     current_section: Optional[NarratorModel] = None
@@ -48,6 +49,12 @@ class TraceModel(BaseModel):
     def validate_section_number(cls, v):
         if v < 0:
             raise ValueError("Section number cannot be negative")
+        return v
+    
+    @field_validator('session_id')
+    def validate_session_id(cls, v):
+        if not v.strip():
+            raise ValueError("Session ID cannot be empty")
         return v
     
     def add_action(self, action: Dict[str, Any]):
