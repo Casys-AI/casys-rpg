@@ -118,6 +118,7 @@ nav:
     - Overview: architecture/overview.md
     - Components: architecture/components.md
   - Agents:
+    - Overview: agents/overview.md
     - Rules Agent: agents/rules-agent.md
     - Decision Agent: agents/decision-agent.md
     - Narrator Agent: agents/narrator-agent.md

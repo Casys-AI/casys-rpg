@@ -14,7 +14,7 @@ Thank you for your interest in contributing to Casys RPG! This document provides
 
 ## Code of Conduct
 
-This project follows a Code of Conduct that all contributors are expected to adhere to. Please read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing.
+This project follows a Code of Conduct that all contributors are expected to adhere to. Please read [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 ## Getting Started
 
