@@ -6,7 +6,7 @@ from typing import Protocol, Optional, Any, Dict, runtime_checkable
 from .base_protocols import CacheProtocol
 
 @runtime_checkable
-class CacheManagerProtocol(Protocol, CacheProtocol):
+class CacheManagerProtocol(CacheProtocol):
     """Protocol defining the interface for caching operations."""
     
     def initialize(self) -> None:

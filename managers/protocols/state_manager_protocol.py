@@ -11,7 +11,7 @@ from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from .base_protocols import StorageProtocol
 
 @runtime_checkable
-class StateManagerProtocol(Protocol, StorageProtocol):
+class StateManagerProtocol(StorageProtocol):
     """Protocol defining the interface for state management."""
     
     def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol) -> None:

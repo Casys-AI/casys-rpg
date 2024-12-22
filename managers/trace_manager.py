@@ -52,7 +52,7 @@ class TraceManager(TraceManagerProtocol):
             details=action
         )
         
-        self._current_trace.history.append(trace_action)
+        self._current_trace.add_action(trace_action)
         await self.save_trace()
 
     async def save_trace(self) -> None:

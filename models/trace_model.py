@@ -56,15 +56,36 @@ class TraceModel(BaseModel):
         if not v.strip():
             raise ValueError("Session ID cannot be empty")
         return v
-    
+        
     def add_action(self, action: Dict[str, Any]):
-        """Add an action to the trace history."""
+        """Add a new action to the trace history.
+
+        Args:
+            action (Dict[str, Any]): A dictionary containing action details with the following structure:
+                - section (int): The section number where the action occurred
+                - action_type (ActionType): The type of action (user_input, dice_roll, etc.)
+                - details (Dict[str, Any]): Additional details about the action
+
+        Example:
+            ```python
+            trace.add_action({
+                "section": 1,
+                "action_type": ActionType.USER_INPUT,
+                "details": {"input": "go north"}
+            })
+            ```
+        """
         if not isinstance(action, TraceAction):
             action = TraceAction(**action)
         self.history.append(action)
     
     def update_character(self, character: CharacterModel):
-        """Update character state in trace."""
+        """Update the character state in the trace model.
+
+        Args:
+            character (CharacterModel): The new character state to update with.
+                This will replace the current character state in the trace.
+        """
         self.character = character
         self.add_action({
             "section": self.section_number,
