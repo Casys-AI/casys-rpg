@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CASYS RPG - Socket.IO Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .message.received {
+            background-color: #e3f2fd;
+        }
+        .message.sent {
+            background-color: #f5f5f5;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        input, button {
+            padding: 5px;
+            margin: 2px;
+        }
+        button {
+            cursor: pointer;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        #gameState {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .state-updated {
+            animation: highlight 1s ease-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #fff3cd; }
+            100% { background-color: #f8f9fa; }
+        }
+    </style>
+</head>
+<body>
+    <h1>CASYS RPG - Socket.IO Test</h1>
+    <div class="container">
+        <div class="panel">
+            <h2>Messages</h2>
+            <div id="messages" class="messages"></div>
+            <div class="input-group">
+                <input type="text" id="gameId" placeholder="Game ID">
+                <button onclick="joinGame()">Join Game</button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="playerInput" placeholder="Enter your command">
+                <button onclick="sendInput()">Send</button>
+            </div>
+            <button onclick="requestState()">Request State</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+        <div class="panel">
+            <h2>Game State</h2>
+            <div id="gameState">Waiting for state updates...</div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentGameId = null;
+
+        function connect() {
+            socket = io('http://localhost:8000', {
+                path: '/socket.io'
+            });
+
+            socket.on('connect', () => {
+                addMessage('System', 'Connected to server');
+            });
+
+            socket.on('disconnect', () => {
+                addMessage('System', 'Disconnected from server');
+            });
+
+            socket.on('error', (data) => {
+                addMessage('Error', data.message);
+            });
+
+            socket.on('game_state', (data) => {
+                updateGameState(data);
+            });
+
+            socket.on('player_joined', (data) => {
+                addMessage('System', `Player ${data.player_id} joined`);
+            });
+
+            socket.on('player_left', (data) => {
+                addMessage('System', `Player ${data.player_id} left`);
+            });
+
+            // Écouteur pour les mises à jour d'état
+            socket.on('state_update', (data) => {
+                updateGameState(data);
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                currentGameId = null;
+                addMessage('System', 'Disconnected');
+            }
+        }
+
+        function joinGame() {
+            if (!socket) {
+                connect();
+            }
+
+            const gameId = document.getElementById('gameId').value;
+            if (!gameId) {
+                addMessage('Error', 'Please enter a game ID');
+                return;
+            }
+
+            currentGameId = gameId;
+            socket.emit('join_game', { game_id: gameId });
+            addMessage('System', `Joining game ${gameId}`);
+        }
+
+        function sendInput() {
+            if (!socket || !currentGameId) {
+                addMessage('Error', 'Please join a game first');
+                return;
+            }
+
+            const input = document.getElementById('playerInput').value;
+            if (!input) {
+                addMessage('Error', 'Please enter a command');
+                return;
+            }
+
+            socket.emit('player_input', {
+                game_id: currentGameId,
+                input: input
+            });
+
+            addMessage('You', input, 'sent');
+            document.getElementById('playerInput').value = '';
+        }
+
+        function requestState() {
+            if (!socket || !currentGameId) {
+                addMessage('Error', 'Please join a game first');
+                return;
+            }
+
+            socket.emit('request_state', { game_id: currentGameId });
+        }
+
+        function addMessage(sender, message, type = 'received') {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            messageElement.textContent = `${sender}: ${message}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateGameState(state) {
+            const gameStateDiv = document.getElementById('gameState');
+            const formattedState = JSON.stringify(state, null, 2);
+            gameStateDiv.textContent = formattedState;
+            
+            // Animation de mise à jour
+            gameStateDiv.classList.remove('state-updated');
+            void gameStateDiv.offsetWidth; // Force reflow
+            gameStateDiv.classList.add('state-updated');
+            
+            // Log dans les messages aussi
+            addMessage('State Update', 'Game state updated');
+        }
+    </script>
+</body>
+</html>

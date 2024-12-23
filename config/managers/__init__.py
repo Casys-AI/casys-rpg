@@ -1,8 +1,8 @@
 """Manager configuration package."""
-from config.managers.manager_config_base import ManagerConfigBase
-from config.managers.agent_manager_config import AgentManagerConfig
+from config.managers.character_manager_config import CharacterManagerConfig
+from config.managers.decision_manager_config import DecisionManagerConfig
 
 __all__ = [
-    'ManagerConfigBase',
-    'AgentManagerConfig'
+    'CharacterManagerConfig',
+    'DecisionManagerConfig'
 ]

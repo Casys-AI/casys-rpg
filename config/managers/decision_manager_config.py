@@ -1,24 +1,10 @@
-"""
-Configuration for the Decision Manager
-"""
-from pydantic import BaseModel, Field
+"""Decision Manager configuration."""
+from pydantic import Field
+from config.storage_config import StorageConfig
 
-class DecisionManagerConfig(BaseModel):
+class DecisionManagerConfig(StorageConfig):
     """Configuration for the Decision Manager."""
     
-    # Cache settings
-    cache_enabled: bool = Field(
-        default=True,
-        description="Enable caching of decisions"
-    )
-    
-    # Debug settings
-    debug: bool = Field(
-        default=False,
-        description="Enable debug mode"
-    )
-    
-    # Validation settings
     validate_responses: bool = Field(
         default=True,
         description="Validate responses against rules"

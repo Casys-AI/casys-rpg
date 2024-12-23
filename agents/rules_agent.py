@@ -5,25 +5,23 @@ Handles game rules analysis and validation using LLM.
 from typing import Dict, Optional, Any, List, AsyncGenerator
 from datetime import datetime
 import json
-from pydantic import BaseModel, Field
-from langchain.schema.messages import SystemMessage, HumanMessage
+from pydantic import Field
+from langchain_core.messages import SystemMessage, HumanMessage
+
 from models.game_state import GameState
 from models.rules_model import RulesModel, DiceType, SourceType
 from models.errors_model import RulesError
 from agents.base_agent import BaseAgent
-from agents.protocols.base_agent_protocol import BaseAgentProtocol
 from config.agents.rules_agent_config import RulesAgentConfig
 from config.logging_config import get_logger
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
-from agents.protocols import RulesAgentProtocol
+from agents.protocols.rules_agent_protocol import RulesAgentProtocol
 
 logger = get_logger('rules_agent')
 
-class RulesAgent(BaseAgent, RulesAgentProtocol):
-    """Agent responsible for rules analysis."""
+class RulesAgent(BaseAgent):
+    """Agent for analyzing and validating game rules."""
     
-    config: RulesAgentConfig = Field(default_factory=RulesAgentConfig)
-
     def __init__(self, config: RulesAgentConfig, rules_manager: RulesManagerProtocol):
         """Initialize the agent with configuration.
         
@@ -98,7 +96,6 @@ class RulesAgent(BaseAgent, RulesAgentProtocol):
             response = await self.config.llm.ainvoke(messages)
             
             try:
-                
                 rules_data = json.loads(response.content)
                 rules_data["section_number"] = section_number
                 rules_data["source"] = "llm_analysis"
@@ -148,3 +145,18 @@ class RulesAgent(BaseAgent, RulesAgentProtocol):
                 last_update=datetime.now()
             )
             yield {"rules": error_rules.model_dump()}
+
+    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict[str, GameState]:
+        """Synchronous invocation of the agent.
+        
+        Args:
+            input_data: Input data for rule validation
+            config: Optional configuration
+            
+        Returns:
+            Dict[str, GameState]: Processing results and updated game state
+        """
+        raise NotImplementedError("Use ainvoke for rules processing")
+
+# Register RulesAgent as implementing RulesAgentProtocol
+RulesAgentProtocol.register(RulesAgent)

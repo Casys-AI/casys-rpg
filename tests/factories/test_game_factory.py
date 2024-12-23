@@ -1,9 +1,11 @@
 """Tests for the game factory module."""
 import pytest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from agents.factories.game_factory import GameFactory
 from config.game_config import GameConfig
+from config.storage_config import StorageConfig
 from agents.narrator_agent import NarratorAgent
 from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
@@ -17,17 +19,15 @@ from managers.cache_manager import CacheManager
 @pytest.fixture
 def mock_config():
     """Create a mock game configuration."""
-    return GameConfig.get_default_config(base_path="./test_data")
+    config = GameConfig.create_default()
+    storage_config = StorageConfig(base_path=Path("./test_data"))
+    config.manager_configs.storage_config = storage_config
+    return config
 
 @pytest.fixture
-def mock_cache_manager():
-    """Create a mock cache manager."""
-    return Mock(spec=CacheManager)
-
-@pytest.fixture
-def game_factory(mock_config, mock_cache_manager):
+def game_factory(mock_config):
     """Create a game factory instance."""
-    return GameFactory(config=mock_config, cache_manager=mock_cache_manager)
+    return GameFactory(config=mock_config)
 
 def test_create_narrator_agent(game_factory):
     """Test creation of narrator agent."""
@@ -103,10 +103,10 @@ def test_create_managers(game_factory):
     assert isinstance(decision_manager, DecisionManager)
     assert isinstance(trace_manager, TraceManager)
 
-def test_invalid_config(mock_cache_manager):
+def test_invalid_config():
     """Test factory creation with invalid config."""
     with pytest.raises(ValueError):
-        GameFactory(config=None, cache_manager=mock_cache_manager)
+        GameFactory(config=None)
 
 def test_invalid_cache_manager(mock_config):
     """Test factory creation with invalid cache manager."""

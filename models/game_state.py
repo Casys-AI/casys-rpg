@@ -109,8 +109,7 @@ class GameState(GameStateInput, GameStateOutput):
     def model_dump_json(self, **kwargs):
         """Override model_dump_json to handle datetime serialization."""
         return super().model_dump_json(
-            **kwargs,
-            default=lambda x: x.isoformat() if isinstance(x, datetime) else None
+            **{k: v for k, v in kwargs.items() if k != 'default'}
         )
 
     @classmethod

@@ -5,7 +5,13 @@ from unittest.mock import Mock, AsyncMock, MagicMock
 from datetime import datetime
 
 from agents.decision_agent import DecisionAgent
+from agents.factories.game_factory import GameFactory
 from config.agents.decision_agent_config import DecisionAgentConfig
+from config.agents.narrator_agent_config import NarratorAgentConfig
+from config.agents.rules_agent_config import RulesAgentConfig
+from config.agents.trace_agent_config import TraceAgentConfig
+from config.game_config import GameConfig, ManagerConfigs, AgentConfigs
+from config.storage_config import StorageConfig
 from models.game_state import GameState
 from models.rules_model import RulesModel, DiceType
 from models.errors_model import DecisionError
@@ -42,10 +48,31 @@ def config(mock_llm, mock_rules_agent):
     )
 
 @pytest_asyncio.fixture
-async def decision_agent(config, mock_decision_manager):
+async def decision_agent(config, mock_decision_manager, mock_llm):
     """Create a test decision agent."""
-    agent = DecisionAgent(config=config, decision_manager=mock_decision_manager)
-    return agent
+    # Create test game config
+    game_config = GameConfig(
+        manager_configs=ManagerConfigs(
+            storage_config=StorageConfig(base_path="./test_data")
+        ),
+        agent_configs=AgentConfigs(
+            narrator_config=NarratorAgentConfig(llm=mock_llm),
+            rules_config=RulesAgentConfig(llm=mock_llm),
+            decision_config=config,
+            trace_config=TraceAgentConfig(llm=mock_llm)
+        )
+    )
+    
+    # Create factory with test config
+    factory = GameFactory(game_config)
+    
+    # Create all components
+    agents, managers = factory.create_game_components()
+    
+    # Replace managers with mocks
+    agents.decision_agent = DecisionAgent(config=config, decision_manager=mock_decision_manager)
+    
+    return agents.decision_agent
 
 @pytest.fixture
 def sample_game_state():

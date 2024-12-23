@@ -33,6 +33,7 @@ def sample_data():
 def sample_model():
     """Sample pydantic model for testing."""
     return TraceModel(
+        game_id="test-game",
         session_id="test-session",
         start_time=datetime.now(),
         history=[]
@@ -113,7 +114,7 @@ async def test_model_serialization(cache_manager, sample_model):
     await cache_manager.save_cached_content(
         key="test-model",
         namespace="trace",
-        data=sample_model
+        data=sample_model.model_dump()
     )
     
     # Get model back
@@ -123,3 +124,4 @@ async def test_model_serialization(cache_manager, sample_model):
     )
     assert isinstance(result, dict)  # Should be deserialized to dict
     assert result["session_id"] == sample_model.session_id
+    assert result["game_id"] == sample_model.game_id

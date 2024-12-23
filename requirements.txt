@@ -1,10 +1,18 @@
 # API Dependencies
-fastapi
-uvicorn
+fastapi>=0.95.0
+uvicorn>=0.21.1
 python-multipart
 
+# Socket.IO Dependencies
+python-socketio[asyncio_client]
+python-engineio>=4.11.1
+fastapi-socketio
+aiohttp>=3.11.0
+websocket-client>=1.8.0
+requests>=2.32.3
+
 # Core Dependencies
-pydantic
+pydantic>=2.0.0
 pydantic-core
 pydantic-settings
 python-dotenv>=1.0.0
@@ -17,7 +25,6 @@ langchain-community
 langgraph
 
 # Vector Store
-
 faiss-cpu>=1.7.4
 
 # Testing
@@ -35,10 +42,7 @@ mypy>=1.7.1
 ruff>=0.1.6
 
 # Outils
-streamlit>=1.28.0
 python-dotenv>=1.0.0
 
 #docs
 mkdocs
-mkdocs-material
-mkdocs-material[imaging]

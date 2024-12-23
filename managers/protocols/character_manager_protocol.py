@@ -5,6 +5,7 @@ Defines the interface for character management.
 from typing import Protocol, Dict, Any, Optional, runtime_checkable
 from datetime import datetime
 from models.character_model import CharacterModel, CharacterStats
+from models.errors_model import CharacterError
 from pydantic import BaseModel
 
 @runtime_checkable
@@ -20,7 +21,7 @@ class CharacterManagerProtocol(Protocol):
         """Get current character with lazy loading."""
         ...
 
-    def get_character_stats(self) -> Optional[CharacterStats]:
+    async def get_character_stats(self) -> Optional[CharacterStats]:
         """
         Get current character stats.
         
@@ -32,28 +33,53 @@ class CharacterManagerProtocol(Protocol):
         """
         ...
 
-    def save_character_stats(self, stats: Dict[str, Any]) -> None:
+    async def save_character_stats(self, stats: Dict[str, Any]) -> Optional[CharacterError]:
         """
         Save character stats.
         
         Args:
             stats: Dictionary of stats to update
             
-        Raises:
-            CharacterError: If stats are invalid or save fails
+        Returns:
+            Optional[CharacterError]: Error if save failed
         """
         ...
 
-    def _validate_stats(self, stats: Dict[str, Any]) -> None:
+    async def update_character_stats(self, stat_updates: Dict[str, Any]) -> Optional[CharacterError]:
         """
-        Validate stats before saving.
+        Update character stats.
         
         Args:
-            stats: Dictionary of stats to validate
+            stat_updates: Dictionary of stats to update
             
-        Raises:
-            CharacterError: If stats are invalid
+        Returns:
+            Optional[CharacterError]: Error if update failed
         """
+        ...
+
+    async def validate_stats(self, stats: Dict[str, Any]) -> Optional[CharacterError]:
+        """
+        Validate character stats.
+        
+        Args:
+            stats: Stats to validate
+            
+        Returns:
+            Optional[CharacterError]: Error if validation failed
+        """
+        ...
+
+    def get_character_id(self) -> str:
+        """Get current character ID."""
+        ...
+
+    def get_character_name(self) -> str:
+        """Get current character name."""
+        ...
+
+    @property
+    def last_save(self) -> Optional[datetime]:
+        """Get timestamp of last save operation."""
         ...
 
     def save_character(self, character: CharacterModel) -> None:
@@ -83,18 +109,6 @@ class CharacterManagerProtocol(Protocol):
         """
         ...
 
-    def update_character_stats(self, updates: Dict[str, Any]) -> None:
-        """
-        Update character stats with new values.
-        
-        Args:
-            updates: Dictionary of stats to update
-            
-        Raises:
-            CharacterError: If update fails or stats are invalid
-        """
-        ...
-
     def get_stats_summary(self) -> str:
         """
         Get a summary of current character stats.
@@ -102,9 +116,4 @@ class CharacterManagerProtocol(Protocol):
         Returns:
             str: Formatted summary of character stats
         """
-        ...
-
-    @property
-    def last_save(self) -> Optional[datetime]:
-        """Get timestamp of last save operation."""
         ...
