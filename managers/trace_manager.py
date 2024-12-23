@@ -56,14 +56,32 @@ class TraceManager(TraceManagerProtocol):
         if not self._current_trace:
             await self.start_session()
             
+        # Créer une copie des détails sans le type d'action
+        details = action.copy()
+        action_type = ActionType(details.pop("type", ActionType.ERROR))
+            
         trace_action = TraceAction(
             timestamp=datetime.now(),
             section=state.section_number,
-            action_type=action.get("type", ActionType.ERROR),
-            details=action
+            action_type=action_type,
+            details=details
         )
         
-        self._current_trace.add_action(trace_action)
+        # Créer une nouvelle trace avec l'action ajoutée
+        new_history = list(self._current_trace.history)
+        new_history.append(trace_action)
+        self._current_trace = TraceModel(
+            game_id=self._current_trace.game_id,
+            session_id=self._current_trace.session_id,
+            section_number=state.section_number,  
+            start_time=self._current_trace.start_time,
+            history=new_history,
+            current_section=self._current_trace.current_section,
+            current_rules=self._current_trace.current_rules,
+            character=self._current_trace.character,
+            error=self._current_trace.error
+        )
+        
         await self.save_trace()
 
     async def save_trace(self) -> None:

@@ -1,4 +1,5 @@
-import { component$, Slot, useSignal, useVisibleTask$ } from '@builder.io/qwik';
+import { component$, Slot, useSignal, useOnDocument, $ } from '@builder.io/qwik';
+import { API_CONFIG } from '~/config/api';
 
 interface ErrorState {
   hasError: boolean;
@@ -9,32 +10,55 @@ interface ErrorState {
 export const ErrorBoundary = component$(() => {
   const errorState = useSignal<ErrorState>({ hasError: false });
 
-  useVisibleTask$(async () => {
-    try {
-      // Vérifier l'état de l'API
-      const response = await fetch('http://localhost:8000/api/health');
-      if (!response.ok) {
-        throw new Error(`API inaccessible: ${response.statusText}`);
+  // Utiliser useOnDocument pour le health check de manière non-bloquante
+  useOnDocument('DOMContentLoaded', $(() => {
+    const checkHealth = async () => {
+      try {
+        console.log('🏥 Checking API health...');
+        console.log(`🔍 Health check URL: ${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
+        
+        // Vérifier l'état de l'API
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
+        console.log('📡 Health check response:', response);
+        
+        if (!response.ok) {
+          console.error('❌ API health check failed:', response.statusText);
+          throw new Error(`API inaccessible: ${response.statusText}`);
+        }
+        
+        console.log('✅ API health check successful');
+        
+        // Vérifier l'état de l'espace auteur
+        console.log('🏥 Checking author space...');
+        const authorResponse = await fetch(`${API_CONFIG.BASE_URL}/api/author/health`);
+        console.log('📡 Author health check response:', authorResponse);
+        
+        if (!authorResponse.ok) {
+          console.error('❌ Author health check failed:', authorResponse.statusText);
+          throw new Error(`Espace auteur inaccessible: ${authorResponse.statusText}`);
+        }
+        
+        const authorHealth = await authorResponse.json();
+        console.log('📊 Author health data:', authorHealth);
+        
+        if (authorHealth.status !== 'ok') {
+          console.error('❌ Author space reported error:', authorHealth.message);
+          throw new Error(authorHealth.message);
+        }
+        
+        console.log('✅ Author health check successful');
+      } catch (error) {
+        console.error('💥 Health check error:', error);
+        errorState.value = {
+          hasError: true,
+          error: error as Error,
+          errorInfo: 'Erreur de connexion à l\'API'
+        };
       }
-      
-      // Vérifier l'état de l'espace auteur
-      const authorResponse = await fetch('http://localhost:8000/api/author/health');
-      if (!authorResponse.ok) {
-        throw new Error(`Espace auteur inaccessible: ${authorResponse.statusText}`);
-      }
-      
-      const authorHealth = await authorResponse.json();
-      if (authorHealth.status !== 'ok') {
-        throw new Error(authorHealth.message);
-      }
-    } catch (error) {
-      errorState.value = {
-        hasError: true,
-        error: error as Error,
-        errorInfo: 'Erreur de connexion à l\'API'
-      };
-    }
-  });
+    };
+    
+    checkHealth();
+  }));
 
   if (errorState.value.hasError) {
     return (
@@ -51,7 +75,7 @@ export const ErrorBoundary = component$(() => {
             class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             onClick$={() => window.location.reload()}
           >
-            Réessayer
+            Rafraîchir la page
           </button>
         </div>
       </div>

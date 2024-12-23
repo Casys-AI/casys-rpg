@@ -2,63 +2,58 @@
 API FastAPI pour le jeu interactif
 """
 
+# Standard library imports
 import os
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple, AsyncGenerator
 import sys
 import logging
-from typing import Dict, Any, List, AsyncGenerator
-from datetime import datetime
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-# Add project root to PYTHONPATH
-PROJECT_ROOT = Path(__file__).parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
-
+# Third-party imports
 from fastapi import FastAPI, WebSocket, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 
-# Add project root to PYTHONPATH
-PROJECT_ROOT = Path(__file__).parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
-
-from fastapi import FastAPI, WebSocket, HTTPException, Depends, status
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-
+# Local imports
 from config.storage_config import StorageConfig
-from models.game_state import GameState
-from managers.agent_manager import AgentManager
-from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
-
-import uuid
-from api.socketio import init_socketio
-
-from models.character_model import CharacterModel
-from models.trace_model import TraceModel
-from models.decision_model import DecisionModel, DiceResult
-
 from config.game_config import GameConfig
-from config.storage_config import StorageConfig, StorageFormat, NamespaceConfig
-from utils.game_utils import roll_dice
 from config.logging_config import get_logger
 
+from models.game_state import GameState
+from models.errors_model import GameError, NarratorError, StateError, AgentError
+from models.decision_model import DiceResult, DecisionModel
+from models.character_model import CharacterModel
+from models.trace_model import TraceModel
+
+from managers.agent_manager import AgentManager
+
+from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
+
+from api.socketio import init_socketio
 from api.dto.request_dto import GameInitRequest, FeedbackRequest, ActionRequest
 from api.dto.response_dto import ActionResponse, GameResponse, HealthResponse
 from api.dto.converters import to_game_state, from_game_state, to_domain_feedback
 
+from utils.game_utils import roll_dice
+
+# Initialize logger
 logger = get_logger('api')
 
 # Configuration
-#TODO enlever car dans .env et run.py
-API_HOST = "127.0.0.1"
-API_PORT = 8000
+API_HOST = os.getenv("CASYS_HOST", "127.0.0.1")
+API_PORT = int(os.getenv("CASYS_PORT", "8001"))  # Changed default port to 8001
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+
+# Add project root to PYTHONPATH
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 # Gestionnaire de connexions WebSocket
 class ConnectionManager:
@@ -94,16 +89,51 @@ _game_components: tuple[GameAgents, GameManagers] | None = None
 def get_agent_manager() -> AgentManager:
     """Get AgentManager instance."""
     global _agent_manager, _game_factory, _game_components
+    
     if not _agent_manager:
+        logger.info("Creating new AgentManager instance")
         if not _game_factory:
+            logger.debug("Creating new GameFactory instance")
             _game_factory = GameFactory()
+        
         if not _game_components:
+            logger.debug("Creating game components")
             _game_components = _game_factory.create_game_components()
+            
         agents, managers = _game_components
-        _agent_manager = AgentManager(agents=agents, managers=managers)
+        logger.debug("Initializing AgentManager with components")
+        _agent_manager = AgentManager(
+            agents=agents,
+            managers=managers,
+            story_graph_config=_game_factory._config.agent_configs.story_graph_config
+        )
+        logger.info("AgentManager initialized successfully")
+    else:
+        logger.debug("Returning existing AgentManager instance")
+        
     return _agent_manager
 
 # Gestionnaire de l'application
+async def shutdown_event():
+    """Cleanup API components."""
+    try:
+        global _game_factory, _agent_manager, _game_components
+        
+        # Cleanup agent manager
+        if _agent_manager:
+            logger.debug("Cleaning up AgentManager")
+            await _agent_manager.stop_game()
+        
+        # Reset global variables
+        _game_factory = None
+        _agent_manager = None
+        _game_components = None
+        
+        logger.info("API shutdown successfully")
+    except Exception as e:
+        logger.error(f"Failed to shutdown API: {e}")
+        raise
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan."""
@@ -113,21 +143,35 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
     # Shutdown
     logger.info("Shutting down...")
+    await shutdown_event()
+
+# Configuration CORS
+origins = [
+    "http://localhost:9000",  # Frontend Qwik
+    "http://127.0.0.1:9000",
+    "http://localhost:8001",  # API
+    "http://127.0.0.1:8001",
+    "http://localhost:5173",  # Frontend Qwik (dev)
+    "ws://localhost:8001",    # WebSocket
+    "ws://localhost:5173",    # WebSocket (dev)
+    "http://127.0.0.1:5173", # Frontend Qwik (dev)
+    "ws://127.0.0.1:5173",   # WebSocket (dev)
+]
 
 # Création de l'application
 app = FastAPI(
     title="Casys RPG API",
     description="API pour le jeu de rôle interactif Casys",
     version="1.0.0",
+    lifespan=lifespan,
     docs_url=None,
-    redoc_url=None,
-    lifespan=lifespan
+    redoc_url=None
 )
 
-# Configuration CORS
+# Configuration des middlewares
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En production, spécifier les origines exactes
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -157,10 +201,25 @@ async def get_current_state(
 async def startup_event():
     """Initialize API components."""
     try:
-        # Initialize game components
-        agent_manager = get_agent_manager()
-        await agent_manager.initialize()
-        logger.info("Game components initialized successfully")
+        global _game_factory, _agent_manager, _game_components
+        
+        # Initialize game factory
+        logger.debug("Initializing GameFactory")
+        _game_factory = GameFactory()
+        
+        # Create game components
+        logger.debug("Creating game components")
+        _game_components = _game_factory.create_game_components()
+        
+        # Initialize agent manager
+        agents, managers = _game_components
+        logger.debug("Initializing AgentManager")
+        _agent_manager = AgentManager(
+            agents=agents,
+            managers=managers,
+            story_graph_config=_game_factory._config.agent_configs.story_graph_config
+        )
+        
         logger.info("API started successfully")
     except Exception as e:
         logger.error(f"Failed to start API: {e}")
@@ -273,7 +332,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # WebSocket endpoint
-@app.websocket("/ws")
+@app.websocket("/ws/game")
 async def websocket_endpoint(
     websocket: WebSocket,
     agent_mgr = Depends(get_agent_manager)
@@ -286,17 +345,49 @@ async def websocket_endpoint(
     - Real-time state updates
     - Game events broadcasting
     """
+    logger.info("New WebSocket connection attempt")
     await manager.connect(websocket)
     try:
+        logger.info("WebSocket connection established")
+        
+        # Envoyer l'état initial
+        try:
+            initial_state = await agent_mgr.get_state()
+            if initial_state:
+                await websocket.send_json(from_game_state(initial_state))
+        except Exception as e:
+            logger.error(f"Error sending initial state: {e}")
+            await websocket.send_json({
+                "error": str(e),
+                "status": "error"
+            })
+        
         while True:
-            data = await websocket.receive_json()
-            response = await agent_mgr.process_websocket_message(data)
-            await websocket.send_json(response)
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+            if websocket.client_state == WebSocketState.DISCONNECTED:
+                break
+                
+            try:
+                data = await websocket.receive_json()
+                logger.debug(f"Received WebSocket data: {data}")
+                response = await agent_mgr.process_websocket_message(data)
+                await websocket.send_json(from_game_state(response))
+            except WebSocketDisconnect:
+                logger.info("WebSocket disconnected")
+                break
+            except Exception as e:
+                logger.error(f"Error processing WebSocket message: {e}")
+                await websocket.send_json({
+                    "error": str(e),
+                    "status": "error"
+                })
+                
     except Exception as e:
-        logger.error(f"WebSocket error: {str(e)}")
-        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        logger.error(f"WebSocket error: {e}")
+    finally:
+        logger.info("Cleaning up WebSocket connection")
+        if websocket.client_state != WebSocketState.DISCONNECTED:
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        manager.disconnect(websocket)
 
 # Documentation des WebSockets
 @app.get("/ws/info", include_in_schema=False)
@@ -308,14 +399,16 @@ async def websocket_info():
     }
 
 # Routes REST
-@app.post("/action")
+@app.post("/api/game/action")
 async def process_action(
     action: ActionRequest,
     agent_mgr = Depends(get_agent_manager)
 ) -> ActionResponse:
     """Process a game action."""
     try:
+        logger.info(f"Processing action: {action}")
         result = await agent_mgr.process_action(action)
+        logger.info("Action processed successfully")
         return ActionResponse(
             success=True,
             message="Action processed successfully",
@@ -327,6 +420,25 @@ async def process_action(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+@app.get("/api/game/state")
+async def get_game_state(agent_mgr = Depends(get_agent_manager)) -> Dict[str, Any]:
+    """Get current game state.
+    
+    Args:
+        agent_mgr (AgentManager): Agent manager instance
+        
+    Returns:
+        Dict[str, Any]: Current game state
+    """
+    try:
+        state = await agent_mgr.get_current_state()
+        return state
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        ) from e
 
 @app.post("/feedback")
 async def save_feedback(feedback: FeedbackRequest):
@@ -341,12 +453,32 @@ async def save_feedback(feedback: FeedbackRequest):
             detail=str(e)
         )
 
-@app.get("/health")
-async def health_check() -> HealthResponse:
-    """Health check endpoint."""
+@app.get("/api/health")
+async def health_check(check_type: Optional[str] = None) -> HealthResponse:
+    """Health check endpoint.
+    
+    Args:
+        check_type (str, optional): Type of health check ('api', 'author'). Defaults to None.
+    
+    Returns:
+        HealthResponse: Health status information
+    """
+    logger.info(f"Health check requested - Type: {check_type}")
+    
+    version = "1.0.0"  # TODO: Get from config
+    timestamp = datetime.now().isoformat()
+    
+    if check_type == "author":
+        message = "Author API is running"
+    else:
+        message = "API is running"
+        
     return HealthResponse(
-        status="healthy",
-        message="API is running"
+        status="ok",
+        message=message,
+        timestamp=timestamp,
+        version=version,
+        type=check_type
     )
 
 @app.get("/roll/{dice_type}")
@@ -364,24 +496,12 @@ async def roll_game_dice(dice_type: str) -> DiceResult:
             detail=str(e)
         )
 
-@app.get("/state")
-async def get_game_state(agent_mgr = Depends(get_agent_manager)):
-    """Get current game state."""
-    try:
-        return to_game_state(await agent_mgr.get_state())
-    except Exception as e:
-        logger.error(f"Error getting game state: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
 @app.get("/subscribe")
 async def subscribe_to_game_updates(agent_mgr = Depends(get_agent_manager)):
     """Subscribe to game state updates."""
     try:
         return StreamingResponse(
-            agent_mgr.subscribe_to_updates(),
+            agent_mgr.stream_game_state(),
             media_type="text/event-stream"
         )
     except Exception as e:
@@ -436,7 +556,7 @@ async def submit_response(
 ):
     """Submit a user response."""
     try:
-        return await agent_mgr.process_response(response)
+        return await agent_mgr.submit_response(response)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -481,11 +601,11 @@ async def get_feedback(agent_mgr = Depends(get_agent_manager)):
             detail=str(e)
         )
 
-@app.post("/init")
+@app.post("/api/game/initialize")
 async def initialize_game(
-    init_request: GameInitRequest,
+    init_request: Optional[GameInitRequest] = None,
     agent_mgr = Depends(get_agent_manager)
-) -> GameResponse:
+) -> Dict[str, Any]:
     """
     Initialize a new game session.
     
@@ -494,41 +614,102 @@ async def initialize_game(
     2. Initializes the StoryGraph and all agents
     3. Sets up the initial game state
     4. Returns the session details and initial state
+    
+    If no init_request is provided, uses default parameters.
     """
     try:
+        logger.info("Starting new game initialization")
+        
+        # Use default parameters if none provided
+        if not init_request:
+            logger.debug("No init request provided, using defaults")
+            init_request = GameInitRequest(
+                game_id=str(uuid.uuid4()),
+                player_id=None,
+                settings={}
+            )
+            logger.debug("Created default init request: %s", init_request)
+        
         session_id = str(uuid.uuid4())
-        game_factory = GameFactory()
+        logger.info(f"Generated session ID: {session_id}")
         
-        # Initialize game components
-        story_graph = await game_factory.create_story_graph()
-        rules_agent = await game_factory.create_rules_agent()
-        decision_agent = await game_factory.create_decision_agent()
-        narrator_agent = await game_factory.create_narrator_agent()
-        trace_agent = await game_factory.create_trace_agent()
-        
-        # Initialize game state
-        initial_state = await agent_mgr.initialize_game(
-            session_id=session_id,
-            story_graph=story_graph,
-            rules_agent=rules_agent,
-            decision_agent=decision_agent,
-            narrator_agent=narrator_agent,
-            trace_agent=trace_agent,
-            init_params=init_request.dict()
-        )
-        
-        return GameResponse(
-            session_id=session_id,
-            initial_state=to_game_state(initial_state)
-        )
-        
+        try:
+            # Initialize game components
+            logger.debug("Initializing game components")
+            await agent_mgr.initialize()
+            logger.debug("Game components initialized successfully")
+            
+            # Convert request to dict and filter out None values
+            logger.debug("Processing initialization request")
+            init_params = {
+                k: v for k, v in init_request.model_dump().items() 
+                if v is not None
+            }
+            logger.debug(f"Processed init parameters: {init_params}")
+            
+            # Initialize game state
+            logger.debug("Creating initial game state")
+            initial_state = await agent_mgr.initialize_game(
+                session_id=session_id,
+                init_params=init_params
+            )
+            logger.debug("Game state initialized successfully")
+            
+            # Prepare response
+            logger.debug("Preparing response")
+            response = {
+                "session_id": session_id,
+                "initial_state": initial_state.model_dump()
+            }
+            logger.info(f"Game initialization completed for session {session_id}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error during game initialization: {e}", exc_info=True)
+            raise GameError(f"Game initialization failed: {str(e)}")
+            
     except ValueError as e:
+        logger.error(f"Validation error during game initialization: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except GameError as e:
+        logger.error(f"Game error during initialization: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
     except Exception as e:
-        logger.error(f"Error initializing game: {e}")
+        logger.error(f"Unexpected error during game initialization: {e}")
+        logger.error("Stack trace:", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@app.post("/stop")
+async def stop_game(
+    agent_mgr = Depends(get_agent_manager)
+) -> Dict[str, str]:
+    """
+    Stop the current game session and cleanup resources.
+    
+    This endpoint:
+    1. Saves the final game state
+    2. Saves trace data
+    3. Cleans up resources
+    4. Resets the story graph
+    """
+    try:
+        logger.info("Stopping game session")
+        await agent_mgr.stop_game()
+        logger.info("Game session stopped successfully")
+        return {"status": "success", "message": "Game session stopped successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error stopping game session: {e}")
+        logger.error("Stack trace:", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -538,19 +719,8 @@ async def initialize_game(
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler."""
-    logger.error(f"Unhandled exception: {exc}")
+    logger.error(f"Global exception: {exc}")
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"message": str(exc)}
-    )
-
-if __name__ == "__main__":
-    logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
-    import uvicorn
-    uvicorn.run(
-        "app:app",
-        host=API_HOST,
-        port=API_PORT,
-        reload=True,
-        log_level="info"
+        status_code=500,
+        content={"detail": str(exc)}
     )

@@ -14,10 +14,20 @@ class ActionResponse:
 
 @dataclass
 class HealthResponse:
-    """Health check response."""
+    """Health check response model.
+    
+    Attributes:
+        status (str): Current health status ('ok', 'error', etc.)
+        message (str): Descriptive message about the health status
+        timestamp (str): ISO formatted timestamp of the check
+        version (str, optional): API version
+        type (str, optional): Type of health check ('api', 'author', etc.)
+    """
     status: str
     message: str
-    timestamp: datetime = datetime.now()
+    timestamp: str
+    version: Optional[str] = None
+    type: Optional[str] = None
 
 
 @dataclass

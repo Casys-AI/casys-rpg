@@ -18,6 +18,11 @@ class StateManagerProtocol(Protocol):
         ...
     
     @property
+    def game_id(self) -> str:
+        """Get current game ID."""
+        ...
+    
+    @property
     def current_state(self) -> Optional[GameState]:
         """Get current game state."""
         ...
@@ -26,7 +31,7 @@ class StateManagerProtocol(Protocol):
         """Initialize the state manager and generate game_id."""
         ...
     
-    async def save_state(self, state: GameState) -> Optional[StateError]:
+    async def save_state(self, state: GameState) -> GameState:
         """
         Save the current game state.
         
@@ -34,11 +39,14 @@ class StateManagerProtocol(Protocol):
             state: The game state to save
             
         Returns:
-            Optional[StateError]: Error if save failed, None otherwise
+            GameState: The saved game state
+            
+        Raises:
+            StateError: If validation or save fails
         """
         ...
-    
-    async def load_state(self, section_number: int) -> Union[GameState, StateError]:
+
+    async def load_state(self, section_number: int) -> Optional[GameState]:
         """
         Load state for a specific section.
         
@@ -46,26 +54,61 @@ class StateManagerProtocol(Protocol):
             section_number: Section number to load
             
         Returns:
-            Union[GameState, StateError]: The loaded game state, or StateError if not found
+            Optional[GameState]: Loaded state if exists
+            
+        Raises:
+            StateError: If load fails
+        """
+        ...
+
+    async def get_current_state(self) -> Optional[GameState]:
+        """
+        Get the current game state.
+        
+        Returns:
+            Optional[GameState]: The current game state, or None if not found
+            
+        Raises:
+            StateError: If retrieval fails
+        """
+        ...
+    
+    async def clear_state(self) -> None:
+        """Clear current state."""
+        ...
+    
+    async def create_initial_state(self) -> GameState:
+        """
+        Create and return initial game state.
+        
+        Returns:
+            GameState: Initial state
+            
+        Raises:
+            StateError: If creation fails
         """
         ...
     
     async def create_error_state(self, error_message: str) -> GameState:
         """
-        Create an error state with the given message.
+        Create error state.
         
         Args:
-            error_message: Error message to include in the state
+            error_message: Error message
             
         Returns:
-            GameState: The created error state
+            GameState: Error state
+            
+        Raises:
+            StateError: If creation fails
         """
         ...
     
-    def get_storage_path(self) -> str:
-        """Get storage path for state files."""
-        ...
-    
-    def get_storage_options(self) -> Dict[str, Any]:
-        """Get storage options for state management."""
+    def get_current_timestamp(self) -> str:
+        """
+        Get current timestamp in ISO format.
+        
+        Returns:
+            str: Current timestamp in ISO format
+        """
         ...

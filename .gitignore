@@ -32,6 +32,9 @@ game.log
 data/trace/
 data/rules/cache/
 data/sections/cache/
+data/cache/
+data/cache/**/*
+**/cache/**/*
 
 # Fichiers de configuration locaux
 .env

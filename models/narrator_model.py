@@ -1,23 +1,31 @@
-"""Modèle pour la narration."""
+"""
+Narrator Model Module
+Defines the model for narrative content.
+"""
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
 class SourceType(str, Enum):
-    """Type de source pour le contenu."""
-    RAW = "raw"      # Contenu chargé depuis le fichier source
-    PROCESSED = "processed" # Contenu traité par l'agent
-    ERROR = "error"  # État d'erreur
+    """Type of content source."""
+    RAW = "raw"        # Content loaded from source file
+    PROCESSED = "processed"  # Content processed by agent
+    ERROR = "error"    # Error state
 
 class NarratorModel(BaseModel):
-    """Modèle pour une section narrative."""
+    """Model for a narrative section."""
     
-    section_number: int = Field(..., gt=0, description="Numéro de la section")
-    content: str = Field(default="", description="Contenu de la section")
-    source_type: SourceType = Field(default=SourceType.RAW, description="Type de source")
-    error: Optional[str] = Field(default=None, description="Message d'erreur si présent")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Horodatage")
+    section_number: int = Field(..., gt=0, description="Section number")
+    content: str = Field(default="", description="Section content")
+    source_type: SourceType = Field(default=SourceType.RAW, description="Source type")
+    error: Optional[str] = Field(default=None, description="Error message if present")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp")
 
     class Config:
-        """Configuration du modèle."""
+        """Model configuration."""
+        arbitrary_types_allowed = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

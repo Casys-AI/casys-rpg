@@ -2,6 +2,7 @@
 from typing import Dict, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+import uuid
 
 from models.decision_model import DiceResult, DecisionModel
 from models.character_model import CharacterModel
@@ -9,12 +10,11 @@ from models.narrator_model import NarratorModel, SourceType as NarratorSourceTyp
 from models.rules_model import RulesModel, DiceType, SourceType as RulesSourceType
 from models.trace_model import TraceModel
 
-class GameStateInput(BaseModel):
-    """Input state for the game workflow."""
-    section_number: int
-    player_input: Optional[str] = None
-    effects: Dict[str, Any] = Field(default_factory=dict)
-    flags: Dict[str, Any] = Field(default_factory=dict)
+class GameStateBase(BaseModel):
+    """Base state model with common fields."""
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source: RulesSourceType = RulesSourceType.RAW
+    last_update: datetime = Field(default_factory=datetime.now)
     
     model_config = ConfigDict(
         json_encoders={
@@ -23,7 +23,15 @@ class GameStateInput(BaseModel):
         arbitrary_types_allowed=True
     )
 
-class GameStateOutput(BaseModel):
+class GameStateInput(GameStateBase):
+    """Input state for the game workflow."""
+    section_number: int = Field(default=1, ge=1, description="Current section number")
+    player_input: Optional[str] = None
+    content: Optional[str] = None
+    effects: Dict[str, Any] = Field(default_factory=dict)
+    flags: Dict[str, Any] = Field(default_factory=dict)
+
+class GameStateOutput(GameStateBase):
     """Output state from the game workflow."""
     narrative: Optional[NarratorModel] = None
     rules: Optional[RulesModel] = None
@@ -32,73 +40,79 @@ class GameStateOutput(BaseModel):
     dice_roll: Optional[DiceResult] = None
     decision: Optional[DecisionModel] = None
     error: Optional[str] = None
-    
-    model_config = ConfigDict(
-        json_encoders={
-            datetime: lambda v: v.isoformat()
-        },
-        arbitrary_types_allowed=True
-    )
-
-class GameState(GameStateInput, GameStateOutput):
-    """Complete game state at a point in time."""
-    source: RulesSourceType = RulesSourceType.RAW
     narrative_content: Optional[str] = None
     current_rules: Optional[Dict[str, Any]] = None
     current_decision: Optional[Dict[str, Any]] = None
-    last_update: datetime = Field(
-        default_factory=datetime.now,
-        json_schema_extra={"format": "date-time"}
-    )
-    
-    model_config = ConfigDict(
-        json_encoders={
-            datetime: lambda v: v.isoformat()
-        },
-        arbitrary_types_allowed=True
-    )
-    
-    @model_validator(mode='before')
-    def handle_addable_values(cls, values):
-        """Handle AddableValuesDict and ensure all required fields are present."""
-        if str(type(values)) == "<class 'langgraph.pregel.io.AddableValuesDict'>" and 'error' in values:
-            error_msg = values.get('error', '')
-            if '{section_number}' in error_msg:
-                error_msg = error_msg.format(section_number=1)
-            
-            values = {
-                'section_number': 1,
-                'error': error_msg,
-                'player_input': None,
-                'effects': {},
-                'flags': {},
-                'source': RulesSourceType.RAW,
-                'last_update': datetime.now()
-            }
-        return values
 
-    @field_validator('section_number')
-    def validate_section_number(cls, v):
-        """Validate section number is positive."""
-        if v < 1:
-            raise ValueError("Section number must be positive")
-        return v
+class GameState(GameStateInput, GameStateOutput):
+    """Complete game state at a point in time."""
+    
+    @property
+    def state(self) -> Dict[str, Any]:
+        """Get the complete state as a dictionary.
+        
+        Returns:
+            Dict[str, Any]: Complete state
+        """
+        return self.model_dump()
     
     @model_validator(mode='after')
-    def validate_state_consistency(self):
-        """Validate that all section numbers match."""
-        section = self.section_number
-        
-        if self.narrative and self.narrative.section_number != section:
-            raise ValueError("Narrative section number mismatch")
-            
-        if self.rules and self.rules.section_number != section:
-            raise ValueError("Rules section number mismatch")
-            
-        if self.trace and self.trace.section_number != section:
-            raise ValueError("Trace section number mismatch")
-            
+    def validate_state(self) -> 'GameState':
+        """Validate the complete state."""
+        if self.error and not isinstance(self.error, str):
+            self.error = str(self.error)
         return self
+
+    @model_validator(mode='after')
+    def validate_section_numbers(self) -> 'GameState':
+        """Validate that section numbers match across components."""
+        if self.narrative and self.narrative.section_number != self.section_number:
+            raise ValueError(
+                f"Narrative section number {self.narrative.section_number} "
+                f"does not match game state section number {self.section_number}"
+            )
+        
+        if self.rules and self.rules.section_number != self.section_number:
+            raise ValueError(
+                f"Rules section number {self.rules.section_number} "
+                f"does not match game state section number {self.section_number}"
+            )
+        
+        return self
+        
+    def update_from_input(self, input_state: GameStateInput) -> None:
+        """Update state from input."""
+        for field in input_state.model_fields:
+            if hasattr(input_state, field):
+                setattr(self, field, getattr(input_state, field))
+                
+    def update_from_output(self, output_state: GameStateOutput) -> None:
+        """Update state from output."""
+        for field in output_state.model_fields:
+            if hasattr(output_state, field):
+                setattr(self, field, getattr(output_state, field))
+                
+    def to_input(self) -> GameStateInput:
+        """Convert to input state."""
+        return GameStateInput(
+            section_number=self.section_number,
+            player_input=self.player_input,
+            content=self.content,
+            effects=self.effects,
+            flags=self.flags
+        )
+        
+    def to_output(self) -> GameStateOutput:
+        """Convert to output state."""
+        return GameStateOutput(
+            narrative=self.narrative,
+            rules=self.rules,
+            trace=self.trace,
+            character=self.character,
+            dice_roll=self.dice_roll,
+            decision=self.decision,
+            error=self.error
+        )
 
     def with_updates(self, **updates) -> "GameState":
         """Create a new state with updates."""
@@ -154,6 +168,7 @@ class GameState(GameStateInput, GameStateOutput):
             section_number=section_number,
             source=RulesSourceType.RAW,
             player_input=None,
+            content=None,
             effects={},
             flags={}
         )
@@ -184,6 +199,7 @@ class GameState(GameStateInput, GameStateOutput):
             source=RulesSourceType.RAW,
             error=error_message,
             player_input=None,
+            content=None,
             effects={},
             flags={},
             narrative=None,

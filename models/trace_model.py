@@ -54,6 +54,10 @@ class TraceModel(BaseModel):
     game_id: str = Field(description="Unique game identifier")
     session_id: Annotated[str, Field(min_length=1, description="Unique session identifier")]
     section_number: Annotated[int, Field(ge=0, description="Current section number")] = 0
+    start_time: datetime = Field(
+        default_factory=datetime.now,
+        description="When this trace was started"
+    )
     history: List[TraceAction] = Field(
         default_factory=list,
         description="History of all actions in this session"

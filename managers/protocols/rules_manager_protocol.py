@@ -1,65 +1,65 @@
 """
 Rules Manager Protocol
-Defines the interface for rules management.
+Defines the interface for game rules management.
 """
-from typing import Protocol, Union, runtime_checkable, Optional
-from config.storage_config import StorageConfig
-from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from typing import Dict, Any, List, Optional, Protocol, runtime_checkable, Union
 from models.rules_model import RulesModel
 from models.errors_model import RulesError
+from config.storage_config import StorageConfig
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 
 @runtime_checkable
 class RulesManagerProtocol(Protocol):
-    """Protocol defining the interface for rules management."""
+    """Protocol for rules management operations."""
     
     def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol) -> None:
-        """Initialize with configuration and cache manager."""
+        """Initialize rules manager."""
         ...
         
-    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
+    async def get_cached_rules(self, section_number: int) -> Optional[RulesModel]:
         """
-        Get existing rules for a section from storage.
+        Get rules from cache only.
         
         Args:
             section_number: Section number to get rules for
             
         Returns:
-            Union[RulesModel, RulesError]: Rules if found, or error if not found
+            Optional[RulesModel]: Cached rules if found, None otherwise
+        """
+        ...
+        
+    async def get_raw_content(self, section_number: int) -> Union[str, RulesError]:
+        """
+        Get raw content from storage.
+        
+        Args:
+            section_number: Section number to get content for
+            
+        Returns:
+            Union[str, RulesError]: Raw content or error if not found
         """
         ...
         
     async def save_rules(self, rules: RulesModel) -> Union[RulesModel, RulesError]:
         """
-        Save rules to storage.
+        Save rules to cache.
         
         Args:
-            rules: Rules to save
+            rules: Rules model to save
             
         Returns:
             Union[RulesModel, RulesError]: Saved rules or error
         """
         ...
         
-    async def exists_raw_rules(self, section_number: int) -> bool:
+    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
         """
-        Check if rules exist for a section.
+        Get existing rules for a section.
         
         Args:
-            section_number: Section number to check
+            section_number: Section number to get rules for
             
         Returns:
-            bool: True if rules exist
-        """
-        ...
-        
-    def get_rules_content(self, section_number: int) -> Optional[str]:
-        """
-        Get raw rules content for a section.
-        
-        Args:
-            section_number: Section number to get content for
-            
-        Returns:
-            Optional[str]: Raw rules content if found
+            Union[RulesModel, RulesError]: Existing rules or error
         """
         ...

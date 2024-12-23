@@ -20,7 +20,7 @@ T = TypeVar('T', bound=BaseModel)
 _FORMAT_TO_EXTENSION = {
     StorageFormat.JSON: ".json",
     StorageFormat.MARKDOWN: ".md",
-    StorageFormat.RAW: ".raw"
+    StorageFormat.RAW: ".md"
 }
 
 def _json_serial(obj):
@@ -178,27 +178,40 @@ class CacheManager(CacheManagerProtocol):
             return None
 
     async def clear_namespace_cache(self, namespace: str) -> None:
-        """Clear all cached data for a specific namespace."""
+        """
+        Clear all cached data for a specific namespace.
+        
+        Args:
+            namespace: Namespace to clear
+            
+        Raises:
+            KeyError: If namespace is unknown
+        """
         if namespace not in self.config.namespaces:
             raise KeyError(f"Unknown namespace: {namespace}")
-                
-        # Clear memory cache
-        prefix = f"{namespace}:"
-        self._memory_cache = {
-            k: v for k, v in self._memory_cache.items()
-            if not k.startswith(prefix)
-        }
+            
+        self.logger.info(f"Clearing cache for namespace: {namespace}")
         
-        # Clear storage
-        try:
-            directory = self.config.get_absolute_path(namespace)
-            pattern = f"*{self._get_file_extension(namespace)}"
-            files = await self._fs_adapter.list_files(directory, pattern)
-            for file in files:
-                await self._fs_adapter.delete_file_async(file)
-        except Exception as e:
-            self.logger.error(f"Error clearing namespace {namespace}: {e}")
-            raise
+        # Clear in-memory cache for this namespace
+        keys_to_remove = [
+            k for k in self._memory_cache.keys() 
+            if k.startswith(f"{namespace}:")
+        ]
+        for key in keys_to_remove:
+            del self._memory_cache[key]
+            
+        # Clear persistent storage for this namespace if needed
+        if self.config.namespaces[namespace].persistent:
+            namespace_dir = self.config.get_absolute_path(namespace)
+            if namespace_dir.exists():
+                for file_path in namespace_dir.glob("*"):
+                    if file_path.is_file():
+                        try:
+                            file_path.unlink()
+                        except Exception as e:
+                            self.logger.error(f"Failed to delete file {file_path}: {e}")
+                            
+        self.logger.debug(f"Cache cleared for namespace: {namespace}")
 
     async def save_cached_content(self, key: str, namespace: str, data: Any) -> bool:
         """Save content to cache."""
@@ -234,31 +247,60 @@ class CacheManager(CacheManagerProtocol):
         try:
             # Vérifier d'abord dans le cache
             if await self.get_cached_data(key, namespace) is not None:
+                self.logger.debug(f"Content found in cache for {namespace}:{key}")
                 return True
                 
             # Sinon vérifier dans le stockage
             file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
-            return file_path.exists()
+            self.logger.debug(f"Looking for file at path: {file_path} (absolute: {file_path.absolute()})")
+            exists = file_path.exists()
+            self.logger.debug(f"File exists: {exists}")
+            return exists
+            
         except Exception as e:
-            self.logger.error(f"Error checking content existence: {str(e)}")
+            self.logger.error(f"Error checking content existence: {str(e)}", exc_info=True)
             return False
 
-    def load_raw_content(self, section_number: int, namespace: str) -> Optional[str]:
+    async def load_raw_content(self, key: str, namespace: str) -> Optional[str]:
         """
-        Load raw content.
+        Load raw content from storage.
         
         Args:
-            section_number: Section number to load
-            namespace: Namespace to load from
+            key: Unique identifier for the content
+            namespace: Namespace for organizing data
             
         Returns:
-            Optional[str]: Raw content if found
+            Optional[str]: Content if found, None otherwise
+            
+        Raises:
+            KeyError: If namespace is unknown
         """
         try:
-            raw_path = self.config.get_absolute_path(namespace) / f"{section_number}.md"
-            return self._fs_adapter.read_file(raw_path)
+            # Vérifier d'abord dans le cache
+            cached_data = await self.get_cached_data(key, namespace)
+            if cached_data is not None:
+                self.logger.debug(f"Content found in cache for {namespace}:{key}")
+                return cached_data
+                
+            # Sinon charger depuis le stockage
+            file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
+            self.logger.debug(f"Looking for file at path: {file_path} (absolute: {file_path.absolute()})")
+            self.logger.debug(f"Base path is: {self.config.base_path} (absolute: {self.config.base_path.absolute()})")
+            self.logger.debug(f"File exists: {file_path.exists()}")
+            
+            if not file_path.exists():
+                return None
+                
+            content = await self._fs_adapter.read_file(file_path)
+            self.logger.debug(f"Content loaded: {content is not None}")
+            
+            if content:
+                # Mettre en cache pour les prochaines fois
+                await self.save_cached_data(key, namespace, content)
+            return content
+            
         except Exception as e:
-            self.logger.error(f"Error loading content {section_number} from {namespace}: {e}")
+            self.logger.error(f"Error loading raw content: {str(e)}", exc_info=True)
             return None
 
     async def delete_cached_content(self, key: str, namespace: str) -> bool:

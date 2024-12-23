@@ -62,12 +62,12 @@ DEFAULT_NAMESPACES = {
     "cached_sections": NamespaceConfig(
         path=Path("cache/sections"),
         format=StorageFormat.MARKDOWN,
-        cache_enabled=False
+        ttl_seconds=None
     ),
     "sections": NamespaceConfig(
-        path=Path("sections"),
+        path=Path("sections"),  # Relatif à base_path (./data)
         format=StorageFormat.MARKDOWN,  # Les fichiers sont en markdown même si c'est la source
-        cache_enabled=False  # Pas de cache car c'est la source
+        ttl_seconds=None  # Pas de cache car c'est la source
     )
 }
 

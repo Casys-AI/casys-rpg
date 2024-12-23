@@ -23,15 +23,3 @@ class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
         """
         ...
         
-    async def validate_choice(self, choice: str, valid_choices: List[str]) -> bool:
-        """
-        Validate a user choice against available options.
-        
-        Args:
-            choice: User's choice
-            valid_choices: List of valid choices
-            
-        Returns:
-            bool: True if choice is valid
-        """
-        ...

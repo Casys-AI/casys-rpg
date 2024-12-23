@@ -1,13 +1,14 @@
 """
 Rules Manager Module
-Handles game rules analysis and caching.
+Handles game rules storage and caching.
 """
 
 from typing import Dict, Optional, Any, Union, List
 from datetime import datetime
 import logging
-import re
 from pathlib import Path
+from loguru import logger
+import re
 
 from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
@@ -25,35 +26,172 @@ class RulesManager(RulesManagerProtocol):
             config: Storage configuration
             cache_manager: Cache manager instance
         """
+        logger.info("Initializing RulesManager")
         self.config = config
         self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
+        logger.debug("RulesManager initialized with config: %s", config.__class__.__name__)
+
+    async def get_cached_rules(self, section_number: int) -> Optional[RulesModel]:
+        """Get rules from cache only."""
+        logger.info(f"Getting cached rules for section {section_number}")
+        
+        try:
+            content = await self.cache.get_cached_content(
+                key=f"section_{section_number}_rules",
+                namespace="rules"
+            )
+            if not content:
+                logger.debug(f"No rules found in cache for section {section_number}")
+                return None
+                
+            rules = self._markdown_to_rules(content, section_number)
+            if rules:
+                logger.info(f"Successfully retrieved rules for section {section_number} from cache")
+                return rules
+                
+            logger.warning(f"Failed to parse cached rules for section {section_number}")
+            return None
+            
+        except KeyError:
+            logger.warning(f"Invalid namespace for section {section_number}")
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving cached rules: {str(e)}")
+            return None
+
+    async def get_raw_content(self, section_number: int) -> Union[str, RulesError]:
+        """Get raw content from storage."""
+        logger.info(f"Getting raw content for section {section_number}")
+        
+        try:
+            if not await self.cache.exists_raw_content(
+                key=str(section_number),
+                namespace="sections"
+            ):
+                logger.warning(f"No raw content found for section {section_number}")
+                return RulesError(
+                    section_number=section_number,
+                    message=f"No raw content found for section {section_number}"
+                )
+                
+            content = await self.cache.load_raw_content(
+                key=str(section_number),
+                namespace="sections"
+            )
+            if content:
+                logger.debug(f"Found raw content for section {section_number}")
+                return content
+                
+            logger.warning(f"Failed to load raw content for section {section_number}")
+            return RulesError(
+                section_number=section_number,
+                message=f"Failed to load raw content for section {section_number}"
+            )
+            
+        except KeyError:
+            logger.error(f"Invalid namespace for section {section_number}")
+            return RulesError(
+                section_number=section_number,
+                message="Invalid namespace configuration"
+            )
+        except Exception as e:
+            logger.error(f"Error loading raw content: {str(e)}")
+            return RulesError(
+                section_number=section_number,
+                message=f"Error loading raw content: {str(e)}"
+            )
+
+    async def save_rules(self, rules: RulesModel) -> Union[RulesModel, RulesError]:
+        """Save rules to cache."""
+        logger.info(f"Saving rules for section {rules.section_number}")
+        
+        try:
+            content = self._rules_to_markdown(rules)
+            await self.cache.save_cached_content(
+                key=f"section_{rules.section_number}_rules",
+                namespace="rules",
+                data=content
+            )
+            logger.debug(f"Rules saved successfully for section {rules.section_number}")
+            return rules
+            
+        except KeyError:
+            logger.error(f"Invalid namespace for section {rules.section_number}")
+            return RulesError(
+                section_number=rules.section_number,
+                message="Invalid namespace configuration"
+            )
+        except Exception as e:
+            logger.error(f"Error saving rules: {str(e)}")
+            return RulesError(
+                section_number=rules.section_number,
+                message=f"Error saving rules: {str(e)}"
+            )
+
+    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
+        """Get existing rules for a section."""
+        logger.info(f"Getting existing rules for section {section_number}")
+        
+        # Try to get from cache first
+        logger.debug(f"Attempting to get rules from cache for section {section_number}")
+        rules = await self.get_cached_rules(section_number)
+        if rules:
+            logger.info(f"Successfully retrieved rules for section {section_number} from cache")
+            return rules
+
+        # If not in cache, check if raw rules exist
+        logger.debug(f"Rules not found in cache for section {section_number}, checking raw storage")
+        raw_content = await self.get_raw_content(section_number)
+        if isinstance(raw_content, RulesError):
+            logger.warning(f"Rules not found in raw storage for section {section_number}")
+            return raw_content
+
+        # Parse and save rules
+        logger.debug(f"Parsing raw rules content for section {section_number}")
+        rules = self._markdown_to_rules(raw_content, section_number)
+        if not rules:
+            logger.error(f"Failed to parse rules for section {section_number}")
+            return RulesError(
+                section_number=section_number,
+                message=f"Error parsing rules for section {section_number}"
+            )
+
+        logger.debug(f"Saving parsed rules to cache for section {section_number}")
+        await self.save_rules(rules)
+        logger.info(f"Successfully retrieved, parsed and cached rules for section {section_number}")
+        return rules
 
     def _rules_to_markdown(self, rules: RulesModel) -> str:
         """Convert rules to markdown format."""
+        logger.debug("Converting rules to markdown for section %d", rules.section_number)
+        
         # Extraire les sections cibles des choix
         target_sections = [str(choice.target_section) for choice in rules.choices if choice.target_section is not None]
+        
+        # Formater les choix
+        choices_text = "No choices available" if not rules.choices else self._format_choices(rules.choices)
         
         return f"""# Rules for Section {rules.section_number}
 
 ## Metadata
-- Last Update: {rules.last_update.isoformat()}
+- Last_Update: {rules.last_update.isoformat()}
 - Source: {rules.source}
-- Source Type: {rules.source_type.value}
+- Source_Type: {rules.source_type.value}
 
 ## Analysis
-- Needs Dice: {rules.needs_dice}
-- Dice Type: {rules.dice_type.value}
-- Needs User Response: {rules.needs_user_response}
-- Next Action: {rules.next_action or 'None'}
+- Needs_Dice: {rules.needs_dice}
+- Dice_Type: {rules.dice_type.value}
+- Needs_User_Response: {rules.needs_user_response}
+- Next_Action: {rules.next_action or 'None'}
 - Conditions: {', '.join(rules.conditions) if rules.conditions else 'None'}
-- Target Sections: {', '.join(target_sections) if target_sections else 'None'}
+- Target_Sections: {', '.join(target_sections) if target_sections else 'None'}
 
 ## Choices
-{self._format_choices(rules.choices)}
+{choices_text}
 
 ## Summary
-{rules.rules_summary}
+{rules.rules_summary or ''}
 
 ## Error
 {rules.error or 'None'}
@@ -61,14 +199,15 @@ class RulesManager(RulesManagerProtocol):
 
     def _format_choices(self, choices) -> str:
         """Format choices for markdown display."""
+        logger.debug("Formatting %d choices", len(choices))
         if not choices:
             return "No choices available"
             
         formatted = []
         for choice in choices:
             conditions = f"\n  - Conditions: {', '.join(choice.conditions)}" if choice.conditions else ""
-            dice = f"\n  - Dice Type: {choice.dice_type.value}" if choice.dice_type else ""
-            dice_results = f"\n  - Dice Results: {choice.dice_results}" if choice.dice_results else ""
+            dice = f"\n  - Dice_Type: {choice.dice_type.value}" if choice.dice_type else ""
+            dice_results = f"\n  - Dice_Results: {choice.dice_results}" if choice.dice_results else ""
             target = f"\n  - Target: Section {choice.target_section}" if choice.target_section else ""
             
             formatted.append(
@@ -80,11 +219,17 @@ class RulesManager(RulesManagerProtocol):
 
     def _parse_choices(self, content: str) -> List[Choice]:
         """Parse choices from markdown content."""
+        logger.debug("Parsing choices from content")
+        if content.strip() == "No choices available":
+            logger.debug("No choices found in content")
+            return []
+            
         choices = []
         choice_pattern = r"\* (.*?) \(Type: (.*?)\)((?:\n  - .*)*)"
         
         for match in re.finditer(choice_pattern, content):
             text, choice_type, details = match.groups()
+            logger.debug("Parsing choice: '%s'", text)
             
             # Parse details
             conditions = []
@@ -97,9 +242,11 @@ class RulesManager(RulesManagerProtocol):
                     line = line.strip()
                     if line.startswith('- Conditions:'):
                         conditions = [c.strip() for c in line[13:].split(',') if c.strip()]
-                    elif line.startswith('- Dice Type:'):
-                        dice_type = DiceType(line[12:].strip())
-                    elif line.startswith('- Dice Results:'):
+                        logger.debug("Parsed conditions: %s", conditions)
+                    elif line.startswith('- Dice_Type:'):
+                        dice_type = DiceType(line[12:].strip().lower())
+                        logger.debug("Parsed dice type: %s", dice_type.value if dice_type else None)
+                    elif line.startswith('- Dice_Results:'):
                         # Parse dict format "{key: value}"
                         results_str = line[15:].strip()
                         if results_str != '{}':
@@ -107,179 +254,166 @@ class RulesManager(RulesManagerProtocol):
                             for pair in results_str.split(','):
                                 key, value = pair.split(':')
                                 dice_results[key.strip().strip("'")] = int(value.strip())
+                        logger.debug("Parsed dice results: %s", dice_results)
                     elif line.startswith('- Target:'):
-                        target_section = int(line[16:].strip())  # Skip "Section " prefix
+                        # Extraire uniquement le nombre de la section
+                        section_text = line[16:].strip()  # Skip "Section " prefix
+                        try:
+                            # Nettoyer le texte et extraire le nombre
+                            section_num = ''.join(filter(str.isdigit, section_text))
+                            target_section = int(section_num) if section_num else None
+                            logger.debug("Parsed target section: %d", target_section if target_section else 0)
+                        except ValueError as e:
+                            logger.error("Invalid section number in choice: %s - %s", section_text, str(e))
+                            target_section = None
             
-            choice = Choice(
-                text=text,
-                type=ChoiceType(choice_type),
-                target_section=target_section,
-                conditions=conditions,
-                dice_type=dice_type,
-                dice_results=dice_results
-            )
-            choices.append(choice)
+            try:
+                choice = Choice(
+                    text=text,
+                    type=ChoiceType(choice_type.lower()),
+                    target_section=target_section,
+                    conditions=conditions,
+                    dice_type=dice_type or DiceType.NONE,
+                    dice_results=dice_results
+                )
+                choices.append(choice)
+                logger.debug("Choice parsed successfully: '%s'", choice.text)
+            except Exception as e:
+                logger.error("Error creating choice: %s", str(e), exc_info=True)
+                continue
             
+        logger.info("Successfully parsed %d choices", len(choices))
         return choices
 
     def _markdown_to_rules(self, content: str, section_number: int) -> Optional[RulesModel]:
         """Parse markdown content to RulesModel."""
+        logger.debug("Parsing markdown content for section %d", section_number)
+        
+        # Split content into sections
+        sections = {}
+        current_section = None
+        current_content = []
+        
+        for line in content.split('\n'):
+            if line.startswith('## '):
+                if current_section:
+                    sections[current_section] = '\n'.join(current_content).strip()
+                current_section = line[3:].strip()
+                current_content = []
+            else:
+                current_content.append(line)
+                
+        if current_section:
+            sections[current_section] = '\n'.join(current_content).strip()
+        
+        logger.debug("Parsed sections: %s", list(sections.keys()))
+        
+        # Vérifier les sections requises
+        required_sections = {'Metadata', 'Analysis', 'Choices', 'Summary'}
+        missing_sections = required_sections - set(sections.keys())
+        if missing_sections:
+            logger.error("Missing required sections: %s", ', '.join(missing_sections))
+            return None
+        
+        # Parse metadata
+        metadata = {}
         try:
-            # Split content into sections
-            sections = {}
-            current_section = None
-            current_content = []
-            
-            for line in content.split('\n'):
-                if line.startswith('## '):
-                    if current_section:
-                        sections[current_section] = '\n'.join(current_content).strip()
-                    current_section = line[3:].strip()
-                    current_content = []
-                else:
-                    current_content.append(line)
-                    
-            if current_section:
-                sections[current_section] = '\n'.join(current_content).strip()
-            
-            # Parse metadata
-            metadata = {}
             if 'Metadata' in sections:
                 for line in sections['Metadata'].split('\n'):
                     if line.startswith('- '):
                         key, value = line[2:].split(': ', 1)
-                        metadata[key.lower()] = value
-            
-            # Parse analysis
-            analysis = {}
+                        # Convertir la clé en snake_case
+                        key = key.replace('_', ' ').lower().replace(' ', '_')
+                        metadata[key] = value.strip()
+            logger.debug("Parsed metadata: %s", metadata)
+        except Exception as e:
+            logger.error("Error parsing metadata section: %s", str(e), exc_info=True)
+            return None
+        
+        # Parse analysis
+        analysis = {}
+        try:
             if 'Analysis' in sections:
-                for line in sections['Analysis'].split('\n'):
+                analysis_content = sections['Analysis'].strip()
+                if not analysis_content:
+                    logger.error("Analysis section is empty")
+                    return None
+                    
+                for line in analysis_content.split('\n'):
                     if line.startswith('- '):
                         key, value = line[2:].split(': ', 1)
-                        analysis[key.lower()] = value
-            
-            # Parse choices
-            choices = []
+                        # Convertir la clé en snake_case
+                        key = key.replace('_', ' ').lower().replace(' ', '_')
+                        analysis[key] = value.strip()
+            logger.debug("Parsed analysis: %s", analysis)
+        except Exception as e:
+            logger.error("Error parsing analysis section: %s", str(e), exc_info=True)
+            return None
+        
+        # Parse choices
+        choices = []
+        try:
             if 'Choices' in sections:
                 choices = self._parse_choices(sections['Choices'])
-            
-            # Parse summary and error
-            summary = []
+            logger.debug("Parsed %d choices", len(choices))
+        except Exception as e:
+            logger.error("Error parsing choices section: %s", str(e), exc_info=True)
+            return None
+        
+        # Parse summary and error
+        summary = []
+        error = None
+        try:
             if 'Summary' in sections:
                 summary = sections['Summary'].split('\n')
                 
-            error = None
             if 'Error' in sections:
                 error = sections['Error'].strip()
                 if error == 'None':
                     error = None
-            
-            # Create RulesModel
-            return RulesModel(
-                section_number=section_number,
-                dice_type=DiceType(analysis['dice type']),
-                needs_dice=analysis['needs dice'].lower() == 'true',
-                needs_user_response=analysis['needs user response'].lower() == 'true',
-                next_action=None if analysis['next action'] == 'None' else analysis['next action'],
-                conditions=[] if analysis['conditions'] == 'None' else [c.strip() for c in analysis['conditions'].split(',')],
-                choices=choices,
-                rules_summary='\n'.join(summary).strip(),
-                error=error,
-                source=metadata['source'],
-                source_type=SourceType(metadata['source type']),
-                last_update=datetime.fromisoformat(metadata['last update'])
-            )
-            
         except Exception as e:
-            self.logger.error(f"Error parsing markdown content: {str(e)}")
+            logger.error("Error parsing summary/error sections: %s", str(e), exc_info=True)
             return None
 
-    async def get_rules_content(self, section_number: int) -> Optional[str]:
-        """Get raw rules content for a section."""
-        try:
-            return await self.cache.get_cached_content(
-                key=f"section_{section_number}_rules",
-                namespace="rules"
-            )
-        except Exception as e:
-            self.logger.error(f"Error getting rules content for section {section_number}: {str(e)}")
+        # Vérifier si toutes les clés requises sont présentes
+        required_keys = ['dice_type', 'needs_dice', 'needs_user_response', 'next_action', 'conditions']
+        missing_keys = [key for key in required_keys if key not in analysis]
+        if missing_keys:
+            logger.error("Missing required keys in analysis: %s", ', '.join(missing_keys))
+            logger.error("Available keys: %s", list(analysis.keys()))
             return None
-
-    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
-        """Get existing rules for a section."""
+        
+        # Create RulesModel
         try:
-            # Try to get from cache first
-            content = await self.get_rules_content(section_number)
-            if content:
-                rules = self._markdown_to_rules(content, section_number)
-                if rules:
-                    return rules
-
-            # If not in cache, check if raw rules exist
-            if not await self.exists_raw_rules(section_number):
-                return RulesError(
-                    section_number=section_number,
-                    message=f"Rules not found for section {section_number}"
-                )
-
-            # Load raw content from file
-            raw_content = await self.cache.load_raw_content(section_number, "sections")
-            if not raw_content:
-                return RulesError(
-                    section_number=section_number,
-                    message=f"Error loading raw rules for section {section_number}"
-                )
-
-            # Parse and save rules
-            rules = self._markdown_to_rules(raw_content, section_number)
-            if not rules:
-                return RulesError(
-                    section_number=section_number,
-                    message=f"Error parsing rules for section {section_number}"
-                )
-
-            await self.save_rules(rules)
-            return rules
-
-        except Exception as e:
-            self.logger.error(f"Error getting rules for section {section_number}: {str(e)}")
-            return RulesError(
-                section_number=section_number,
-                message=str(e)
-            )
-
-    async def save_rules(self, rules: RulesModel) -> Union[RulesModel, RulesError]:
-        """Save rules to storage."""
-        try:
-            # Convert to markdown
-            content = self._rules_to_markdown(rules)
+            model_data = {
+                "section_number": section_number,
+                "dice_type": DiceType((analysis['dice_type'] or 'none').lower()),
+                "needs_dice": analysis['needs_dice'].lower() == 'true',
+                "needs_user_response": analysis['needs_user_response'].lower() == 'true',
+                "next_action": None if analysis['next_action'] == 'None' else analysis['next_action'],
+                "conditions": [] if analysis['conditions'] == 'None' else [c.strip() for c in analysis['conditions'].split(',')],
+                "choices": choices,
+                "rules_summary": '\n'.join(summary).strip(),
+                "error": error,
+                "source": metadata['source'],
+                "source_type": SourceType((metadata.get('source_type') or 'raw').lower()),
+                "last_update": datetime.fromisoformat(metadata.get('last_update', datetime.now().isoformat()))
+            }
             
-            # Save to cache
-            success = await self.cache.save_cached_content(
-                key=f"section_{rules.section_number}_rules",
-                namespace="rules",
-                data=content
-            )
-            
-            if not success:
-                return RulesError(
-                    section_number=rules.section_number,
-                    message="Failed to save rules to cache"
-                )
-                
-            return rules
-            
+            logger.debug("Creating RulesModel with data: %s", {
+                "section_number": section_number,
+                "dice_type": model_data["dice_type"],
+                "needs_dice": model_data["needs_dice"],
+                "needs_user_response": model_data["needs_user_response"],
+                "next_action": model_data["next_action"],
+                "conditions": model_data["conditions"],
+                "choices_count": len(model_data["choices"]),
+                "source": model_data["source"],
+                "source_type": model_data["source_type"]
+            })
+            model = RulesModel(**model_data)
+            logger.info("Successfully created RulesModel for section %d", section_number)
+            return model
         except Exception as e:
-            self.logger.error(f"Error saving rules: {str(e)}")
-            return RulesError(
-                section_number=rules.section_number,
-                message=str(e)
-            )
-
-    async def exists_raw_rules(self, section_number: int) -> bool:
-        """Check if rules exist for a section."""
-        try:
-            return await self.cache.exists_raw_content(str(section_number), "sections")
-        except Exception as e:
-            self.logger.error(f"Error checking rules existence for section {section_number}: {str(e)}")
-            return False
+            logger.error("Error creating RulesModel: %s", str(e), exc_info=True)
+            return None

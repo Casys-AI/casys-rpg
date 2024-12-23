@@ -44,37 +44,48 @@ class RulesAgent(BaseAgent):
             RulesModel: Analyzed rules with dice requirements, conditions and choices
         """
         try:
+            self.logger.debug(f"Starting process_section_rules for section {section_number}")
+            
             # Check cache first
-            existing_rules = await self.rules_manager.get_existing_rules(section_number)
-            if not isinstance(existing_rules, RulesError):
+            cached_rules = await self.rules_manager.get_cached_rules(section_number)
+            if cached_rules:
                 self.logger.info(f"Rules found in cache for section {section_number}")
-                return existing_rules
-
-            # Get content if not provided
-            if content is None:
-                content = self.rules_manager.get_rules_content(section_number)
-                if not content:
-                    raise ValueError(f"No content found for section {section_number}")
-                
+                return cached_rules
+            
+            # Get raw content if not provided
+            if not content:
+                self.logger.debug("No content provided, fetching raw content")
+                raw_content = await self.rules_manager.get_raw_content(section_number)
+                if isinstance(raw_content, RulesError):
+                    self.logger.error(f"No rules found for section {section_number}")
+                    return RulesModel(
+                        section_number=section_number,
+                        source=SourceType.ERROR,
+                        error=raw_content.message
+                    )
+                content = raw_content
+            
             # Extract rules with LLM
+            self.logger.info(f"Analyzing rules for section {section_number} with LLM")
             rules = await self._extract_rules_with_llm(section_number, content)
             
             # Save to cache if analysis successful
             if not rules.error:
+                self.logger.debug("Analysis successful, saving to cache")
                 save_result = await self.rules_manager.save_rules(rules)
                 if isinstance(save_result, RulesError):
                     self.logger.error(f"Failed to save rules: {save_result.message}")
-                
+                else:
+                    self.logger.info("Rules saved successfully")
+            
             return rules
             
         except Exception as e:
-            self.logger.error(f"Error analyzing rules for section {section_number}: {e}")
+            self.logger.error(f"Error processing rules: {str(e)}")
             return RulesModel(
                 section_number=section_number,
-                error=f"Error analyzing rules: {str(e)}",
-                source="error",
-                source_type=SourceType.ERROR,
-                last_update=datetime.now()
+                source=SourceType.ERROR,
+                error=str(e)
             )
 
     async def _extract_rules_with_llm(self, section_number: int, content: str) -> RulesModel:
@@ -88,26 +99,105 @@ class RulesAgent(BaseAgent):
             RulesModel: Extracted rules including dice requirements, conditions and choices
         """
         try:
+            self.logger.debug(f"Starting LLM extraction for section {section_number}")
+            
             messages = [
                 SystemMessage(content=self.config.system_message),
-                HumanMessage(content=f"Analyze section {section_number}:\n\n{content}")
+                HumanMessage(content=f"""Section Number: {section_number} Content: {content}""")
             ]
             
             response = await self.config.llm.ainvoke(messages)
             
             try:
-                rules_data = json.loads(response.content)
+                # Valider que la réponse est du JSON valide
+                content = response.content.strip()
+                if not content.startswith('{'):
+                    # Si ce n'est pas du JSON, essayer d'extraire le bloc JSON
+                    import re
+                    json_match = re.search(r'\{[\s\S]*\}', content)
+                    if json_match:
+                        content = json_match.group(0)
+                    else:
+                        raise ValueError("Response does not contain a JSON object")
+                
+                rules_data = json.loads(content)
+                
+                # Valider les champs requis
+                required_fields = {'needs_dice', 'dice_type', 'needs_user_response', 
+                                 'next_action', 'conditions', 'choices', 'rules_summary'}
+                missing_fields = required_fields - set(rules_data.keys())
+                if missing_fields:
+                    # Si des champs sont manquants, fournir des valeurs par défaut
+                    defaults = {
+                        'needs_dice': False,
+                        'dice_type': 'none',
+                        'needs_user_response': True,  # Par défaut, on suppose qu'une réponse est nécessaire
+                        'next_action': 'user_first',
+                        'conditions': [],
+                        'choices': [],
+                        'rules_summary': content  # Utiliser le contenu comme résumé par défaut
+                    }
+                    for field in missing_fields:
+                        rules_data[field] = defaults[field]
+                        self.logger.warning(f"Using default value for missing field: {field}")
+                
+                # Ajouter les champs supplémentaires
                 rules_data["section_number"] = section_number
                 rules_data["source"] = "llm_analysis"
                 rules_data["source_type"] = SourceType.PROCESSED
                 rules_data["last_update"] = datetime.now()
+                rules_data["error"] = None
                 
-                return RulesModel(**rules_data)
+                # Convertir les choix en objets Choice
+                if "choices" in rules_data:
+                    choices = []
+                    for choice in rules_data["choices"]:
+                        if isinstance(choice, str):
+                            # Si le choix est une simple chaîne, créer un choix direct
+                            choice = {
+                                "text": choice,
+                                "type": "direct",
+                                "conditions": [],
+                                "dice_type": "none",
+                                "dice_results": {},
+                                "target_section": None
+                            }
+                        else:
+                            # S'assurer que tous les champs optionnels sont présents
+                            choice.setdefault("conditions", [])
+                            choice.setdefault("dice_type", "none")
+                            choice.setdefault("dice_results", {})
+                            choice.setdefault("type", "direct")
+                            
+                            # Convertir les types en minuscules
+                            if "type" in choice:
+                                choice["type"] = choice["type"].lower()
+                            if "dice_type" in choice:
+                                choice["dice_type"] = choice["dice_type"].lower()
+                                
+                        choices.append(choice)
+                    rules_data["choices"] = choices
+                    
+                    self.logger.debug(f"Processed choices: {choices}")
+                
+                # Créer le modèle
+                model = RulesModel(**rules_data)
+                self.logger.debug(f"Created RulesModel: {model}")
+                return model
                 
             except json.JSONDecodeError as e:
-                self.logger.error(f"Error parsing LLM response: {e}")
+                self.logger.error(f"Invalid JSON in LLM response: {e}")
+                self.logger.error(f"Response content: {response.content}")
+                # Créer un modèle par défaut en cas d'erreur
                 return RulesModel(
                     section_number=section_number,
+                    needs_dice=False,
+                    dice_type="none",
+                    needs_user_response=True,
+                    next_action="user_first",
+                    conditions=[],
+                    choices=[],
+                    rules_summary=content,
                     error=f"Error parsing LLM response: {str(e)}",
                     source="error",
                     source_type=SourceType.ERROR,
@@ -115,9 +205,18 @@ class RulesAgent(BaseAgent):
                 )
                 
         except Exception as e:
-            self.logger.error(f"Error in LLM analysis: {e}")
+            self.logger.error(f"Error extracting rules with LLM: {e}")
+            self.logger.error(f"Section content: {content}")
+            # Créer un modèle par défaut en cas d'erreur
             return RulesModel(
                 section_number=section_number,
+                needs_dice=False,
+                dice_type="none",
+                needs_user_response=True,
+                next_action="user_first",
+                conditions=[],
+                choices=[],
+                rules_summary=content,
                 error=f"Error in LLM analysis: {str(e)}",
                 source="error",
                 source_type=SourceType.ERROR,
@@ -130,6 +229,8 @@ class RulesAgent(BaseAgent):
             game_state = GameState(**input_data)
             section_number = game_state.section_number
             content = input_data.get("content")
+            
+            self.logger.debug(f"Processing section {section_number} with content: {content}")
             
             rules = await self.process_section_rules(section_number, content)
             

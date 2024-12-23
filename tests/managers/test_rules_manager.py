@@ -72,22 +72,25 @@ def sample_rules_markdown():
 # Rules for Section 1
 
 ## Metadata
-- Last Update: 2024-12-22T12:00:00
+- Last_Update: 2024-12-22T12:00:00
 - Source: test_source
-- Source Type: raw
+- Source_Type: raw
 
 ## Analysis
-- Needs Dice: true
-- Dice Type: combat
-- Needs User Response: true
-- Next Action: user_first
+- Needs_Dice: true
+- Dice_Type: combat
+- Needs_User_Response: true
+- Next_Action: user_first
 - Conditions: condition1, condition2
-- Next Sections: 2, 3
-- Choices: choice1, choice2
+- Next_Sections: 2, 3
 
 ## Choices
-1. Choice 1
-2. Choice 2 if has sword and health > 10
+* Choice 1 (Type: direct)
+  - Target: Section 2
+
+* Choice 2 (Type: conditional)
+  - Target: Section 3
+  - Conditions: has_sword, health > 10
 
 ## Summary
 Test rules summary
@@ -117,12 +120,10 @@ async def test_get_rules_content(rules_manager, mock_cache_manager, sample_rules
     assert content is None
 
 @pytest.mark.asyncio
-async def test_get_existing_rules(rules_manager, mock_cache_manager, sample_rules_model, sample_rules_markdown):
-    """Test getting existing rules."""
-    # Test cache hit
+async def test_get_existing_rules_cache_hit(rules_manager, mock_cache_manager, sample_rules_model, sample_rules_markdown):
+    """Test getting existing rules with cache hit."""
+    # Configure mock for cache hit
     mock_cache_manager.get_cached_content.return_value = sample_rules_markdown
-    mock_cache_manager.exists_raw_content.return_value = True
-    mock_cache_manager.load_raw_content.return_value = sample_rules_markdown
     
     result = await rules_manager.get_existing_rules(1)
     assert isinstance(result, RulesModel)
@@ -130,7 +131,15 @@ async def test_get_existing_rules(rules_manager, mock_cache_manager, sample_rule
     assert result.needs_dice is True
     assert result.dice_type == DiceType.COMBAT
     
-    # Test cache miss but raw content exists
+    # Verify cache was checked once
+    mock_cache_manager.get_cached_content.assert_called_once()
+    mock_cache_manager.exists_raw_content.assert_not_called()
+    mock_cache_manager.load_raw_content.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_get_existing_rules_cache_miss(rules_manager, mock_cache_manager, sample_rules_model, sample_rules_markdown):
+    """Test getting existing rules with cache miss but raw content exists."""
+    # Configure mock for cache miss but raw content exists
     mock_cache_manager.get_cached_content.return_value = None
     mock_cache_manager.exists_raw_content.return_value = True
     mock_cache_manager.load_raw_content.return_value = sample_rules_markdown
@@ -143,9 +152,10 @@ async def test_get_existing_rules(rules_manager, mock_cache_manager, sample_rule
     assert result.choices[0].type == ChoiceType.DIRECT
     assert result.choices[1].type == ChoiceType.CONDITIONAL
     
-    # Verify cache calls
-    mock_cache_manager.exists_raw_content.assert_called_once()
+    # Verify cache was checked once, then raw content was loaded
     mock_cache_manager.get_cached_content.assert_called_once()
+    mock_cache_manager.exists_raw_content.assert_called_once()
+    mock_cache_manager.load_raw_content.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_save_rules(rules_manager, mock_cache_manager, sample_rules_model):
@@ -163,10 +173,12 @@ def test_markdown_conversion(rules_manager, sample_rules_model, sample_rules_mar
     """Test markdown conversion methods."""
     # Test rules to markdown
     markdown = rules_manager._rules_to_markdown(sample_rules_model)
-    assert "# Rules for Section" in markdown
-    assert "Test rules summary" in markdown
-    assert "combat" in markdown.lower()
-    
+    assert isinstance(markdown, str)
+    assert "# Rules for Section 1" in markdown
+    assert "## Metadata" in markdown
+    assert "## Analysis" in markdown
+    assert "## Choices" in markdown
+
     # Test markdown to rules
     rules = rules_manager._markdown_to_rules(sample_rules_markdown, 1)
     assert isinstance(rules, RulesModel)
@@ -174,7 +186,63 @@ def test_markdown_conversion(rules_manager, sample_rules_model, sample_rules_mar
     assert rules.needs_dice is True
     assert rules.dice_type == DiceType.COMBAT
     assert len(rules.conditions) == 2
-    assert len(rules.next_sections) == 2
     assert len(rules.choices) == 2
     assert rules.choices[0].type == ChoiceType.DIRECT
     assert rules.choices[1].type == ChoiceType.CONDITIONAL
+    # Vérifier que les sections cibles sont bien définies
+    assert rules.choices[0].target_section is not None
+    assert rules.choices[1].target_section is not None
+
+def test_markdown_conversion_invalid_content(rules_manager):
+    """Test markdown conversion with invalid or incomplete content."""
+    # Test with missing sections
+    invalid_markdown = """# Section 1"""
+    rules = rules_manager._markdown_to_rules(invalid_markdown, 1)
+    assert rules is None
+
+    # Test with missing required fields
+    incomplete_markdown = """# Rules for Section 1
+
+## Metadata
+- Last_Update: 2024-12-22T12:00:00
+- Source: test_source
+- Source_Type: raw
+
+## Analysis
+- Target_Sections: 2, 3
+
+## Choices
+* Choice 1 (Type: direct)
+  - Target: Section 2
+
+## Summary
+Test summary
+
+## Error
+None
+"""
+    rules = rules_manager._markdown_to_rules(incomplete_markdown, 1)
+    assert rules is None
+
+    # Test with empty Analysis section
+    no_analysis_markdown = """# Rules for Section 1
+
+## Metadata
+- Last_Update: 2024-12-22T12:00:00
+- Source: test_source
+- Source_Type: raw
+
+## Analysis
+
+## Choices
+* Choice 1 (Type: direct)
+  - Target: Section 2
+
+## Summary
+Test summary
+
+## Error
+None
+"""
+    rules = rules_manager._markdown_to_rules(no_analysis_markdown, 1)
+    assert rules is None
