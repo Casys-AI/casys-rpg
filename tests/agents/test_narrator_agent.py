@@ -1,161 +1,150 @@
-"""Tests for the narrator agent module."""
+"""Tests for the NarratorAgent."""
+
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, MagicMock
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from agents.narrator_agent import NarratorAgent
-from config.agents.narrator_agent_config import NarratorAgentConfig
 from models.narrator_model import NarratorModel, SourceType
 from models.errors_model import NarratorError
+from models.game_state import GameState
+from config.agents.narrator_agent_config import NarratorAgentConfig
 
 @pytest.fixture
 def mock_narrator_manager():
-    """Create a mock narrator manager."""
-    manager = Mock()
-    manager.get_section_content = AsyncMock()
-    manager.get_raw_section_content = AsyncMock()
-    manager.save_section_content = AsyncMock()
+    manager = AsyncMock()
+    manager.get_cached_content = AsyncMock(return_value=None)
+    manager.get_raw_content = AsyncMock()
+    manager.save_content = AsyncMock()
+    manager.format_content = MagicMock()
     return manager
 
 @pytest.fixture
-def mock_llm():
-    """Create a mock LLM."""
-    llm = MagicMock()
-    llm.ainvoke = AsyncMock()
-    return llm
+def mock_config():
+    config = MagicMock(spec=NarratorAgentConfig)
+    config.llm = AsyncMock()
+    config.llm.ainvoke = AsyncMock()
+    config.system_message = "You are a narrator"
+    return config
 
 @pytest.fixture
-def config(mock_llm):
-    """Create a test narrator agent config."""
-    return NarratorAgentConfig(
-        llm=mock_llm,
-        system_message="Test system message"
-    )
-
-@pytest_asyncio.fixture
-async def narrator_agent(config, mock_narrator_manager):
-    """Create a test narrator agent."""
-    agent = NarratorAgent(config=config, narrator_manager=mock_narrator_manager)
-    return agent
+def narrator_agent(mock_config, mock_narrator_manager):
+    return NarratorAgent(config=mock_config, narrator_manager=mock_narrator_manager)
 
 @pytest.fixture
-def sample_markdown_content():
-    """Sample markdown content for testing."""
+def sample_content():
     return """# Section 1
-
-This is a test section.
-- Point 1
-- Point 2
-
-## Subsection
-More content here."""
+    
+This is a test section with some content."""
 
 @pytest.fixture
-def sample_narrator_model():
-    """Create a sample narrator model."""
+def sample_model():
     return NarratorModel(
         section_number=1,
-        content="""This is a test section.
-- Point 1
-- Point 2
-
-## Subsection
-More content here.""",
+        content="# Section 1\nTest content",
         source_type=SourceType.PROCESSED,
         timestamp=datetime.now()
     )
 
-@pytest.mark.asyncio
-async def test_process_section_cache_hit(narrator_agent, mock_narrator_manager, sample_narrator_model):
-    """Test processing a section with cache hit."""
-    # Setup mock
-    mock_narrator_manager.get_section_content.return_value = sample_narrator_model
-    
-    # Process section
-    result = await narrator_agent.process_section(1)
-    
-    # Verify result
-    assert isinstance(result, NarratorModel)
-    assert result.section_number == 1
-    assert result.content == sample_narrator_model.content
-    assert result.source_type == SourceType.PROCESSED
-    
-    # Verify manager calls
-    mock_narrator_manager.get_section_content.assert_called_once_with(1)
-    mock_narrator_manager.get_raw_section_content.assert_not_called()
+@pytest.fixture
+def sample_game_state():
+    return GameState(
+        section_number=1,
+        narrative_content="",
+        last_update=datetime.now()
+    )
 
 @pytest.mark.asyncio
-async def test_process_section_cache_miss(
-    narrator_agent, mock_narrator_manager, mock_llm, sample_markdown_content
-):
-    """Test processing a section with cache miss."""
-    # Setup mocks
-    mock_narrator_manager.get_section_content.return_value = None
-    mock_narrator_manager.get_raw_section_content.return_value = sample_markdown_content
-    mock_llm.ainvoke.return_value.content = sample_markdown_content
-    
-    # Process section
+async def test_process_section_cache_hit(narrator_agent, mock_narrator_manager, sample_model):
+    """Test processing section with cache hit."""
+    mock_narrator_manager.get_cached_content.return_value = sample_model
     result = await narrator_agent.process_section(1)
-    
-    # Verify result
     assert isinstance(result, NarratorModel)
     assert result.section_number == 1
-    assert result.source_type == SourceType.PROCESSED
-    
-    # Verify manager calls
-    mock_narrator_manager.get_section_content.assert_called_once_with(1)
-    mock_narrator_manager.get_raw_section_content.assert_called_once_with(1)
-    mock_narrator_manager.save_section_content.assert_called_once()
+    mock_narrator_manager.get_raw_content.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_process_section_not_found(narrator_agent, mock_narrator_manager):
-    """Test processing a non-existent section."""
-    # Setup mock
-    mock_narrator_manager.get_section_content.return_value = None
-    mock_narrator_manager.get_raw_section_content.return_value = None
+async def test_process_section_cache_miss(narrator_agent, mock_narrator_manager, sample_content, sample_model):
+    """Test processing section with cache miss."""
+    mock_narrator_manager.get_cached_content.return_value = None
+    mock_narrator_manager.get_raw_content.return_value = sample_content
+    mock_narrator_manager.format_content.return_value = sample_model
+    mock_narrator_manager.save_content.return_value = sample_model
     
-    # Process section
-    result = await narrator_agent.process_section(999)
+    result = await narrator_agent.process_section(1)
+    assert isinstance(result, NarratorModel)
+    assert result.section_number == 1
+    mock_narrator_manager.get_raw_content.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_process_section_raw_content_error(narrator_agent, mock_narrator_manager):
+    """Test processing section with raw content error."""
+    mock_narrator_manager.get_cached_content.return_value = None
+    mock_narrator_manager.get_raw_content.return_value = NarratorError(
+        section_number=1,
+        message="Content not found"
+    )
     
-    # Verify result
+    result = await narrator_agent.process_section(1)
     assert isinstance(result, NarratorError)
-    assert result.section_number == 999
-    assert "not found" in result.message.lower()
+    assert "Content not found" in result.message
 
 @pytest.mark.asyncio
-async def test_process_section_with_error(narrator_agent, mock_narrator_manager, mock_llm):
-    """Test processing a section with LLM error."""
-    # Setup mocks
-    mock_narrator_manager.get_section_content.return_value = None
-    mock_narrator_manager.get_raw_section_content.return_value = "Test content"
-    mock_llm.ainvoke.side_effect = Exception("LLM error")
+async def test_process_section_format_error(narrator_agent, mock_narrator_manager, sample_content):
+    """Test processing section with format error."""
+    mock_narrator_manager.get_cached_content.return_value = None
+    mock_narrator_manager.get_raw_content.return_value = sample_content
+    mock_narrator_manager.format_content.return_value = NarratorError(
+        section_number=1,
+        message="Format error"
+    )
     
-    # Process section
     result = await narrator_agent.process_section(1)
-    
-    # Verify result
     assert isinstance(result, NarratorError)
-    assert result.section_number == 1
-    assert "llm error" in result.message.lower()
+    assert "Format error" in result.message
 
 @pytest.mark.asyncio
-async def test_process_section_with_raw_content(
-    narrator_agent, mock_narrator_manager, mock_llm, sample_markdown_content
-):
-    """Test processing a section with provided raw content."""
-    # Setup mock
-    mock_llm.ainvoke.return_value.content = sample_markdown_content
+async def test_process_content_success(narrator_agent, mock_config):
+    """Test processing content with LLM successfully."""
+    mock_config.llm.ainvoke.return_value.content = "Processed content"
+    content = "Raw content"
+    result = await narrator_agent._process_content(content)
+    assert result == "Processed content"
+    mock_config.llm.ainvoke.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_process_content_error(narrator_agent, mock_config):
+    """Test processing content with LLM error."""
+    mock_config.llm.ainvoke.side_effect = Exception("LLM error")
+    content = "Raw content"
+    result = await narrator_agent._process_content(content)
+    assert result == content  # Should return original content on error
+
+@pytest.mark.asyncio
+async def test_ainvoke_success(narrator_agent, mock_narrator_manager, sample_model, sample_game_state):
+    """Test agent invocation with success."""
+    mock_narrator_manager.get_cached_content.return_value = None
+    mock_narrator_manager.get_raw_content.return_value = "Raw content"
+    mock_narrator_manager.format_content.return_value = sample_model
+    mock_narrator_manager.save_content.return_value = sample_model
     
-    # Process section with raw content
-    result = await narrator_agent.process_section(1, raw_content="Test raw content")
+    async for result in narrator_agent.ainvoke(sample_game_state.model_dump()):
+        assert "narrative" in result
+        narrative = result["narrative"]
+        assert narrative["section_number"] == 1
+        assert narrative["source_type"] == SourceType.PROCESSED.value
+
+@pytest.mark.asyncio
+async def test_ainvoke_error(narrator_agent, mock_narrator_manager, sample_game_state):
+    """Test agent invocation with error."""
+    mock_narrator_manager.get_cached_content.return_value = None
+    mock_narrator_manager.get_raw_content.return_value = NarratorError(
+        section_number=1,
+        message="Processing error"
+    )
     
-    # Verify result
-    assert isinstance(result, NarratorModel)
-    assert result.section_number == 1
-    assert result.source_type == SourceType.PROCESSED
-    
-    # Verify manager calls
-    mock_narrator_manager.get_section_content.assert_not_called()
-    mock_narrator_manager.get_raw_section_content.assert_not_called()
-    mock_narrator_manager.save_section_content.assert_called_once()
+    async for result in narrator_agent.ainvoke(sample_game_state.model_dump()):
+        assert "narrative" in result
+        narrative = result["narrative"]
+        assert narrative["source_type"] == SourceType.ERROR.value
+        assert "Processing error" in narrative["error"]

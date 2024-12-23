@@ -102,16 +102,16 @@ class CacheManagerProtocol(Protocol):
         """
         ...
     
-    async def load_raw_content(self, section_number: int, namespace: str) -> Optional[str]:
+    async def load_raw_content(self, key: str, namespace: str) -> Optional[str]:
         """
-        Load raw content.
+        Load raw content from storage.
         
         Args:
-            section_number: Section number to load
-            namespace: Namespace to load from
+            key: Unique identifier for the content
+            namespace: Namespace for organizing data
             
         Returns:
-            Optional[str]: Raw content if found
+            Optional[str]: Content if found, None otherwise
             
         Raises:
             KeyError: If namespace is unknown

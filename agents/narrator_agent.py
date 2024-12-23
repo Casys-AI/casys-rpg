@@ -1,4 +1,5 @@
-"""NarratorAgent Module
+"""
+NarratorAgent Module
 Handles content processing and formatting.
 """
 
@@ -33,59 +34,133 @@ class NarratorAgent(BaseAgent):
         self.narrator_manager = narrator_manager
         self.logger = logger
 
-    async def process_section(self, section_number: int, raw_content: Optional[str] = None) -> Union[NarratorModel, NarratorError]:
+    async def process_section(self, section_number: int, content: Optional[str] = None) -> Union[NarratorModel, NarratorError]:
         """Process and format a game section.
         
         Args:
             section_number: Section number to process
-            raw_content: Optional raw content to process. If not provided, will be fetched from manager.
+            content: Optional raw content to process. If not provided, will be fetched from manager.
             
         Returns:
             Union[NarratorModel, NarratorError]: Processed section content or error
         """
         try:
-            # Get content from manager if not provided
-            if not raw_content:
-                raw_content = await self.narrator_manager.get_section_content(section_number)
-                
-            # Process content with LLM
-            processed_content = await self._process_content(raw_content)
+            logger.debug("Starting process_section for section {}", section_number)
             
-            # Create model
-            return NarratorModel(
-                section_number=section_number,
-                content=processed_content,
-                source_type=SourceType.PROCESSED,
-                timestamp=datetime.now()
-            )
+            # Check cache first
+            cached_content = await self.narrator_manager.get_cached_content(section_number)
+            if cached_content:
+                logger.info("Content found in cache for section {}", section_number)
+                return cached_content
+            
+            # Get raw content if not provided
+            if not content:
+                logger.debug("No raw content provided, fetching from manager")
+                raw_content_result = await self.narrator_manager.get_raw_content(section_number)
+                if isinstance(raw_content_result, NarratorError):
+                    logger.error("Failed to get raw content: {}", raw_content_result.message)
+                    return raw_content_result
+                content = raw_content_result
+            
+            # Process content with LLM
+            logger.info("Processing content for section {} with LLM", section_number)
+            processed_result = await self._process_content(section_number, content)
+            if isinstance(processed_result, NarratorError):
+                logger.error("Failed to process content: {}", processed_result.message)
+                return processed_result
+                
+            # Save to cache
+            save_result = await self.narrator_manager.save_content(processed_result)
+            if isinstance(save_result, NarratorError):
+                logger.error("Failed to save content: {}", save_result.message)
+                return save_result
+                
+            return processed_result
             
         except Exception as e:
-            self.logger.error(f"Error processing section {section_number}: {e}")
-            return NarratorError(message=str(e))
+            logger.error("Error processing section {}: {}", section_number, str(e))
+            return NarratorError(
+                section_number=section_number,
+                message=str(e)
+            )
 
-    async def _process_content(self, content: str) -> str:
+    async def _process_content(self, section_number: int, content: str) -> Union[NarratorModel, NarratorError]:
         """Process content using LLM.
         
         Args:
+            section_number: Section number
             content: Raw content to process
             
         Returns:
-            str: Processed content
+            Union[NarratorModel, NarratorError]: Processed content model or error
         """
         try:
+            logger.debug("Starting content processing with LLM")
+            
             messages = [
                 SystemMessage(content=self.config.system_message),
-                HumanMessage(content=f"Format this content:\n\n{content}")
+                HumanMessage(content=f"""Section Number: {section_number} Content : {content}""")
             ]
             
             response = await self.config.llm.ainvoke(messages)
-            formatted_content = response.content
             
-            return formatted_content
+            try:
+                # Valider que la réponse est du JSON valide
+                content = response.content.strip()
+                if not content.startswith('{'):
+                    # Si ce n'est pas du JSON, essayer d'extraire le bloc JSON
+                    import re
+                    json_match = re.search(r'\{[\s\S]*\}', content)
+                    if json_match:
+                        content = json_match.group(0)
+                    else:
+                        raise ValueError("Response does not contain a JSON object")
+                
+                response_data = json.loads(content)
+                
+                # Valider les champs requis
+                required_fields = {'content', 'source_type', 'error'}
+                missing_fields = required_fields - set(response_data.keys())
+                if missing_fields:
+                    # Si des champs sont manquants, fournir des valeurs par défaut
+                    defaults = {
+                        'content': content,  # Utiliser le contenu brut par défaut
+                        'source_type': 'processed',
+                        'error': None
+                    }
+                    for field in missing_fields:
+                        response_data[field] = defaults[field]
+                        logger.warning(f"Using default value for missing field: {field}")
+                
+                # Créer le NarratorModel
+                return NarratorModel(
+                    section_number=section_number,
+                    content=response_data['content'],
+                    source_type=SourceType(response_data['source_type'].lower()),
+                    error=response_data['error'],
+                    timestamp=datetime.now()
+                )
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in LLM response: {e}")
+                logger.error(f"Response content: {response.content}")
+                return NarratorError(
+                    section_number=section_number,
+                    message=f"Invalid JSON in LLM response: {str(e)}"
+                )
+            except Exception as e:
+                logger.error(f"Error parsing LLM response: {str(e)}")
+                return NarratorError(
+                    section_number=section_number,
+                    message=f"Error parsing LLM response: {str(e)}"
+                )
             
         except Exception as e:
-            self.logger.error(f"Error formatting content: {e}")
-            return content
+            logger.error("Error formatting content: {}", str(e))
+            return NarratorError(
+                section_number=section_number,
+                message=f"Error formatting content: {str(e)}"
+            )
 
     async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
         """Process game state and update narrative.
@@ -94,7 +169,7 @@ class NarratorAgent(BaseAgent):
             input_data: Input data containing game state
             
         Yields:
-            Dict[str, Any]: Updated game state with narrative
+            Dict[str, Any]: Updated narrative content
         """
         try:
             game_state = GameState.model_validate(input_data)
@@ -103,7 +178,7 @@ class NarratorAgent(BaseAgent):
             section_result = await self.process_section(game_state.section_number)
             
             if isinstance(section_result, NarratorError):
-                self.logger.error(f"Error processing section: {section_result.message}")
+                logger.error("Error processing section: {}", section_result.message)
                 error_model = NarratorModel(
                     section_number=game_state.section_number,
                     content="",
@@ -121,11 +196,11 @@ class NarratorAgent(BaseAgent):
             yield {"narrative": section_result.model_dump()}
             
         except Exception as e:
-            self.logger.error(f"Error in ainvoke: {e}")
+            logger.error("Error in agent invocation: {}", str(e))
             error_model = NarratorModel(
                 section_number=input_data.get("section_number", 1),
                 content="",
-                error=f"Error in agent invocation: {e}",
+                error=f"Error in agent invocation: {str(e)}",
                 source_type=SourceType.ERROR,
                 timestamp=datetime.now()
             )

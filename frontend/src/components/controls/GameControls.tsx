@@ -1,7 +1,8 @@
 import { component$, useStylesScoped$, $ } from '@builder.io/qwik';
 import type { GameState } from '~/types/game';
+import { API_CONFIG } from '~/config/api';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = API_CONFIG.baseURL;
 
 interface GameControlsProps {
   gameState: GameState;

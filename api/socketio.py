@@ -10,6 +10,9 @@ from fastapi_socketio import SocketManager
 from fastapi import FastAPI
 from models.game_state import GameState
 from models.trace_model import ActionType
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Store active game sessions
 game_sessions: Dict[str, Dict[str, Any]] = {}
@@ -27,119 +30,98 @@ def init_socketio(app: FastAPI) -> SocketManager:
         SocketManager: Initialized Socket.IO manager
     """
     global _socket_manager
-    if not _socket_manager:
+    
+    if _socket_manager is None:
+        logger.info("Initializing Socket.IO manager")
         _socket_manager = SocketManager(
             app=app,
-            mount_location="/ws",
-            cors_allowed_origins=["*"],  # En production, spécifier les origines exactes
-            socketio_path="socket.io",
+            mount_location="/socket.io",
+            cors_allowed_origins=[
+                "http://localhost:9000",
+                "http://127.0.0.1:9000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+                "http://localhost:5173"
+            ],
+            socketio_path="",
+            async_mode="asgi"
         )
         
         # Register event handlers
         @_socket_manager.on("connect")
         async def connect(sid: str):
             """Handle client connection."""
-            print(f"Client connected: {sid}")
+            logger.info(f"Socket.IO client connected: {sid}")
             await _socket_manager.emit('connection_response', {'status': 'connected'}, to=sid)
 
         @_socket_manager.on("disconnect")
         async def disconnect(sid: str):
             """Handle client disconnection."""
-            print(f"Client disconnected: {sid}")
+            logger.info(f"Socket.IO client disconnected: {sid}")
             # Clean up game session if exists
             for game_id, session in game_sessions.items():
                 if sid in session.get('players', []):
                     session['players'].remove(sid)
                     if not session['players']:
                         del game_sessions[game_id]
+                    break
 
         @_socket_manager.on("join_game")
         async def join_game(sid: str, data: Dict[str, Any]):
-            """Handle player joining a game.
-            
-            Args:
-                sid: Session ID
-                data: Must contain game_id
-            """
+            """Handle game join request."""
             game_id = data.get('game_id')
             if not game_id:
-                await _socket_manager.emit('error', {'message': 'game_id is required'}, to=sid)
+                logger.warning(f"Join game attempt without game_id from {sid}")
+                await _socket_manager.emit('error', {'message': 'Game ID required'}, to=sid)
                 return
-
+                
             if game_id not in game_sessions:
+                logger.info(f"Creating new game session {game_id}")
                 game_sessions[game_id] = {
                     'players': [],
-                    'state': None,
                     'created_at': datetime.now()
                 }
             
             if sid not in game_sessions[game_id]['players']:
                 game_sessions[game_id]['players'].append(sid)
+                logger.info(f"Player {sid} joined game {game_id}")
             
-            await _socket_manager.emit('game_joined', {
-                'game_id': game_id,
-                'player_count': len(game_sessions[game_id]['players'])
-            }, to=sid)
-
-        @_socket_manager.on("player_input")
-        async def player_input(sid: str, data: Dict[str, Any]):
-            """Handle player input.
+            await _socket_manager.emit('game_joined', {'game_id': game_id}, to=sid)
             
-            Args:
-                sid: Session ID
-                data: Must contain game_id and input
-            """
+        @_socket_manager.on("game_action")
+        async def game_action(sid: str, data: Dict[str, Any]):
+            """Handle game action."""
             game_id = data.get('game_id')
-            player_input = data.get('input')
+            action = data.get('action')
             
-            if not game_id or not player_input:
-                await _socket_manager.emit('error', {'message': 'game_id and input are required'}, to=sid)
+            if not game_id or not action:
+                logger.warning(f"Invalid game action from {sid}: {data}")
+                await _socket_manager.emit('error', {'message': 'Invalid action data'}, to=sid)
                 return
-            
-            if game_id not in game_sessions:
-                await _socket_manager.emit('error', {'message': 'game not found'}, to=sid)
-                return
-            
-            # Process player input and update game state
-            # TODO: Implement game state update logic
-            
-            # Broadcast updated state to all players in the game
-            await _socket_manager.emit('game_update', {
-                'game_id': game_id,
-                'state': game_sessions[game_id]['state']
-            }, room=game_id)
-
-        @_socket_manager.on("request_state")
-        async def request_state(sid: str, data: Dict[str, Any]):
-            """Handle request for current game state.
-            
-            Args:
-                sid: Session ID
-                data: Must contain game_id
-            """
-            game_id = data.get('game_id')
-            
-            if not game_id:
-                await _socket_manager.emit('error', {'message': 'game_id is required'}, to=sid)
-                return
-            
-            if game_id not in game_sessions:
-                await _socket_manager.emit('error', {'message': 'game not found'}, to=sid)
-                return
-            
-            await _socket_manager.emit('game_state', {
-                'game_id': game_id,
-                'state': game_sessions[game_id]['state']
-            }, to=sid)
                 
+            if game_id not in game_sessions:
+                logger.warning(f"Game action for non-existent game {game_id} from {sid}")
+                await _socket_manager.emit('error', {'message': 'Game not found'}, to=sid)
+                return
+                
+            logger.info(f"Broadcasting game action in {game_id}: {action}")
+            # Broadcast action to all players in the game
+            for player_sid in game_sessions[game_id]['players']:
+                await _socket_manager.emit('game_update', {
+                    'game_id': game_id,
+                    'action': action,
+                    'timestamp': datetime.now().isoformat()
+                }, to=player_sid)
+                
+        logger.info("Socket.IO manager initialized successfully")
     return _socket_manager
 
-def get_socketio_app() -> SocketManager:
+def get_socketio_manager() -> SocketManager:
     """Get the Socket.IO manager.
     
     Returns:
         SocketManager: The Socket.IO manager
     """
     if not _socket_manager:
-        raise RuntimeError("Socket.IO manager not initialized. Call init_socketio first.")
+        raise RuntimeError("Socket.IO manager not initialized")
     return _socket_manager

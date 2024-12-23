@@ -1,5 +1,6 @@
 import { component$, useContext } from '@builder.io/qwik';
 import { GameContext } from '~/routes/store';
+import { API_CONFIG } from '~/config';
 
 export default component$(() => {
   const store = useContext(GameContext);
@@ -11,7 +12,7 @@ export default component$(() => {
         <button
           onClick$={async () => {
             try {
-              const response = await fetch('http://localhost:8000/game/roll-dice?dice_type=d6', {
+              const response = await fetch(`${API_CONFIG.development.BASE_URL}/game/roll-dice?dice_type=d6`, {
                 method: 'POST',
               });
               const data = await response.json();
@@ -48,7 +49,7 @@ export default component$(() => {
         <button
           onClick$={async () => {
             try {
-              const response = await fetch('http://localhost:8000/game/reset', {
+              const response = await fetch(`${API_CONFIG.development.BASE_URL}/game/reset`, {
                 method: 'POST',
               });
               const data = await response.json();

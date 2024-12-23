@@ -114,7 +114,7 @@ export const DiceRoller = component$<DiceRollerProps>(({ diceType, gameState }) 
     error.value = null;
 
     try {
-      const response = await fetch('http://localhost:8000/game/roll-dice', {
+      const response = await fetch(`${API_CONFIG.development.BASE_URL}/game/roll-dice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

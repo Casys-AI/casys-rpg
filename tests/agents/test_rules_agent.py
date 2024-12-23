@@ -12,20 +12,21 @@ from config.agents.rules_agent_config import RulesAgentConfig
 from models.errors_model import RulesError
 
 @pytest.fixture
+def mock_llm():
+    """Create a mock LLM."""
+    llm = AsyncMock()
+    llm.ainvoke = AsyncMock(return_value=Mock(content='{"result": "success"}'))
+    return llm
+
+@pytest.fixture
 def mock_rules_manager():
     """Create a mock rules manager."""
     manager = AsyncMock()
     # Configure the mock to return properly
-    manager.get_section_rules = AsyncMock()
-    manager.analyze_rules = AsyncMock()
+    manager.get_existing_rules = AsyncMock(return_value=None)
+    manager.get_raw_rules = AsyncMock(return_value=None)
+    manager.save_rules = AsyncMock()
     return manager
-
-@pytest.fixture
-def mock_llm():
-    """Create a mock LLM."""
-    llm = AsyncMock()
-    llm.apredict = AsyncMock(return_value='{"result": "success"}')
-    return llm
 
 @pytest.fixture
 def config(mock_llm):
@@ -63,7 +64,7 @@ def sample_rules_model():
     """Create a sample rules model."""
     return RulesModel(
         section_number=1,
-        needs_dice=True,  # Changed from needs_dice_roll
+        needs_dice=True,  
         dice_type=DiceType.COMBAT,
         conditions=["Must have sword", "SKILL > 8"],
         choices=[
@@ -88,21 +89,21 @@ def sample_rules_model():
 async def test_process_section_rules_cache_hit(rules_agent, mock_rules_manager, sample_rules_model):
     """Test processing rules with cache hit."""
     # Setup mock to return our model
-    mock_rules_manager.get_section_rules.return_value = sample_rules_model
+    mock_rules_manager.get_existing_rules.return_value = sample_rules_model
     
     # Process rules
     result = await rules_agent.process_section_rules(1)
     
     # Verify the result
     assert result.section_number == sample_rules_model.section_number
-    assert result.needs_dice == sample_rules_model.needs_dice  # Changed from needs_dice_roll
+    assert result.needs_dice == sample_rules_model.needs_dice
     assert result.dice_type == sample_rules_model.dice_type
     assert result.conditions == sample_rules_model.conditions
     assert len(result.choices) == len(sample_rules_model.choices)
     assert result.rules_summary == sample_rules_model.rules_summary
     
     # Verify the mock was called correctly
-    mock_rules_manager.get_section_rules.assert_called_once_with(1)
+    mock_rules_manager.get_existing_rules.assert_called_once_with(1)
 
 @pytest.mark.asyncio
 async def test_process_section_rules_cache_miss(
@@ -110,9 +111,9 @@ async def test_process_section_rules_cache_miss(
 ):
     """Test processing rules with cache miss."""
     # Setup mocks
-    mock_rules_manager.get_section_rules.return_value = None
+    mock_rules_manager.get_existing_rules.return_value = None
     mock_rules_manager.get_raw_rules.return_value = sample_rules_content
-    mock_llm.apredict.return_value = sample_rules_model.model_dump_json()
+    mock_llm.ainvoke.return_value.content = sample_rules_model.model_dump_json()
     
     # Process rules
     result = await rules_agent.process_section_rules(1)
@@ -124,15 +125,15 @@ async def test_process_section_rules_cache_miss(
     assert result.dice_type == DiceType.COMBAT
     
     # Verify manager calls
-    mock_rules_manager.get_section_rules.assert_called_once_with(1)
+    mock_rules_manager.get_existing_rules.assert_called_once_with(1)
     mock_rules_manager.get_raw_rules.assert_called_once_with(1)
-    mock_rules_manager.analyze_rules.assert_called_once()
+    mock_rules_manager.save_rules.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_process_section_rules_not_found(rules_agent, mock_rules_manager):
     """Test processing rules for non-existent section."""
     # Setup mock
-    mock_rules_manager.get_section_rules.return_value = None
+    mock_rules_manager.get_existing_rules.return_value = None
     mock_rules_manager.get_raw_rules.return_value = None
     
     # Process rules
@@ -147,9 +148,9 @@ async def test_process_section_rules_not_found(rules_agent, mock_rules_manager):
 async def test_process_section_rules_with_error(rules_agent, mock_rules_manager, mock_llm):
     """Test processing rules with LLM error."""
     # Setup mocks
-    mock_rules_manager.get_section_rules.return_value = None
+    mock_rules_manager.get_existing_rules.return_value = None
     mock_rules_manager.get_raw_rules.return_value = "Test rules"
-    mock_llm.apredict.side_effect = Exception("LLM error")
+    mock_llm.ainvoke.side_effect = Exception("LLM error")
     
     # Process rules
     result = await rules_agent.process_section_rules(1)
@@ -165,7 +166,8 @@ async def test_process_section_rules_with_content(
 ):
     """Test processing rules with provided content."""
     # Setup mock
-    mock_llm.apredict.return_value = sample_rules_model.model_dump_json()
+    mock_llm.ainvoke.return_value = Mock(content=sample_rules_model.model_dump_json())
+    mock_rules_manager.save_rules.return_value = sample_rules_model
     
     # Process rules with content
     result = await rules_agent.process_section_rules(1, content="Test rules content")
@@ -177,6 +179,6 @@ async def test_process_section_rules_with_content(
     assert result.dice_type == sample_rules_model.dice_type
     
     # Verify manager calls
-    mock_rules_manager.get_section_rules.assert_not_called()
+    mock_rules_manager.get_existing_rules.assert_not_called()
     mock_rules_manager.get_raw_rules.assert_not_called()
-    mock_rules_manager.analyze_rules.assert_called_once()
+    mock_rules_manager.save_rules.assert_called_once()

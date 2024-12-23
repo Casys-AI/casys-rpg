@@ -81,7 +81,7 @@ export const FeedbackPanel = component$<FeedbackPanelProps>(({ sectionNumber, pr
     success.value = false;
 
     try {
-      const response = await fetch('http://localhost:8000/game/feedback', {
+      const response = await fetch(`${API_CONFIG.development.BASE_URL}/game/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -10,10 +10,6 @@ from models.game_state import GameState
 class BaseAgentProtocol(Protocol):
     """Protocol defining the common interface for all agents."""
     
-    def initialize(self) -> None:
-        """Initialize the agent."""
-        ...
-
     async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Asynchronous invocation of the agent.

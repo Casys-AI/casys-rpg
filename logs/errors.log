@@ -1,0 +1,531 @@
+2024-12-23 21:34:13 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:34:13 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:34:13 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:34:13 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StateManager' object has no attribute 'get_current_timestamp'
+2024-12-23 21:34:13 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:34:58 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:34:58 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:34:58 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:34:58 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StateManager' object has no attribute 'get_current_timestamp'
+2024-12-23 21:34:58 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:36:09 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:36:09 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:36:09 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:36:09 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StateManager' object has no attribute 'get_current_timestamp'
+2024-12-23 21:36:09 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:36:32 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:36:32 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:36:32 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:36:32 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:36:32 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:36:48 | ERROR    | api.app:global_exception_handler:658 - Global exception: HealthResponse.__init__() got an unexpected keyword argument 'version'
+2024-12-23 21:37:10 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:37:10 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:37:10 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:37:10 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:37:10 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:37:12 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:37:12 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:37:12 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:37:12 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:37:12 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:37:13 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:37:13 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:37:13 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:37:13 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:37:13 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:37:18 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:37:18 | ERROR    | managers.agent_manager:initialize_game:357 - Error initializing game session %s: %s
+2024-12-23 21:37:18 | ERROR    | managers.agent_manager:initialize_game:358 - Stack trace:
+2024-12-23 21:37:18 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:37:18 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:38:56 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:38:56 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:38:56 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:38:56 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:38:56 | ERROR    | api.app:initialize_game:620 - Unexpected error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:38:56 | ERROR    | api.app:initialize_game:621 - Stack trace:
+2024-12-23 21:40:50 | ERROR    | managers.workflow_manager:execute_workflow:251 - Error executing workflow: %s
+2024-12-23 21:40:50 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:40:50 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:40:50 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:40:50 | ERROR    | api.app:initialize_game:617 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'StoryGraph' object has no attribute 'execute'
+2024-12-23 21:40:50 | ERROR    | api.app:global_exception_handler:671 - Global exception: name 'GameError' is not defined
+2024-12-23 21:42:14 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:42:14 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:42:14 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:42:14 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:42:14 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:42:14 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:42:14 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:42:14 | ERROR    | api.app:initialize_game:617 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:42:14 | ERROR    | api.app:global_exception_handler:671 - Global exception: name 'GameError' is not defined
+2024-12-23 21:42:36 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:42:36 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:42:36 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:42:36 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:42:36 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:42:36 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:42:36 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:42:36 | ERROR    | api.app:initialize_game:606 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:42:36 | ERROR    | api.app:global_exception_handler:660 - Global exception: name 'GameError' is not defined
+2024-12-23 21:42:54 | ERROR    | api.app:global_exception_handler:660 - Global exception: HealthResponse.__init__() got an unexpected keyword argument 'version'
+2024-12-23 21:42:54 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:42:54 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:42:54 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:42:54 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:42:54 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:42:54 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:42:54 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:42:54 | ERROR    | api.app:initialize_game:606 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:42:54 | ERROR    | api.app:global_exception_handler:660 - Global exception: name 'GameError' is not defined
+2024-12-23 21:43:02 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:43:02 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:43:02 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:43:02 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:43:02 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:43:02 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:43:02 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:43:02 | ERROR    | api.app:initialize_game:606 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:43:02 | ERROR    | api.app:global_exception_handler:660 - Global exception: name 'GameError' is not defined
+2024-12-23 21:43:30 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:43:30 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:43:30 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:43:30 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:43:30 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:43:30 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:43:30 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:43:30 | ERROR    | api.app:initialize_game:606 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:43:30 | ERROR    | api.app:global_exception_handler:660 - Global exception: name 'GameError' is not defined
+2024-12-23 21:44:48 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-23 21:44:48 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 21:44:48 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 21:44:48 | ERROR    | managers.workflow_manager:execute_workflow:257 - Error executing workflow: %s
+2024-12-23 21:44:48 | ERROR    | managers.agent_manager:initialize_game:369 - Error executing initial workflow: %s
+2024-12-23 21:44:48 | ERROR    | managers.agent_manager:initialize_game:376 - Error initializing game session %s: %s
+2024-12-23 21:44:48 | ERROR    | managers.agent_manager:initialize_game:377 - Stack trace:
+2024-12-23 21:44:48 | ERROR    | api.app:initialize_game:606 - Error during game initialization: Failed to initialize game session: Failed to execute initial workflow: Workflow execution failed: 'GameState' object has no attribute 'state'
+2024-12-23 21:44:48 | ERROR    | api.app:global_exception_handler:660 - Global exception: name 'GameError' is not defined
+2024-12-23 21:46:26 | ERROR    | managers.agent_manager:initialize_game:349 - Error initializing workflow: 'WorkflowManager' object has no attribute 'initialize_workflow'
+2024-12-23 21:46:26 | ERROR    | managers.agent_manager:initialize_game:365 - Error during game initialization: 'WorkflowManager' object has no attribute 'initialize_workflow'
+2024-12-23 21:46:26 | ERROR    | api.app:initialize_game:609 - Error during game initialization: Failed to initialize game: 'WorkflowManager' object has no attribute 'initialize_workflow'
+2024-12-23 21:46:26 | ERROR    | api.app:global_exception_handler:663 - Global exception: name 'GameError' is not defined
+2024-12-23 22:00:26 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 22:00:26 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 22:00:26 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 22:00:26 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 22:00:26 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:00:26 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:00:26 | ERROR    | api.app:initialize_game:609 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:00:26 | ERROR    | api.app:global_exception_handler:663 - Global exception: name 'GameError' is not defined
+2024-12-23 22:04:53 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 22:04:53 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 22:04:53 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 22:04:53 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 22:04:53 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:04:53 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:04:53 | ERROR    | api.app:initialize_game:609 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:04:53 | ERROR    | api.app:global_exception_handler:663 - Global exception: name 'GameError' is not defined
+2024-12-23 22:28:08 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 22:28:08 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 22:28:08 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 22:28:08 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 22:28:08 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:28:08 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:28:08 | ERROR    | api.app:initialize_game:609 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:28:08 | ERROR    | api.app:global_exception_handler:663 - Global exception: name 'GameError' is not defined
+2024-12-23 22:32:37 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:33:22 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:34:00 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:35:10 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:36:01 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:36:14 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:36:20 | ERROR    | logging:callHandlers:1736 - http://localhost:9000 is not an accepted origin. (further occurrences of this error will be logged with level INFO)
+2024-12-23 22:50:05 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 22:50:05 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 22:50:05 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 22:50:05 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 22:50:05 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:50:05 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:50:05 | ERROR    | api.app:initialize_game:612 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:50:05 | ERROR    | api.app:initialize_game:622 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:51:10 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 22:51:10 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 22:51:10 | ERROR    | agents.story_graph:_process_narrative:169 - Error processing narrative: %s
+2024-12-23 22:51:10 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 22:51:10 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:51:10 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:51:10 | ERROR    | api.app:initialize_game:612 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 22:51:10 | ERROR    | api.app:initialize_game:622 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: 'GameState' object has no attribute 'state'
+2024-12-23 23:02:40 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-23 23:02:40 | ERROR    | agents.story_graph:_process_rules:149 - Error processing rules: %s
+2024-12-23 23:02:40 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-23 23:02:40 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: Branch did not return a valid destination
+2024-12-23 23:02:40 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-23 23:02:40 | ERROR    | api.app:initialize_game:612 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-23 23:02:40 | ERROR    | api.app:initialize_game:622 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-23 23:14:40 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:15:12 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:15:38 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:18:26 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:19:50 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:25:04 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:25:36 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:32:18 | ERROR    | logging:callHandlers:1736 - [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] une seule utilisation de chaque adresse de socket (protocole/adresse réseau/port) est habituellement autorisée
+2024-12-23 23:32:18 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'AgentManager' object has no attribute 'cleanup'
+2024-12-23 23:32:18 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.cleanup()
+          ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentManager' object has no attribute 'cleanup'
+
+2024-12-23 23:32:18 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 00:20:32 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'AgentManager' object has no attribute 'cleanup'
+2024-12-24 00:26:16 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-24 00:26:22 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-24 00:26:22 | ERROR    | managers.agent_manager:initialize_game:361 - Error executing initial workflow: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 00:26:22 | ERROR    | managers.agent_manager:initialize_game:368 - Error during game initialization: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 00:26:22 | ERROR    | api.app:initialize_game:652 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 00:26:22 | ERROR    | api.app:initialize_game:662 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 00:35:46 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 707, in run_until_complete
+    self.run_forever()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 678, in run_forever
+    self._run_once()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 2033, in _run_once
+    handle._run()
+    ~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    with self.capture_signals():
+         ~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 148, in __exit__
+    next(self.gen)
+    ~~~~^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 330, in capture_signals
+    signal.raise_signal(captured_signal)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+2024-12-24 00:38:05 | ERROR    | managers.agent_manager:stop_game:523 - Error stopping game session: %s
+2024-12-24 00:38:05 | ERROR    | managers.agent_manager:stop_game:524 - Stack trace:
+2024-12-24 00:38:05 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'CacheManager' object has no attribute 'clear'
+2024-12-24 00:38:06 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.stop_game()
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\agent_manager.py", line 514, in stop_game
+    await self.cache_manager.clear()
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'CacheManager' object has no attribute 'clear'
+
+2024-12-24 00:38:06 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 00:38:58 | ERROR    | managers.agent_manager:stop_game:523 - Error stopping game session: %s
+2024-12-24 00:38:58 | ERROR    | managers.agent_manager:stop_game:524 - Stack trace:
+2024-12-24 00:38:58 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'CacheManager' object has no attribute 'clear'
+2024-12-24 00:38:58 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.stop_game()
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\agent_manager.py", line 514, in stop_game
+AttributeError: 'CacheManager' object has no attribute 'clear'
+
+2024-12-24 00:38:58 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 00:39:10 | ERROR    | managers.agent_manager:stop_game:512 - Error stopping game: 'Unknown namespace: game_state'
+2024-12-24 00:39:10 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'Unknown namespace: game_state'
+2024-12-24 00:39:10 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.stop_game()
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\agent_manager.py", line 507, in stop_game
+    await self.cache_manager.clear_namespace_cache('game_state')
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\cache_manager.py", line 183, in clear_namespace_cache
+KeyError: 'Unknown namespace: game_state'
+
+2024-12-24 00:39:10 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 00:40:22 | ERROR    | managers.agent_manager:stop_game:512 - Error stopping game: 'Unknown namespace: game_state'
+2024-12-24 00:40:22 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'Unknown namespace: game_state'
+2024-12-24 00:40:22 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.stop_game()
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\agent_manager.py", line 507, in stop_game
+    logger.info("Game stopped successfully")
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\cache_manager.py", line 191, in clear_namespace_cache
+    raise KeyError(f"Unknown namespace: {namespace}")
+KeyError: 'Unknown namespace: game_state'
+
+2024-12-24 00:40:22 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 01:03:56 | ERROR    | managers.agent_manager:stop_game:521 - Error stopping game: 'AgentManager' object has no attribute 'get_state'
+2024-12-24 01:03:56 | ERROR    | api.app:shutdown_event:134 - Failed to shutdown API: 'AgentManager' object has no attribute 'get_state'
+2024-12-24 01:03:56 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 693, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 146, in lifespan
+    await shutdown_event()
+  File "C:\Users\erpes\Desktop\casys-rpg\api\app.py", line 125, in shutdown_event
+    await _agent_manager.stop_game()
+  File "C:\Users\erpes\Desktop\casys-rpg\managers\agent_manager.py", line 514, in stop_game
+    yield state
+    
+AttributeError: 'AgentManager' object has no attribute 'get_state'
+
+2024-12-24 01:03:56 | ERROR    | logging:callHandlers:1736 - Application shutdown failed. Exiting.
+2024-12-24 01:11:20 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: %s
+2024-12-24 01:11:20 | ERROR    | managers.rules_manager:_markdown_to_rules:355 - Error parsing choices section: %s
+2024-12-24 01:11:26 | ERROR    | managers.workflow_manager:execute_workflow:267 - Error executing workflow: %s
+2024-12-24 01:11:26 | ERROR    | managers.agent_manager:initialize_game:394 - Error executing initial workflow: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 01:11:26 | ERROR    | managers.agent_manager:initialize_game:401 - Error during game initialization: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 01:11:26 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 01:11:26 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: 'GameStateInput' object has no attribute 'rules'
+2024-12-24 01:15:27 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 707, in run_until_complete
+    self.run_forever()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 678, in run_forever
+    self._run_once()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 2033, in _run_once
+    handle._run()
+    ~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    with self.capture_signals():
+         ~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 148, in __exit__
+    next(self.gen)
+    ~~~~^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 330, in capture_signals
+    signal.raise_signal(captured_signal)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+2024-12-24 01:17:36 | ERROR    | managers.workflow_manager:start_workflow:303 - Error in start node: %s
+2024-12-24 01:17:37 | ERROR    | agents.story_graph:route_after_parallel:93 - Expected GameState but got %s
+2024-12-24 01:17:37 | ERROR    | managers.workflow_manager:execute_workflow:277 - Error executing workflow: %s
+2024-12-24 01:17:37 | ERROR    | managers.agent_manager:initialize_game:394 - Error executing initial workflow: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:17:37 | ERROR    | managers.agent_manager:initialize_game:401 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:17:37 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:17:37 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:29:02 | ERROR    | managers.workflow_manager:start_workflow:303 - Error in start node: %s
+2024-12-24 01:29:03 | ERROR    | agents.story_graph:route_after_parallel:93 - Expected GameState but got '%s'
+2024-12-24 01:29:03 | ERROR    | managers.workflow_manager:execute_workflow:277 - Error executing workflow: %s
+2024-12-24 01:29:03 | ERROR    | managers.agent_manager:initialize_game:394 - Error executing initial workflow: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:29:03 | ERROR    | managers.agent_manager:initialize_game:401 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:29:03 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:29:03 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 01:31:42 | ERROR    | api.app:initialize_game:668 - Error during game initialization: AgentManager.initialize_game() got an unexpected keyword argument 'session_id'
+2024-12-24 01:31:42 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: AgentManager.initialize_game() got an unexpected keyword argument 'session_id'
+2024-12-24 01:32:38 | ERROR    | managers.agent_manager:initialize_game:358 - Error during game initialization: %s
+2024-12-24 01:32:38 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: StateManager.create_initial_state() got an unexpected keyword argument 'session_id'
+2024-12-24 01:32:38 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: StateManager.create_initial_state() got an unexpected keyword argument 'session_id'
+2024-12-24 01:32:49 | ERROR    | managers.state_manager:create_initial_state:282 - Failed to create initial state: %s
+2024-12-24 01:32:49 | ERROR    | managers.agent_manager:initialize_game:358 - Error during game initialization: %s
+2024-12-24 01:32:49 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to create initial state: 1 validation error for GameState
+source
+  Input should be 'raw', 'processed' or 'error' [type=enum, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.10/v/enum
+2024-12-24 01:32:49 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to create initial state: 1 validation error for GameState
+source
+  Input should be 'raw', 'processed' or 'error' [type=enum, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.10/v/enum
+2024-12-24 01:42:16 | ERROR    | managers.agent_manager:initialize_game:364 - Error during game initialization: %s
+2024-12-24 01:42:16 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: WorkflowManager.execute_workflow() got an unexpected keyword argument 'story_graph'
+2024-12-24 01:42:16 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: WorkflowManager.execute_workflow() got an unexpected keyword argument 'story_graph'
+2024-12-24 01:44:01 | ERROR    | managers.agent_manager:initialize_game:364 - Error during game initialization: WorkflowManager.execute_workflow() got an unexpected keyword argument 'story_graph'
+2024-12-24 01:44:01 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: WorkflowManager.execute_workflow() got an unexpected keyword argument 'story_graph'
+2024-12-24 01:44:01 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: WorkflowManager.execute_workflow() got an unexpected keyword argument 'story_graph'
+2024-12-24 01:57:54 | ERROR    | managers.workflow_manager:execute_workflow:262 - Error executing workflow: %s
+2024-12-24 01:57:54 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: 'CompiledStateGraph' object has no attribute 'arun'
+2024-12-24 01:57:54 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: 'CompiledStateGraph' object has no attribute 'arun'
+2024-12-24 01:57:54 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: 'CompiledStateGraph' object has no attribute 'arun'
+2024-12-24 02:00:24 | ERROR    | managers.workflow_manager:start_workflow:285 - Error in start node: %s
+2024-12-24 02:00:26 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameState but got %s
+2024-12-24 02:00:26 | ERROR    | managers.workflow_manager:execute_workflow:259 - Error executing workflow: %s
+2024-12-24 02:00:26 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:00:26 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:00:26 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:03:56 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: StateManager.create_initial_state() missing 1 required positional argument: 'session_id'
+2024-12-24 02:03:56 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameState but got %s
+2024-12-24 02:03:57 | ERROR    | managers.workflow_manager:execute_workflow:259 - Error executing workflow: %s
+2024-12-24 02:03:57 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:03:57 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:03:57 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:09:47 | ERROR    | managers.workflow_manager:start_workflow:293 - Error in start node: StateManager.create_initial_state() missing 1 required positional argument: 'session_id'
+2024-12-24 02:09:47 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameState but got %s
+2024-12-24 02:09:48 | ERROR    | managers.workflow_manager:execute_workflow:259 - Error executing workflow: %s
+2024-12-24 02:09:48 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:09:48 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:09:48 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:11:18 | ERROR    | managers.state_manager:create_initial_state:282 - Failed to create initial state: %s
+2024-12-24 02:11:18 | ERROR    | managers.workflow_manager:start_workflow:298 - Error in start node: Failed to create initial state: models.game_state.GameState() got multiple values for keyword argument 'source'
+2024-12-24 02:11:18 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:11:18 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:11:18 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:11:18 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:11:18 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:16:08 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:16:08 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:16:08 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:16:08 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:16:08 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:23:24 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:23:24 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:23:24 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:23:24 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:23:24 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:25:38 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:25:38 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:25:38 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:25:38 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:25:38 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:26:17 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:26:17 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:26:17 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:26:17 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:26:17 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:27:31 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:27:31 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:27:31 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:27:31 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:27:31 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:29:20 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:29:20 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:29:20 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:29:20 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:29:20 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:33:23 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:33:23 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:33:23 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:33:23 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:33:23 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:35:57 | ERROR    | logging:callHandlers:1736 - Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 707, in run_until_complete
+    self.run_forever()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 678, in run_forever
+    self._run_once()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 2033, in _run_once
+    handle._run()
+    ~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    with self.capture_signals():
+         ~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\contextlib.py", line 148, in __exit__
+    next(self.gen)
+    ~~~~^^^^^^^^^^
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\server.py", line 330, in capture_signals
+    signal.raise_signal(captured_signal)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\starlette\routing.py", line 700, in lifespan
+    await receive()
+  File "C:\Users\erpes\Desktop\casys-rpg\.venv\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.496.0_x64__qbz5n2kfra8p0\Lib\asyncio\queues.py", line 186, in get
+    await getter
+asyncio.exceptions.CancelledError
+
+2024-12-24 02:58:09 | ERROR    | agents.story_graph:_route_after_parallel:195 - Expected GameStateOutput but got GameStateInput
+2024-12-24 02:58:09 | ERROR    | managers.workflow_manager:execute_workflow:260 - Error executing workflow: %s
+2024-12-24 02:58:09 | ERROR    | managers.agent_manager:initialize_game:369 - Error during game initialization: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:58:09 | ERROR    | api.app:initialize_game:668 - Error during game initialization: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
+2024-12-24 02:58:09 | ERROR    | api.app:initialize_game:678 - Game error during initialization: Game initialization failed: Failed to initialize game: Failed to execute workflow: Branch did not return a valid destination
