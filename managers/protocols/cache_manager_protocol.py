@@ -2,18 +2,60 @@
 Cache Manager Protocol
 Defines the interface for caching operations.
 """
-from typing import Protocol, Optional, Any, Dict, runtime_checkable
-from .base_protocols import CacheProtocol
+from typing import Optional, Any, Dict, Protocol, runtime_checkable, Type, TypeVar
+from pydantic import BaseModel
+
+T = TypeVar('T', bound=BaseModel)
 
 @runtime_checkable
-class CacheManagerProtocol(CacheProtocol):
+class CacheManagerProtocol(Protocol):
     """Protocol defining the interface for caching operations."""
     
-    def initialize(self) -> None:
-        """Initialize the cache manager."""
+    async def save_cached_data(self, key: str, namespace: str, data: Any) -> None:
+        """
+        Save data to both cache and persistent storage.
+        
+        Args:
+            key: Unique identifier for the data
+            namespace: Namespace for organizing data
+            data: Data to save (can be any serializable type)
+        
+        Raises:
+            KeyError: If namespace is unknown
+            Exception: If save operation fails
+        """
         ...
     
-    async def save_cached_content(self, key: str, namespace: str, data: Any) -> bool:
+    async def get_cached_data(self, key: str, namespace: str, model_type: Optional[Type[T]] = None) -> Optional[Any]:
+        """
+        Get data from cache or persistent storage.
+        
+        Args:
+            key: Unique identifier for the data
+            namespace: Namespace for organizing data
+            model_type: Optional Pydantic model type for deserialization
+            
+        Returns:
+            Optional[Any]: Retrieved data, or None if not found
+            
+        Raises:
+            KeyError: If namespace is unknown
+        """
+        ...
+    
+    async def clear_namespace_cache(self, namespace: str) -> None:
+        """
+        Clear all cached data for a specific namespace.
+        
+        Args:
+            namespace: Namespace to clear
+            
+        Raises:
+            KeyError: If namespace is unknown
+        """
+        ...
+    
+    async def save_cached_content(self, key: str, namespace: str, data: Any) -> None:
         """
         Save content to cache.
         
@@ -22,8 +64,9 @@ class CacheManagerProtocol(CacheProtocol):
             namespace: Cache namespace
             data: Data to cache
             
-        Returns:
-            bool: True if save was successful
+        Raises:
+            KeyError: If namespace is unknown
+            Exception: If save operation fails
         """
         ...
     
@@ -37,27 +80,25 @@ class CacheManagerProtocol(CacheProtocol):
             
         Returns:
             Optional[Any]: Cached content if found
+            
+        Raises:
+            KeyError: If namespace is unknown
         """
         ...
     
-    async def get_cached_content(self, key: str) -> Optional[str]:
-        """Get cached content by key."""
-        ...
-    
-    async def save_cached_content(self, key: str, content: str) -> bool:
-        """Save content to cache."""
-        ...
-    
-    def exists_raw_content(self, section_number: int, namespace: str) -> bool:
+    async def exists_raw_content(self, key: str, namespace: str) -> bool:
         """
-        Check if raw content exists.
+        Check if raw content exists in cache or storage.
         
         Args:
-            section_number: Section number to check
-            namespace: Namespace to check in
+            key: Unique identifier for the content
+            namespace: Namespace for organizing data
             
         Returns:
-            bool: True if exists
+            bool: True if content exists, False otherwise
+            
+        Raises:
+            KeyError: If namespace is unknown
         """
         ...
     
@@ -71,14 +112,13 @@ class CacheManagerProtocol(CacheProtocol):
             
         Returns:
             Optional[str]: Raw content if found
+            
+        Raises:
+            KeyError: If namespace is unknown
         """
         ...
     
-    async def load_raw_content(self, key: str) -> Optional[str]:
-        """Load raw content by key."""
-        ...
-    
-    async def delete_cached_content(self, key: str, namespace: str) -> bool:
+    async def delete_cached_content(self, key: str, namespace: str) -> None:
         """
         Delete content from cache.
         
@@ -86,23 +126,7 @@ class CacheManagerProtocol(CacheProtocol):
             key: Cache key
             namespace: Cache namespace
             
-        Returns:
-            bool: True if delete was successful
+        Raises:
+            KeyError: If namespace is unknown
         """
-        ...
-    
-    async def clear_namespace(self, namespace: str) -> bool:
-        """
-        Clear all content in a namespace.
-        
-        Args:
-            namespace: Cache namespace to clear
-            
-        Returns:
-            bool: True if clear was successful
-        """
-        ...
-    
-    def clear_cache(self) -> None:
-        """Clear all cached content."""
         ...

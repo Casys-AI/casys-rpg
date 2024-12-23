@@ -3,10 +3,11 @@ Trace Agent Module
 Handles game state tracking and analysis.
 """
 
-from typing import Dict, Any, Optional, AsyncGenerator
+from typing import Dict, Any, Optional, AsyncGenerator, Union
 from datetime import datetime
 import logging
 from pathlib import Path
+from pydantic import Field
 from models.game_state import GameState
 from models.trace_model import TraceModel
 from models.character_model import CharacterModel
@@ -16,19 +17,15 @@ from managers.protocols.trace_manager_protocol import TraceManagerProtocol
 from agents.protocols import TraceAgentProtocol
 from models.errors_model import TraceError
 
-class TraceAgent(BaseAgent, TraceAgentProtocol):
-    """
-    Handles game state tracking and analysis.
-    This agent is responsible for:
-    1. Recording and analyzing game state changes
-    2. Providing insights about player decisions
-    3. Tracking game progression
-    4. Generating feedback on player actions
-    """
+class TraceAgent(BaseAgent):
+    """Handles game state tracking and analysis."""
+    
+    config: TraceAgentConfig = Field(default_factory=TraceAgentConfig)
     
     def __init__(self, config: TraceAgentConfig, trace_manager: TraceManagerProtocol):
         """Initialize TraceAgent with configuration and manager."""
         super().__init__(config=config)
+        self.config = config
         self.trace_manager = trace_manager
         self.logger = logging.getLogger(__name__)
 
@@ -121,3 +118,6 @@ class TraceAgent(BaseAgent, TraceAgentProtocol):
         except Exception as e:
             self.logger.error(f"Error in TraceAgent.ainvoke: {e}")
             yield {"error": str(e)}
+
+# Add runtime type checking for protocol
+TraceAgentProtocol.register(TraceAgent)

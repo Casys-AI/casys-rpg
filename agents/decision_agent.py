@@ -4,26 +4,26 @@ Agent responsable des décisions.
 from typing import Dict, Optional, Any, List, AsyncGenerator, Union
 import json
 from langchain.schema.runnable import RunnableSerializable
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import Field
 from models.game_state import GameState
 from models.decision_model import DecisionModel, AnalysisResult
 from models.rules_model import RulesModel
 from models.errors_model import DecisionError
 from langchain_core.messages import HumanMessage, SystemMessage
-from agents.rules_agent import RulesAgent
 from agents.base_agent import BaseAgent
+from agents.protocols.rules_agent_protocol import RulesAgentProtocol
 from config.agents.decision_agent_config import DecisionAgentConfig as DecisionConfig
 from config.logging_config import get_logger
 from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
 from agents.protocols import DecisionAgentProtocol
 
 # Type pour les agents de règles (réel ou mock)
-RulesAgentType = Union[RulesAgent, Any]
+RulesAgentType = Union[RulesAgentProtocol, Any]
 
-class DecisionAgent(BaseAgent, DecisionAgentProtocol):
+class DecisionAgent(BaseAgent):
     """Agent responsable des décisions."""
     
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    config: DecisionConfig = Field(default_factory=DecisionConfig)
     
     def __init__(self, config: DecisionConfig, decision_manager: DecisionManagerProtocol):
         """
@@ -303,3 +303,5 @@ class DecisionAgent(BaseAgent, DecisionAgentProtocol):
         except Exception as e:
             self._logger.error(f"[DecisionAgent] Error during invocation: {e}")
             yield {"error": f"Error during invocation: {str(e)}"}
+
+DecisionAgentProtocol.register(DecisionAgent)

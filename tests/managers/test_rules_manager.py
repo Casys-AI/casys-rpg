@@ -6,7 +6,7 @@ from datetime import datetime
 
 from managers.rules_manager import RulesManager
 from config.storage_config import StorageConfig
-from models.rules_model import RulesModel, DiceType, SourceType
+from models.rules_model import RulesModel, DiceType, SourceType, Choice, ChoiceType
 from models.errors_model import RulesError
 
 @pytest.fixture
@@ -31,7 +31,24 @@ async def rules_manager(config, mock_cache_manager):
     return manager
 
 @pytest.fixture
-def sample_rules_model():
+def sample_choices():
+    """Create sample choices."""
+    return [
+        Choice(
+            text="Choice 1",
+            type=ChoiceType.DIRECT,
+            target_section=2
+        ),
+        Choice(
+            text="Choice 2",
+            type=ChoiceType.CONDITIONAL,
+            target_section=3,
+            conditions=["has_sword", "health > 10"]
+        )
+    ]
+
+@pytest.fixture
+def sample_rules_model(sample_choices):
     """Create a sample rules model."""
     return RulesModel(
         section_number=1,
@@ -43,16 +60,16 @@ def sample_rules_model():
         needs_user_response=True,
         next_action="user_first",
         conditions=["condition1", "condition2"],
-        next_sections=[2, 3],
-        choices=["choice1", "choice2"],
+        choices=sample_choices,
         rules_summary="Test rules summary",
         error=None
     )
 
 @pytest.fixture
 def sample_rules_markdown():
-    """Create a sample rules markdown."""
-    return """# Rules for Section 1
+    """Create sample rules markdown."""
+    return """
+# Rules for Section 1
 
 ## Metadata
 - Last Update: 2024-12-22T12:00:00
@@ -67,6 +84,10 @@ def sample_rules_markdown():
 - Conditions: condition1, condition2
 - Next Sections: 2, 3
 - Choices: choice1, choice2
+
+## Choices
+1. Choice 1
+2. Choice 2 if has sword and health > 10
 
 ## Summary
 Test rules summary
@@ -118,6 +139,13 @@ async def test_get_existing_rules(rules_manager, mock_cache_manager, sample_rule
     assert isinstance(result, RulesModel)
     assert result.section_number == 1
     assert result.source_type == SourceType.RAW
+    assert len(result.choices) == 2
+    assert result.choices[0].type == ChoiceType.DIRECT
+    assert result.choices[1].type == ChoiceType.CONDITIONAL
+    
+    # Verify cache calls
+    mock_cache_manager.exists_raw_content.assert_called_once()
+    mock_cache_manager.get_cached_content.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_save_rules(rules_manager, mock_cache_manager, sample_rules_model):
@@ -148,3 +176,5 @@ def test_markdown_conversion(rules_manager, sample_rules_model, sample_rules_mar
     assert len(rules.conditions) == 2
     assert len(rules.next_sections) == 2
     assert len(rules.choices) == 2
+    assert rules.choices[0].type == ChoiceType.DIRECT
+    assert rules.choices[1].type == ChoiceType.CONDITIONAL

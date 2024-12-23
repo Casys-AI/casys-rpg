@@ -3,10 +3,11 @@ Decision Agent Protocol Module
 Defines the interface for the Decision Agent
 """
 
-from typing import Dict, Optional, List, Protocol, AsyncGenerator
+from typing import Dict, List, Protocol, runtime_checkable
 from models.game_state import GameState
 from agents.protocols.base_agent_protocol import BaseAgentProtocol
 
+@runtime_checkable
 class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol defining the interface for the Decision Agent."""
     
@@ -32,29 +33,5 @@ class DecisionAgentProtocol(BaseAgentProtocol, Protocol):
             
         Returns:
             bool: True if choice is valid
-        """
-        ...
-        
-    async def format_response(self, response: str) -> str:
-        """
-        Format agent response for display.
-        
-        Args:
-            response: Raw response to format
-            
-        Returns:
-            str: Formatted response
-        """
-        ...
-
-    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
-        """
-        Asynchronous invocation interface.
-        
-        Args:
-            input_data: Input data containing game state and user choice
-            
-        Yields:
-            Dict: Decision processing results
         """
         ...

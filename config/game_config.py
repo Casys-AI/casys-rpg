@@ -1,6 +1,6 @@
 """Game configuration module."""
 from typing import Dict, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
 from config.game_constants import (
@@ -18,6 +18,7 @@ from config.agents.narrator_agent_config import NarratorAgentConfig
 from config.agents.rules_agent_config import RulesAgentConfig
 from config.agents.decision_agent_config import DecisionAgentConfig
 from config.agents.trace_agent_config import TraceAgentConfig
+from config.agents.agent_config_base import AgentConfigBase
 
 @dataclass
 class AgentConfigs:
@@ -26,6 +27,7 @@ class AgentConfigs:
     rules_config: RulesAgentConfig
     decision_config: DecisionAgentConfig
     trace_config: TraceAgentConfig
+    story_graph_config: AgentConfigBase = field(default_factory=AgentConfigBase)
 
 @dataclass
 class ManagerConfigs:

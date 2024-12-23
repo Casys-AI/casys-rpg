@@ -1,6 +1,6 @@
 """
 Base Agent Protocol Module
-Defines the comprehensive interface for all game agents.
+Defines the base protocol for all game agents.
 """
 
 from typing import Dict, Optional, AsyncGenerator, Protocol, Any, runtime_checkable
@@ -8,7 +8,7 @@ from models.game_state import GameState
 
 @runtime_checkable
 class BaseAgentProtocol(Protocol):
-    """Protocol defining the comprehensive interface for all agents."""
+    """Protocol defining the common interface for all agents."""
     
     def initialize(self) -> None:
         """Initialize the agent."""
@@ -80,4 +80,16 @@ class BaseAgentProtocol(Protocol):
         Args:
             config_updates: Dictionary of configuration updates
         """
+        ...
+
+    def get_agent_id(self) -> str:
+        """Get unique agent identifier."""
+        ...
+    
+    def get_agent_type(self) -> str:
+        """Get agent type identifier."""
+        ...
+    
+    def get_agent_config(self) -> Dict[str, Any]:
+        """Get agent configuration."""
         ...

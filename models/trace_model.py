@@ -1,8 +1,8 @@
 """Models for the trace agent."""
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Annotated
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from models.character_model import CharacterModel
 from models.narrator_model import NarratorModel
@@ -18,45 +18,67 @@ class ActionType(str, Enum):
 
 class TraceAction(BaseModel):
     """A single action in the game trace."""
-    timestamp: datetime = Field(default_factory=datetime.now)
-    section: int
-    action_type: ActionType
-    details: Dict[str, Any] = Field(default_factory=dict)
-    
-    @field_validator('section')
-    def validate_section(cls, v):
-        if v < 1:
-            raise ValueError("Section must be positive")
-        return v
-    
-    @field_validator('action_type')
-    def validate_action_type(cls, v):
-        if not v.strip():
-            raise ValueError("Action type cannot be empty")
-        return v
+    model_config = ConfigDict(frozen=True)  # Immutable model for better safety
+
+    timestamp: datetime = Field(
+        default_factory=datetime.now,
+        description="When the action occurred"
+    )
+    section: Annotated[int, Field(gt=0, description="Section number must be positive")]
+    action_type: ActionType = Field(description="Type of action performed")
+    details: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional details about the action"
+    )
+
+    @model_validator(mode='after')
+    def validate_action_details(self) -> 'TraceAction':
+        """Validate that the details are consistent with the action type.
+        
+        Returns:
+            TraceAction: The validated action
+            
+        Raises:
+            ValueError: If the details are invalid for the action type
+        """
+        if self.action_type == ActionType.DICE_ROLL and 'roll_result' not in self.details:
+            raise ValueError("Dice roll actions must include 'roll_result' in details")
+        if self.action_type == ActionType.USER_INPUT and 'input' not in self.details:
+            raise ValueError("User input actions must include 'input' in details")
+        return self
 
 class TraceModel(BaseModel):
     """Current state of the game trace."""
-    session_id: str = Field(default="", description="Unique session identifier")
-    section_number: int = 0
-    history: List[TraceAction] = Field(default_factory=list)
+    model_config = ConfigDict(validate_assignment=True)  # Validate on attribute assignment
+
+    game_id: str = Field(description="Unique game identifier")
+    session_id: Annotated[str, Field(min_length=1, description="Unique session identifier")]
+    section_number: Annotated[int, Field(ge=0, description="Current section number")] = 0
+    history: List[TraceAction] = Field(
+        default_factory=list,
+        description="History of all actions in this session"
+    )
     current_section: Optional[NarratorModel] = None
     current_rules: Optional[RulesModel] = None
     character: Optional[CharacterModel] = None
     error: Optional[str] = None
-    
-    @field_validator('section_number')
-    def validate_section_number(cls, v):
-        if v < 0:
-            raise ValueError("Section number cannot be negative")
-        return v
-    
-    @field_validator('session_id')
-    def validate_session_id(cls, v):
-        if not v.strip():
-            raise ValueError("Session ID cannot be empty")
-        return v
+
+    @model_validator(mode='after')
+    def validate_model_consistency(self) -> 'TraceModel':
+        """Validate that the model state is consistent.
         
+        Returns:
+            TraceModel: The validated model
+            
+        Raises:
+            ValueError: If the model state is inconsistent
+        """
+        if self.error and (self.current_section or self.current_rules):
+            raise ValueError("Error state cannot have current section or rules")
+        if bool(self.current_section) != bool(self.current_rules):
+            raise ValueError("Current section and rules must both be set or both be None")
+        return self
+
     def add_action(self, action: Dict[str, Any]):
         """Add a new action to the trace history.
 
@@ -69,16 +91,15 @@ class TraceModel(BaseModel):
         Example:
             ```python
             trace.add_action({
-                "section": 1,
-                "action_type": ActionType.USER_INPUT,
-                "details": {"input": "go north"}
+                'section': 1,
+                'action_type': ActionType.DICE_ROLL,
+                'details': {'roll_result': 6}
             })
             ```
         """
-        if not isinstance(action, TraceAction):
-            action = TraceAction(**action)
-        self.history.append(action)
-    
+        action['timestamp'] = datetime.now()
+        self.history.append(TraceAction(**action))
+
     def update_character(self, character: CharacterModel):
         """Update the character state in the trace model.
 

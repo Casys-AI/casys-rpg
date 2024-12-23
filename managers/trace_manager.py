@@ -3,18 +3,21 @@ Trace Manager Module
 Manages game trace persistence and history.
 """
 
-from typing import Dict, Optional, Any, List
+# Standard library imports
 from datetime import datetime
-import logging
-import json
 from pathlib import Path
+from typing import Dict, Optional, Any, List
+import json
+import logging
+import uuid
 
+# Local imports
+from config.storage_config import StorageConfig
+from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from managers.protocols.trace_manager_protocol import TraceManagerProtocol
+from models.errors_model import TraceError
 from models.game_state import GameState
 from models.trace_model import TraceModel, TraceAction, ActionType
-from config.storage_config import StorageConfig
-from managers.protocols.trace_manager_protocol import TraceManagerProtocol
-from managers.protocols.cache_manager_protocol import CacheManagerProtocol
-from models.errors_model import TraceError
 
 class TraceManager(TraceManagerProtocol):
     """Manages game traces and history."""
@@ -25,20 +28,28 @@ class TraceManager(TraceManagerProtocol):
         self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
         self._current_trace = None
+        self._current_game_id = None
 
     async def start_session(self) -> None:
         """Start a new game session."""
+        session_id = str(datetime.now().timestamp())
+        self._current_game_id = str(uuid.uuid4())
+        
         self._current_trace = TraceModel(
-            session_id=str(datetime.now().timestamp()),
+            game_id=self._current_game_id,
+            session_id=session_id,
             start_time=datetime.now(),
             history=[]
         )
+        
         # Save only the current trace, not in history yet
         await self.cache.save_cached_content(
             key=self._current_trace.session_id,
             namespace="trace",
             data=self._current_trace.model_dump()
         )
+        
+        self.logger.info(f"Started new session {session_id} for game {self._current_game_id}")
 
     async def process_trace(self, state: GameState, action: Dict[str, Any]) -> None:
         """Process and store a game trace."""

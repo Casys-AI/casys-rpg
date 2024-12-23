@@ -6,7 +6,7 @@ Handles game workflow and state transitions.
 import logging
 from typing import Dict, Optional, Any, AsyncGenerator
 from datetime import datetime
-from pydantic import ConfigDict, BaseModel
+from pydantic import Field
 from langchain.schema.runnable import RunnableSerializable
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import StateGraph, START, END
@@ -18,9 +18,10 @@ from agents.protocols import (
     NarratorAgentProtocol,
     RulesAgentProtocol,
     DecisionAgentProtocol,
-    TraceAgentProtocol
+    TraceAgentProtocol,
+    StoryGraphProtocol
 )
-from managers.protocols import StateManagerProtocol
+from managers.protocols.state_manager_protocol import StateManagerProtocol
 from config.agents.agent_config_base import AgentConfigBase
 from models.errors_model import GameError, RulesError, StateError, NarratorError, DecisionError, TraceError
 from models.trace_model import ActionType
@@ -30,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 class StoryGraph(BaseAgent):
     """Manages the game workflow and state transitions."""
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    config: AgentConfigBase
+    model_config = Field(arbitrary_types_allowed=True)
+    config: AgentConfigBase = Field(default_factory=AgentConfigBase)
     state_manager: StateManagerProtocol
     narrator_agent: NarratorAgentProtocol
     rules_agent: RulesAgentProtocol
@@ -508,3 +509,6 @@ class StoryGraph(BaseAgent):
         except Exception as e:
             logger.error(f"Error in workflow processing: {e}")
             yield await self.state_manager.create_error_state(str(e))
+
+# Add runtime type checking for protocol
+StoryGraphProtocol.register(StoryGraph)

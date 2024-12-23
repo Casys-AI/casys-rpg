@@ -1,5 +1,5 @@
 """
-Protocol for the AgentManager component.
+Agent Manager Protocol
 Defines the interface that any AgentManager implementation must follow.
 """
 
@@ -10,15 +10,10 @@ from config.game_config import GameConfig
 @runtime_checkable
 class AgentManagerProtocol(Protocol):
     """High-level coordinator for game interactions.
-    Responsible for:
-    1. Managing user interactions and requests
-    2. Coordinating game state and progression
-    3. Error handling and feedback
-    4. Session management
-    """
+    Responsible for managing agent interactions and game flow."""
     
-    def __init__(self, game_config: GameConfig) -> None:
-        """Initialize with game configuration."""
+    async def initialize(self, config: GameConfig) -> None:
+        """Initialize the agent manager with configuration."""
         ...
         
     async def initialize_game(self) -> None:
@@ -54,7 +49,7 @@ class AgentManagerProtocol(Protocol):
         Process a user's response or decision.
         
         Args:
-            response: The user's input or decision
+            response: The user's response or decision
             
         Returns:
             GameState: Updated game state after processing the response

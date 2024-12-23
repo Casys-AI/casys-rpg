@@ -6,7 +6,7 @@ Centralized configuration for all storage-related settings.
 from enum import Enum
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 class StorageFormat(str, Enum):
     """Storage format for data."""
@@ -73,6 +73,7 @@ DEFAULT_NAMESPACES = {
 
 class StorageConfig(BaseModel):
     """Main storage configuration."""
+    # Base storage settings
     base_path: Path = Field(
         default=Path("./data"),
         description="Base path for all storage operations"
@@ -89,6 +90,30 @@ class StorageConfig(BaseModel):
         default=None,
         description="Current game ID for per-game namespaces"
     )
+    
+    # Manager settings from ManagerConfigBase
+    manager_id: str = Field(
+        default="",
+        description="Unique identifier for the manager"
+    )
+    persistence_enabled: bool = Field(
+        default=True,
+        description="Enable data persistence"
+    )
+    debug: bool = Field(
+        default=False,
+        description="Enable debug mode"
+    )
+    cache_enabled: bool = Field(
+        default=True,
+        description="Enable caching"
+    )
+    options: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional options"
+    )
+    
+    # Namespace configurations
     namespaces: Dict[str, NamespaceConfig] = Field(
         default_factory=lambda: DEFAULT_NAMESPACES.copy(),
         description="Configuration for each storage namespace"

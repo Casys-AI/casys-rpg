@@ -16,6 +16,13 @@ from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 
 T = TypeVar('T', bound=BaseModel)
 
+# Mapping of storage formats to file extensions
+_FORMAT_TO_EXTENSION = {
+    StorageFormat.JSON: ".json",
+    StorageFormat.MARKDOWN: ".md",
+    StorageFormat.RAW: ".raw"
+}
+
 def _json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, (datetime, timedelta)):
@@ -52,7 +59,7 @@ class CacheManager(CacheManagerProtocol):
     def _get_file_extension(self, namespace: str) -> str:
         """Get file extension for namespace."""
         format = self.config.namespaces[namespace].format
-        return f".{format.value}"
+        return _FORMAT_TO_EXTENSION[format]
 
     def _serialize_data(self, data: Any, namespace: str) -> str:
         """Serialize data according to namespace format."""
@@ -174,7 +181,7 @@ class CacheManager(CacheManagerProtocol):
         """Clear all cached data for a specific namespace."""
         if namespace not in self.config.namespaces:
             raise KeyError(f"Unknown namespace: {namespace}")
-            
+                
         # Clear memory cache
         prefix = f"{namespace}:"
         self._memory_cache = {
@@ -210,22 +217,30 @@ class CacheManager(CacheManagerProtocol):
             self.logger.error(f"Error getting content for {namespace}:{key}: {e}")
             return None
 
-    def exists_raw_content(self, section_number: int, namespace: str) -> bool:
+    async def exists_raw_content(self, key: str, namespace: str) -> bool:
         """
-        Check if raw content exists.
+        Check if raw content exists in cache or storage.
         
         Args:
-            section_number: Section number to check
-            namespace: Namespace to check in
+            key: Unique identifier for the content
+            namespace: Namespace for organizing data
             
         Returns:
-            bool: True if exists
+            bool: True if content exists, False otherwise
+            
+        Raises:
+            KeyError: If namespace is unknown
         """
         try:
-            raw_path = self.config.get_absolute_path(namespace) / f"{section_number}.md"
-            return raw_path.exists()
+            # Vérifier d'abord dans le cache
+            if await self.get_cached_data(key, namespace) is not None:
+                return True
+                
+            # Sinon vérifier dans le stockage
+            file_path = self.config.get_absolute_path(namespace) / f"{key}{self._get_file_extension(namespace)}"
+            return file_path.exists()
         except Exception as e:
-            self.logger.error(f"Error checking content {section_number} in {namespace}: {e}")
+            self.logger.error(f"Error checking content existence: {str(e)}")
             return False
 
     def load_raw_content(self, section_number: int, namespace: str) -> Optional[str]:

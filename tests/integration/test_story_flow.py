@@ -2,54 +2,88 @@
 import pytest
 import pytest_asyncio
 from datetime import datetime
+import shutil
+import os
 
 from agents.factories.game_factory import GameFactory
 from config.game_config import GameConfig
 from models.game_state import GameState
-from models.character_model import CharacterModel
+from models.character_model import CharacterModel, CharacterStats, Inventory, Item
 from models.rules_model import DiceType
 from models.errors_model import GameError
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_teardown():
+    """Setup and teardown for all tests."""
+    # Setup
+    os.makedirs("./test_data", exist_ok=True)
+    
+    yield
+    
+    # Teardown
+    shutil.rmtree("./test_data", ignore_errors=True)
 
 @pytest.fixture
 def game_config():
     """Create a test game configuration."""
-    return GameConfig.get_default_config(base_path="./test_data")
+    config = GameConfig.create_default()
+    # Update storage path for tests
+    config.manager_configs.storage_config.base_path = "./test_data"
+    return config
 
 @pytest_asyncio.fixture
 async def game_instance(game_config):
     """Create a test game instance."""
     factory = GameFactory(config=game_config)
-    game = factory.create_game()
-    await game.initialize()
-    return game
+    agents, managers = factory.create_game_components()
+    await agents.story_graph.initialize()
+    return agents.story_graph
 
 @pytest.fixture
-def sample_character():
+def sample_inventory():
+    """Create a sample inventory."""
+    inventory = Inventory()
+    inventory.items["Sword"] = Item(name="Sword", description="A sharp sword")
+    inventory.items["Shield"] = Item(name="Shield", description="A sturdy shield")
+    inventory.gold = 10
+    return inventory
+
+@pytest.fixture
+def sample_stats():
+    """Create sample character stats."""
+    return CharacterStats(
+        health=20,
+        max_health=20,
+        strength=10,
+        dexterity=10,
+        intelligence=10,
+        level=1,
+        experience=0
+    )
+
+@pytest.fixture
+def sample_character(sample_inventory, sample_stats):
     """Create a sample character."""
     return CharacterModel(
-        name="Test Hero",
-        skill=10,
-        stamina=20,
-        luck=7,
-        inventory=["Sword", "Shield"],
-        gold=10
+        stats=sample_stats,
+        inventory=sample_inventory
     )
 
 @pytest.mark.asyncio
 async def test_game_initialization(game_instance):
     """Test game initialization."""
-    assert game_instance.story_graph is not None
+    assert game_instance is not None
     assert game_instance.current_state is not None
     assert game_instance.current_state.section_number == 0
 
 @pytest.mark.asyncio
-async def test_basic_story_progression(game_instance):
+async def test_basic_story_progression(game_instance, sample_character):
     """Test basic story progression without combat."""
     # Create initial state
     state = GameState(
         section_number=1,
         player_input="go to section 2",
-        character=sample_character(),
+        character=sample_character,
         last_update=datetime.now()
     )
     
@@ -63,13 +97,13 @@ async def test_basic_story_progression(game_instance):
     assert result.character is not None
 
 @pytest.mark.asyncio
-async def test_combat_flow(game_instance):
+async def test_combat_flow(game_instance, sample_character):
     """Test story progression with combat."""
     # Create combat state
     state = GameState(
         section_number=1,
         player_input="fight monster",
-        character=sample_character(),
+        character=sample_character,
         needs_dice_roll=True,
         dice_type=DiceType.COMBAT,
         last_update=datetime.now()
@@ -81,16 +115,16 @@ async def test_combat_flow(game_instance):
     # Verify combat results
     assert isinstance(result, GameState)
     assert result.dice_rolls is not None
-    assert result.character.stamina != state.character.stamina  # Combat should affect stamina
+    assert result.character.stats.health != state.character.stats.health  # Combat should affect health
 
 @pytest.mark.asyncio
-async def test_invalid_choice(game_instance):
+async def test_invalid_choice(game_instance, sample_character):
     """Test handling of invalid choices."""
     # Create state with invalid choice
     state = GameState(
         section_number=1,
         player_input="invalid choice",
-        character=sample_character(),
+        character=sample_character,
         last_update=datetime.now()
     )
     
@@ -103,11 +137,22 @@ async def test_invalid_choice(game_instance):
     assert "invalid choice" in result.error.lower()
 
 @pytest.mark.asyncio
-async def test_character_death(game_instance):
+async def test_character_death(game_instance, sample_stats, sample_inventory):
     """Test handling of character death."""
-    # Create dying character
-    dying_character = sample_character()
-    dying_character.stamina = 1
+    # Create dying character with 1 health
+    dying_stats = CharacterStats(
+        health=1,
+        max_health=20,
+        strength=10,
+        dexterity=10,
+        intelligence=10,
+        level=1,
+        experience=0
+    )
+    dying_character = CharacterModel(
+        stats=dying_stats,
+        inventory=sample_inventory
+    )
     
     state = GameState(
         section_number=1,
@@ -123,17 +168,17 @@ async def test_character_death(game_instance):
     
     # Verify death handling
     assert isinstance(result, GameState)
-    assert result.character.stamina <= 0
+    assert result.character.stats.health <= 0
     assert result.game_over
 
 @pytest.mark.asyncio
-async def test_game_save_load(game_instance):
+async def test_game_save_load(game_instance, sample_character):
     """Test game state persistence."""
     # Create initial state
     initial_state = GameState(
         section_number=1,
         player_input="save game",
-        character=sample_character(),
+        character=sample_character,
         last_update=datetime.now()
     )
     
@@ -145,16 +190,16 @@ async def test_game_save_load(game_instance):
     loaded_state = await game_instance.load_game()
     assert loaded_state is not None
     assert loaded_state.section_number == initial_state.section_number
-    assert loaded_state.character.name == initial_state.character.name
+    assert loaded_state.character.stats.health == initial_state.character.stats.health
 
 @pytest.mark.asyncio
-async def test_full_story_sequence(game_instance):
+async def test_full_story_sequence(game_instance, sample_character):
     """Test a complete story sequence."""
     # Initial state
     state = GameState(
         section_number=1,
         player_input="start adventure",
-        character=sample_character(),
+        character=sample_character,
         last_update=datetime.now()
     )
     

@@ -5,6 +5,7 @@ Handles high-level game coordination and user interactions.
 
 from typing import Optional, AsyncGenerator, Dict, Any
 from models.game_state import GameState
+from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
 
 from agents.protocols.story_graph_protocol import StoryGraphProtocol
 from agents.protocols.narrator_agent_protocol import NarratorAgentProtocol
@@ -18,18 +19,18 @@ from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from managers.protocols.character_manager_protocol import CharacterManagerProtocol
 from managers.protocols.trace_manager_protocol import TraceManagerProtocol
 from managers.protocols.agent_manager_protocol import AgentManagerProtocol
+from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
 
-from config.managers.agent_manager_config import AgentManagerConfig
 from config.storage_config import StorageConfig
 
+from agents.base_agent import BaseAgent
 from managers.rules_manager import RulesManager
-from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-class AgentManager(AgentManagerProtocol):
+class AgentManager:
     """High-level coordinator for game interactions.
     Responsible for:
     1. Managing user interactions and requests
@@ -38,28 +39,65 @@ class AgentManager(AgentManagerProtocol):
     4. Session management
     """
     
-    def __init__(self, config: AgentManagerConfig):
-        """Initialize AgentManager with configuration.
+    def __init__(
+        self,
+        agents: 'GameAgents',
+        managers: 'GameManagers'
+    ) -> None:
+        """Initialize AgentManager with game components.
         
         Args:
-            config: Agent manager configuration containing all dependencies
+            agents: Container with all game agents
+            managers: Container with all game managers
         """
-        self.config = config  # Save config
-        self.narrator_agent: NarratorAgentProtocol = config.narrator_agent
-        self.rules_agent: RulesAgentProtocol = config.rules_agent
-        self.decision_agent: DecisionAgentProtocol = config.decision_agent
-        self.trace_agent: TraceAgentProtocol = config.trace_agent
-        self.state_manager: StateManagerProtocol = config.state_manager
-        self.cache_manager: CacheManagerProtocol = config.cache_manager
-        self.character_manager: CharacterManagerProtocol = config.character_manager
-        self.trace_manager: TraceManagerProtocol = config.trace_manager
-        self.rules_manager: RulesManagerProtocol = config.rules_manager
-        self.story_graph: Optional[StoryGraphProtocol] = None
+        self._agents = agents
+        self._managers = managers
         self.logger = logger
+        self.story_graph = None  # Will be initialized in initialize()
+
+    def get_agent(self, agent_type: str) -> BaseAgent:
+        """Get or create an agent instance.
         
-    def initialize(self):
-        """Initialize AgentManager and configure components."""
+        Args:
+            agent_type: Type of agent to get ('rules', 'narrator', etc.)
+            
+        Returns:
+            BaseAgent: Instance of the requested agent type
+        """
+        agent_map = {
+            'rules': self._agents.rules_agent,
+            'narrator': self._agents.narrator_agent,
+            'decision': self._agents.decision_agent,
+            'trace': self._agents.trace_agent
+        }
+        return agent_map[agent_type]
+
+    @property
+    def narrator_agent(self) -> NarratorAgentProtocol:
+        """Get the narrator agent instance."""
+        return self.get_agent('narrator')
+
+    @property
+    def rules_agent(self) -> RulesAgentProtocol:
+        """Get the rules agent instance."""
+        return self.get_agent('rules')
+
+    @property
+    def decision_agent(self) -> DecisionAgentProtocol:
+        """Get the decision agent instance."""
+        return self.get_agent('decision')
+
+    @property
+    def trace_agent(self) -> TraceAgentProtocol:
+        """Get the trace agent instance."""
+        return self.get_agent('trace')
+
+    async def initialize(self):
+        """Initialize the agent manager.
+        This should be called after construction to set up dependencies.
+        """
         self.story_graph = self._configure_story_graph()
+        await self.initialize_game()
         
     def _configure_story_graph(self) -> StoryGraphProtocol:
         """Configure the story graph with all dependencies.
@@ -68,24 +106,8 @@ class AgentManager(AgentManagerProtocol):
             StoryGraphProtocol: Configured story graph instance
         """
         factory = GameFactory()
-        agents = GameAgents(
-            narrator_agent=self.narrator_agent,
-            rules_agent=self.rules_agent,
-            decision_agent=self.decision_agent,
-            trace_agent=self.trace_agent,
-            story_graph=None  # Sera défini par la factory
-        )
         
-        managers = GameManagers(
-            state_manager=self.state_manager,
-            cache_manager=self.cache_manager,
-            character_manager=self.character_manager,
-            trace_manager=self.trace_manager,
-            rules_manager=self.rules_manager,
-            decision_manager=self.decision_manager
-        )
-        
-        return factory._create_story_graph(agents, managers)
+        return factory.create_story_graph(self._agents, self._managers)
 
     async def initialize_game(self) -> None:
         """
@@ -103,7 +125,7 @@ class AgentManager(AgentManagerProtocol):
 
     async def get_state(self) -> GameState:
         """Get the current state of the game."""
-        return await self.state_manager.get_current_state()
+        return await self._managers.state_manager.get_current_state()
 
     async def subscribe_to_updates(self) -> AsyncGenerator[GameState, None]:
         """Stream les mises à jour du jeu en temps réel."""
@@ -112,7 +134,7 @@ class AgentManager(AgentManagerProtocol):
                 yield GameState.model_validate(state)
         except Exception as e:
             self.logger.error(f"Error streaming game state: {e}")
-            error_state = await self.state_manager.create_error_state(str(e))
+            error_state = await self._managers.state_manager.create_error_state(str(e))
             yield error_state
 
     async def navigate_to_section(self, section_number: int) -> GameState:
@@ -129,7 +151,7 @@ class AgentManager(AgentManagerProtocol):
             return await self.story_graph.navigate_to_section(section_number)
         except Exception as e:
             self.logger.error(f"Error navigating to section {section_number}: {e}")
-            return await self.state_manager.create_error_state(str(e))
+            return await self._managers.state_manager.create_error_state(str(e))
 
     async def submit_response(self, response: str) -> GameState:
         """
@@ -145,7 +167,7 @@ class AgentManager(AgentManagerProtocol):
             return await self.story_graph.process_user_input(response)
         except Exception as e:
             self.logger.error(f"Error processing user response: {e}")
-            return await self.state_manager.create_error_state(str(e))
+            return await self._managers.state_manager.create_error_state(str(e))
 
     async def perform_action(self, action: Dict[str, Any]) -> GameState:
         """
@@ -241,10 +263,10 @@ class AgentManager(AgentManagerProtocol):
         try:
             # Initialiser le story graph si nécessaire
             if not self.story_graph:
-                self.initialize()
+                await self.initialize()
                 
             # Obtenir l'état initial
-            initial_state = await self.state_manager.get_state() or {}
+            initial_state = await self._managers.state_manager.get_state() or {}
             
             # Streamer les mises à jour via story graph
             async for state in self.story_graph.stream_game_state():
@@ -264,7 +286,7 @@ class AgentManager(AgentManagerProtocol):
         Returns:
             GameState: Error state
         """
-        return await self.state_manager.create_error_state(error)
+        return await self._managers.state_manager.create_error_state(error)
 
     async def get_user_feedback(self) -> str:
         """
@@ -275,7 +297,10 @@ class AgentManager(AgentManagerProtocol):
         """
         try:
             current_state = await self.get_state()
-            return await self.trace_manager.get_feedback(current_state)
+            return await self._managers.trace_manager.get_feedback(current_state)
         except Exception as e:
             logger.error(f"Error getting user feedback: {e}")
             return f"Error getting feedback: {e}"
+
+# Add runtime type checking for protocol
+AgentManagerProtocol.register(AgentManager)

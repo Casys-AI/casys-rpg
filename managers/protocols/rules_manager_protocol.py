@@ -2,7 +2,7 @@
 Rules Manager Protocol
 Defines the interface for rules management.
 """
-from typing import Protocol, Dict, Any, Optional, runtime_checkable, Union
+from typing import Protocol, Union, runtime_checkable, Optional
 from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from models.rules_model import RulesModel
