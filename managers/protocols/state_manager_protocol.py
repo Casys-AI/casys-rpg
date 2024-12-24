@@ -18,17 +18,20 @@ class StateManagerProtocol(Protocol):
         ...
     
     @property
-    def game_id(self) -> str:
-        """Get current game ID."""
-        ...
-    
-    @property
     def current_state(self) -> Optional[GameState]:
         """Get current game state."""
         ...
     
-    async def initialize(self) -> None:
-        """Initialize the state manager and generate game_id."""
+    async def initialize(self, game_id: Optional[str] = None) -> None:
+        """Initialize the state manager and generate game_id.
+        
+        Args:
+            game_id: Optional game ID to use. If not provided, a new one will be generated.
+        """
+        ...
+    
+    async def get_game_id(self) -> Optional[str]:
+        """Get current game ID."""
         ...
     
     async def save_state(self, state: GameState) -> GameState:
@@ -77,10 +80,24 @@ class StateManagerProtocol(Protocol):
         """Clear current state."""
         ...
     
-    async def create_initial_state(self) -> GameState:
-        """
-        Create and return initial game state.
+    async def get_session(self, game_id: str) -> str:
+        """Get or create session ID for a game.
         
+        Args:
+            game_id: The game ID to get/create session for
+            
+        Returns:
+            str: The session ID
+        """
+        ...
+
+    async def create_initial_state(self, session_id: str, **init_params: Dict[str, Any]) -> GameState:
+        """Create and return initial game state.
+        
+        Args:
+            session_id: Unique session identifier
+            **init_params: Additional initialization parameters
+            
         Returns:
             GameState: Initial state
             
@@ -104,6 +121,10 @@ class StateManagerProtocol(Protocol):
         """
         ...
     
+    async def bind_session(self, game_id: str, session_id: str) -> None:
+        """Bind an existing session ID to a game ID."""
+        ...
+
     def get_current_timestamp(self) -> str:
         """
         Get current timestamp in ISO format.

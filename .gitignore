@@ -21,6 +21,9 @@ ENV/
 *.swo
 
 # Logs et caches
+logs/
+logs/**/*
+*.log
 game.log
 .pytest_cache/
 .cache/

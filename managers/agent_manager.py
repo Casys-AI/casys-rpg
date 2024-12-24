@@ -189,7 +189,7 @@ class AgentManager:
                 
             # Execute workflow through story graph
             logger.debug("Executing game workflow through story graph")
-            state = await self.workflow_manager.execute_workflow(
+            state = await self.managers.workflow_manager.execute_workflow(
                 state=state,
                 user_input=user_input,
                 story_graph=self.story_graph
