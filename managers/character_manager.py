@@ -74,7 +74,7 @@ class CharacterManager(CharacterManagerProtocol):
     def save_character(self, character: CharacterModel) -> None:
         """Save character data to cache."""
         try:
-            self.cache.save_cached_content(
+            self.cache.save_cached_data(
                 key=str(character.id),
                 namespace="characters",
                 data=character.model_dump()

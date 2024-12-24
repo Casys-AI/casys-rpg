@@ -16,7 +16,6 @@ from config.agents.agent_config_base import AgentConfigBase
 from agents.factories.game_factory import GameAgents, GameManagers
 
 
-
 class StoryGraph(StoryGraphProtocol):
     """Story Graph implementation for managing game workflow using LangGraph."""
 
@@ -81,9 +80,7 @@ class StoryGraph(StoryGraphProtocol):
             # Define conditional routing based on state
             def route_to_parallel(state: GameStateInput) -> List[str]:
                 """Route to both rules and narrator nodes."""
-                RULES_NODE = "node_rules"
-                NARRATOR_NODE = "node_narrator"
-                logger.debug("Routing to parallel nodes: ['%s', '%s']", RULES_NODE, NARRATOR_NODE)
+                logger.debug("Routing to parallel nodes: {}, {}", RULES_NODE, NARRATOR_NODE)
                 return [RULES_NODE, NARRATOR_NODE]
                 
             self.route_after_parallel = lambda state: self._route_after_parallel(state)
@@ -117,12 +114,12 @@ class StoryGraph(StoryGraphProtocol):
             logger.debug("Compiling workflow graph")
             self._graph.compile()
             
-            logger.info("LangGraph workflow setup completed successfully")
+            logger.success("LangGraph workflow setup completed successfully")
             
         except Exception as e:
-            logger.error("Error setting up LangGraph workflow: {}", str(e), exc_info=True)
+            logger.exception("Error setting up LangGraph workflow: {}", str(e))
             raise
-            
+
     async def _process_rules(self, input_data: GameStateInput) -> GameStateOutput:
         """Process game rules for the current state."""
         try:
@@ -139,20 +136,23 @@ class StoryGraph(StoryGraphProtocol):
                 )
                 
                 output = GameStateOutput(
+                    session_id=input_data.session_id,
                     rules=rules,
                     narrative_content=input_data.content,
                     section_number=input_data.section_number,
-                    source=input_data.source,
-                    session_id=input_data.session_id
+                    source=input_data.source
                 )
                 logger.debug("Rules processing completed for section {}", input_data.section_number)
                 return output
 
             logger.debug("No rules agent available, returning empty output")
-            return GameStateOutput()
+            return GameStateOutput(session_id=input_data.session_id)
         except Exception as e:
-            logger.error("Error processing rules: {}", str(e), exc_info=True)
-            return GameStateOutput(error=str(e))
+            logger.exception("Error processing rules: {}", str(e))
+            return GameStateOutput(
+                session_id=input_data.session_id,
+                error=str(e)
+            )
 
     async def _process_narrative(self, input_data: GameStateInput) -> GameStateOutput:
         """Process narrative for the current state."""
@@ -173,47 +173,57 @@ class StoryGraph(StoryGraphProtocol):
                     raise narrator_result
                 
                 output = GameStateOutput(
+                    session_id=input_data.session_id,
                     narrative=narrator_result,
                     narrative_content=input_data.content,
                     section_number=input_data.section_number,
-                    source=input_data.source,
-                    session_id=input_data.session_id
+                    source=input_data.source
                 )
                 logger.debug("Narrative processing completed for section {}", input_data.section_number)
                 return output
 
             logger.debug("No narrator agent available, returning empty output")
-            return GameStateOutput()
+            return GameStateOutput(session_id=input_data.session_id)
         except Exception as e:
-            logger.error("Error processing narrative: {}", str(e), exc_info=True)
-            return GameStateOutput(error=str(e))
+            logger.exception("Error processing narrative: {}", str(e))
+            return GameStateOutput(
+                session_id=input_data.session_id,
+                error=str(e)
+            )
 
-    def _route_after_parallel(self, state: GameStateOutput) -> str:
+    def _route_after_parallel(self, state: Any) -> Optional[List[str]]:
         """Route to decision after both processes complete."""
         logger.debug("Checking parallel processes completion")
-        if not isinstance(state, GameStateOutput):
-            logger.error("Expected GameStateOutput but got {}", type(state).__name__)
-            return None
-            
-        if hasattr(state, 'rules') and hasattr(state, 'narrative'):
-            if state.rules is not None and state.narrative is not None:
-                logger.debug("Both processes complete, routing to '{}'", "node_decision")
-                return "node_decision"
-            logger.debug("Still waiting for processes - rules: {}, narrative: {}", 
-                       "present" if state.rules else "missing",
-                       "present" if state.narrative else "missing")
-        else:
-            logger.error("State missing required attributes: rules={}, narrative={}",
-                       "present" if hasattr(state, 'rules') else "missing",
-                       "present" if hasattr(state, 'narrative') else "missing")
         
-        logger.debug("Waiting for all processes to complete")
-        return None  # Continue processing
+        # Log state details at trace level for debugging
+        logger.trace("Received state: type={}, content={}", 
+                    type(state).__name__,
+                    state.__dict__ if hasattr(state, '__dict__') else str(state))
+
+        # Si c'est un GameStateInput, on continue avec les deux branches
+        if isinstance(state, GameStateInput):
+            logger.debug("GameStateInput received, continuing parallel processing")
+            return ["node_rules", "node_narrator"]
+
+        # Si c'est un GameStateOutput, on vérifie qu'on a les deux résultats
+        if isinstance(state, GameStateOutput):
+            if state.rules is not None and state.narrative is not None:
+                logger.info("Both parallel processes complete, routing to decision node")
+                return ["node_decision"]
+            
+            logger.debug("Waiting for parallel processes to complete: rules={}, narrative={}", 
+                      state.rules is not None, 
+                      state.narrative is not None)
+            return ["node_rules", "node_narrator"]  # Continue parallel processing
+
+        # Pour tout autre type d'état, on continue le traitement parallèle
+        logger.warning("Unexpected state type in parallel routing: {}, continuing parallel processing", type(state).__name__)
+        return ["node_rules", "node_narrator"]
 
     async def _process_decision(self, input_data: GameStateInput) -> GameStateOutput:
         """Process decision for the current state."""
         try:
-            logger.info("Processing decision for section: {}", input_data.section_number)
+            logger.info("Processing decision for section {}", input_data.section_number)
             
             if not input_data:
                 raise GameError("No input data available for decision processing")
@@ -236,16 +246,19 @@ class StoryGraph(StoryGraphProtocol):
                     session_id=updated_state.session_id
                 )
 
-            logger.debug("Decision processing completed")
-            return GameStateOutput()
+            logger.debug("No decision agent available, returning empty output")
+            return GameStateOutput(session_id=input_data.session_id)
         except Exception as e:
-            logger.error("Error processing decision: {}", str(e), exc_info=True)
-            return GameStateOutput(error=str(e))
+            logger.exception("Error processing decision: {}", str(e))
+            return GameStateOutput(
+                session_id=input_data.session_id,
+                error=str(e)
+            )
 
     async def _process_trace(self, input_data: GameStateInput) -> GameStateOutput:
         """Process trace for the current state."""
         try:
-            logger.info("Processing trace for section: {}", input_data.section_number)
+            logger.info("Processing trace for section {}", input_data.section_number)
             
             if not input_data:
                 raise GameError("No input data available for trace processing")
@@ -264,30 +277,21 @@ class StoryGraph(StoryGraphProtocol):
                     session_id=input_data.session_id
                 )
 
-            logger.debug("Trace processing completed")
-            return GameStateOutput()
+            logger.debug("No trace agent available, returning empty output")
+            return GameStateOutput(session_id=input_data.session_id)
         except Exception as e:
-            logger.error("Error processing trace: {}", str(e), exc_info=True)
-            return GameStateOutput(error=str(e))
+            logger.exception("Error processing trace: {}", str(e))
+            return GameStateOutput(
+                session_id=input_data.session_id,
+                error=str(e)
+            )
 
-    async def process_user_input(self, input_text: str) -> GameState:
-        """Process user input and update game state.
+    async def get_compiled_workflow(self) -> Any:
+        """Get the compiled workflow graph.
         
-        Args:
-            input_text: User input text
-            
         Returns:
-            GameState: Updated game state
+            Any: Compiled workflow graph ready for execution
         """
-        try:
-            # Get current state
-            current_state = await self.state_manager.get_current_state()
-            if not current_state:
-                return await self.state_manager.create_error_state("No current state")
-            
-            # Execute workflow with user input through workflow manager
-            return await self.workflow_manager.execute_game_workflow(self, current_state, input_text)
-            
-        except Exception as e:
-            logger.error("Error processing user input: {}", str(e))
-            return await self.state_manager.create_error_state(str(e))
+        if not self._graph:
+            await self._setup_workflow()
+        return self._graph.compile()

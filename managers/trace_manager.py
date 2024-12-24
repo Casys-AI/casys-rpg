@@ -43,7 +43,7 @@ class TraceManager(TraceManagerProtocol):
         )
         
         # Save only the current trace, not in history yet
-        await self.cache.save_cached_content(
+        await self.cache.save_cached_data(
             key=self._current_trace.session_id,
             namespace="trace",
             data=self._current_trace.model_dump()
@@ -91,7 +91,7 @@ class TraceManager(TraceManagerProtocol):
             
         try:
             # Save current trace
-            await self.cache.save_cached_content(
+            await self.cache.save_cached_data(
                 key=self._current_trace.session_id,
                 namespace="trace",
                 data=self._current_trace.model_dump()
@@ -99,7 +99,7 @@ class TraceManager(TraceManagerProtocol):
             
             # Only save to history if we have actions
             if self._current_trace.history:
-                await self.cache.save_cached_content(
+                await self.cache.save_cached_data(
                     key=f"history/{self._current_trace.session_id}",
                     namespace="trace",
                     data=self._current_trace.model_dump()
@@ -116,7 +116,7 @@ class TraceManager(TraceManagerProtocol):
         """Get all traces from storage."""
         try:
             # Récupérer toutes les traces de l'historique
-            traces = await self.cache.get_cached_content(
+            traces = await self.cache.get_cached_data(
                 key="history/*",
                 namespace="traces",
                 model_type=TraceModel

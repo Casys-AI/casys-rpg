@@ -16,6 +16,7 @@ from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from models.errors_model import StateError
+from models.character_model import CharacterModel, CharacterStats  # Import CharacterModel and CharacterStats
 
 def _json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -40,21 +41,28 @@ class StateManager(StateManagerProtocol):
         self._current_state: Optional[GameState] = None
         self._game_id: Optional[str] = None
 
-    async def initialize(self) -> None:
-        """Initialize state manager and generate game ID."""
-        try:
-            self._game_id = str(uuid.uuid4())
-            self.config.game_id = self._game_id
-            logger.info(f"Initialized state manager with game ID: {self._game_id}")
-        except Exception as e:
-            logger.error(f"Failed to initialize state manager: {e}")
-            raise StateError(f"Failed to initialize state manager: {str(e)}")
+    async def initialize(self, game_id: Optional[str] = None) -> None:
+        """Initialize state manager and generate game ID.
+        
+        Args:
+            game_id: Optional game ID to use. If not provided, a new one will be generated.
+        """
+        logger.info("Initializing StateManager")
+        self._game_id = game_id if game_id else str(uuid.uuid4())
+        logger.debug("Generated game ID: {}", self._game_id)
+        self.config.game_id = self._game_id
+        await self.cache.update_game_id(self._game_id)
+        logger.info(f"Initialized state manager with game ID: {self._game_id}")
 
     @property
     def game_id(self) -> str:
         """Get current game ID."""
         if not self._game_id:
             raise StateError("State manager not initialized")
+        return self._game_id
+
+    async def get_game_id(self) -> Optional[str]:
+        """Get current game ID."""
         return self._game_id
 
     @property
@@ -141,7 +149,7 @@ class StateManager(StateManagerProtocol):
         try:
             json_data = self._serialize_state(state)
             
-            await self.cache.save_cached_content(
+            await self.cache.save_cached_data(
                 key=f"section_{state.section_number}",
                 namespace="state",
                 data=json_data
@@ -195,7 +203,7 @@ class StateManager(StateManagerProtocol):
             if not self._game_id:
                 raise StateError("State manager not initialized")
                 
-            json_data = await self.cache.get_cached_content(
+            json_data = await self.cache.get_cached_data(
                 key=f"section_{section_number}",
                 namespace="state"
             )
@@ -216,7 +224,7 @@ class StateManager(StateManagerProtocol):
         try:
             logger.debug("Getting current state")
             # Try to get from cache first
-            state = await self.cache.get_cached_content(
+            state = await self.cache.get_cached_data(
                 key="current_state",
                 namespace="state"
             )
@@ -260,11 +268,28 @@ class StateManager(StateManagerProtocol):
                 
             logger.info("Creating initial state for session '{}'", session_id)
             
+            # Create initial character with default stats
+            initial_character = CharacterModel(
+                stats=CharacterStats(
+                    endurance=20,  # Default starting stats
+                    chance=20,
+                    skill=20
+                )
+            )
+            
+            # Save initial character
+            await self.cache.save_cached_data(
+                key="current",  # Use "current" as key for active character
+                namespace="characters",
+                data=initial_character.model_dump()
+            )
+            
             # Create initial state with section 1
             params = {
                 'section_number': 1,
                 'session_id': session_id,
                 'last_update': self.get_current_timestamp(),
+                'character_id': "current",  # Link to the current character
                 **init_params
             }
             

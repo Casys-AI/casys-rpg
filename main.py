@@ -18,7 +18,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 # Import app after logging setup
-from api.app import app, get_agent_manager
+from api.app import app
 
 if __name__ == "__main__":
     import uvicorn
@@ -38,14 +38,6 @@ if __name__ == "__main__":
     
     logger.info(f"Démarrage du serveur sur {host}:{port}")
     
-    # Pre-initialize components
-    try:
-        agent_manager = get_agent_manager()
-        logger.debug("Agent manager initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize agent manager: {e}")
-        sys.exit(1)
-    
     # Start server
     try:
         uvicorn.run(
@@ -53,8 +45,8 @@ if __name__ == "__main__":
             host=host,
             port=port,
             reload=reload,
-            log_config=None  # Use our custom logging config
+            log_level=os.getenv("LOG_LEVEL", "info").lower()
         )
     except Exception as e:
-        logger.error(f"Server failed to start: {e}")
+        logger.error(f"Failed to start server: {e}")
         sys.exit(1)
