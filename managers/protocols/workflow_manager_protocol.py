@@ -94,3 +94,14 @@ class WorkflowManagerProtocol(Protocol):
             GameStateOutput: Final workflow output
         """
         ...
+
+    async def initialize_workflow(self, initial_state: GameState) -> None:
+        """Initialize workflow with initial state.
+        
+        Args:
+            initial_state: Initial game state to use
+            
+        Raises:
+            WorkflowError: If initialization fails
+        """
+        ...
