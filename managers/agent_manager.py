@@ -311,16 +311,21 @@ class AgentManager:
             logger.error("Error during AgentManager initialization: {}", str(e))
             raise GameError(f"Failed to initialize AgentManager: {str(e)}")
 
-    async def get_state(self) -> GameState:
+    async def get_state(self) -> Optional[GameState]:
         """Get current game state."""
         try:
             logger.debug("Fetching current game state")
+            # Vérifie si le game_id est défini avant d'accéder au state
+            if not await self.managers.state_manager.get_game_id():
+                logger.debug("No game ID set, returning None")
+                return None
+                
             state = await self.managers.state_manager.get_current_state()
             logger.debug("Current state: {}", state)
             return state
         except Exception as e:
             logger.error("Error getting game state: {}", str(e))
-            raise
+            return None
 
     async def initialize_game(
         self,
@@ -505,6 +510,12 @@ class AgentManager:
         """Stop the game and save final state."""
         logger.info("Stopping game...")
         try:
+            # Vérifie si le game_id est défini avant de sauvegarder
+            game_id = await self.managers.state_manager.get_game_id()
+            if not game_id:
+                logger.debug("No game ID set, nothing to save")
+                return
+                
             # Save final state
             current_state = await self.get_state()
             if current_state:

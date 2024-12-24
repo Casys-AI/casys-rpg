@@ -41,33 +41,45 @@ DEFAULT_NAMESPACES = {
         path=Path("cache/games/{game_id}/states"),
         format=StorageFormat.JSON,
         ttl_seconds=3600,
+        cache_enabled=True,
         per_game=True
     ),
     "trace": NamespaceConfig(
         path=Path("cache/games/{game_id}/traces"),
         format=StorageFormat.JSON,
-        ttl_seconds=3600,
+        ttl_seconds=None,
+        cache_enabled=True,
         per_game=True
     ),
-    "character": NamespaceConfig(
+    "characters": NamespaceConfig(
         path=Path("cache/games/{game_id}/characters"),
-        format=StorageFormat.MARKDOWN,
+        format=StorageFormat.JSON,
+        ttl_seconds=None,
+        cache_enabled=True,
         per_game=True
     ),
+    # Raw content namespace (source files)
+    "raw_content": NamespaceConfig(
+        path=Path("sections"),  # Relatif à base_path (./data)
+        format=StorageFormat.MARKDOWN,
+        ttl_seconds=None,
+        cache_enabled=False,  # Pas de cache pour les fichiers source
+        per_game=False
+    ),
+    # Cache namespaces
     "rules": NamespaceConfig(
         path=Path("cache/rules"),
         format=StorageFormat.MARKDOWN,
-        ttl_seconds=None
-    ),
-    "cached_sections": NamespaceConfig(
-        path=Path("cache/sections"),
-        format=StorageFormat.MARKDOWN,
-        ttl_seconds=None
+        ttl_seconds=None,
+        cache_enabled=True,
+        per_game=False
     ),
     "sections": NamespaceConfig(
-        path=Path("sections"),  # Relatif à base_path (./data)
-        format=StorageFormat.MARKDOWN,  # Les fichiers sont en markdown même si c'est la source
-        ttl_seconds=None  # Pas de cache car c'est la source
+        path=Path("cache/sections"),
+        format=StorageFormat.MARKDOWN,
+        ttl_seconds=None,
+        cache_enabled=True,
+        per_game=False
     )
 }
 
@@ -126,8 +138,8 @@ class StorageConfig(BaseModel):
             
         path = self.namespaces[namespace].path
         if self.namespaces[namespace].per_game:
-            if not self.game_id:
-                raise ValueError(f"game_id must be set for per-game namespace: {namespace}")
+            if not self.game_id or self.game_id == "{game_id}":
+                raise ValueError(f"Valid game_id must be set for per-game namespace: {namespace}")
             path = Path(str(path).format(game_id=self.game_id))
             
         return self.base_path / path

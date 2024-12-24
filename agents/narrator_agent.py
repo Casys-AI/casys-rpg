@@ -96,32 +96,41 @@ class NarratorAgent(BaseAgent):
         """
         try:
             logger.debug("Starting content processing with LLM")
+            logger.debug("Preparing messages for LLM with section {} and content length {}", section_number, len(content))
             
             messages = [
                 SystemMessage(content=self.config.system_message),
                 HumanMessage(content=f"""Section Number: {section_number} Content : {content}""")
             ]
             
+            logger.debug("Sending request to LLM")
             response = await self.config.llm.ainvoke(messages)
+            logger.debug("Received response from LLM: {}", response.content[:200] + "..." if len(response.content) > 200 else response.content)
             
             try:
                 # Valider que la réponse est du JSON valide
                 content = response.content.strip()
                 if not content.startswith('{'):
                     # Si ce n'est pas du JSON, essayer d'extraire le bloc JSON
+                    logger.debug("Response is not JSON, attempting to extract JSON block")
                     import re
                     json_match = re.search(r'\{[\s\S]*\}', content)
                     if json_match:
                         content = json_match.group(0)
+                        logger.debug("Extracted JSON block: {}", content[:200] + "..." if len(content) > 200 else content)
                     else:
+                        logger.error("No JSON object found in response")
                         raise ValueError("Response does not contain a JSON object")
                 
+                logger.debug("Parsing JSON response")
                 response_data = json.loads(content)
+                logger.debug("Parsed JSON data: {}", response_data)
                 
                 # Valider les champs requis
                 required_fields = {'content', 'source_type', 'error'}
                 missing_fields = required_fields - set(response_data.keys())
                 if missing_fields:
+                    logger.warning("Missing required fields in response: {}", missing_fields)
                     # Si des champs sont manquants, fournir des valeurs par défaut
                     defaults = {
                         'content': content,  # Utiliser le contenu brut par défaut
@@ -130,26 +139,29 @@ class NarratorAgent(BaseAgent):
                     }
                     for field in missing_fields:
                         response_data[field] = defaults[field]
-                        logger.warning(f"Using default value for missing field: {field}")
+                        logger.warning("Using default value for {}: {}", field, defaults[field])
                 
                 # Créer le NarratorModel
-                return NarratorModel(
+                logger.debug("Creating NarratorModel")
+                model = NarratorModel(
                     section_number=section_number,
                     content=response_data['content'],
                     source_type=SourceType(response_data['source_type'].lower()),
-                    error=response_data['error'],
-                    timestamp=datetime.now()
+                    error=response_data['error']
                 )
+                logger.debug("Successfully created NarratorModel: {}", model)
+                return model
                 
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON in LLM response: {e}")
-                logger.error(f"Response content: {response.content}")
+                logger.error("Invalid JSON in LLM response: {}", str(e))
+                logger.error("Response content: {}", response.content)
                 return NarratorError(
                     section_number=section_number,
                     message=f"Invalid JSON in LLM response: {str(e)}"
                 )
             except Exception as e:
-                logger.error(f"Error parsing LLM response: {str(e)}")
+                logger.error("Error parsing LLM response: {}", str(e))
+                logger.error("Full error: {}", str(e), exc_info=True)
                 return NarratorError(
                     section_number=section_number,
                     message=f"Error parsing LLM response: {str(e)}"
@@ -157,6 +169,7 @@ class NarratorAgent(BaseAgent):
             
         except Exception as e:
             logger.error("Error formatting content: {}", str(e))
+            logger.error("Full error: {}", str(e), exc_info=True)
             return NarratorError(
                 section_number=section_number,
                 message=f"Error formatting content: {str(e)}"

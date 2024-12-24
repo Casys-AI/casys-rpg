@@ -25,7 +25,3 @@ class NarratorModel(BaseModel):
 
     class Config:
         """Model configuration."""
-        arbitrary_types_allowed = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }

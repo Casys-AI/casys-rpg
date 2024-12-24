@@ -30,141 +30,110 @@ class RulesManager(RulesManagerProtocol):
         self.config = config
         self.cache = cache_manager
         self.logger = logging.getLogger(__name__)
-        logger.debug("RulesManager initialized with config: %s", config.__class__.__name__)
+        logger.debug("RulesManager initialized with config: {}", config.__class__.__name__)
 
     async def get_cached_rules(self, section_number: int) -> Optional[RulesModel]:
         """Get rules from cache only."""
-        logger.info(f"Getting cached rules for section {section_number}")
+        logger.info("Getting cached rules for section {}", section_number)
         
         try:
-            content = await self.cache.get_cached_content(
+            content = await self.cache.get_cached_data(
                 key=f"section_{section_number}_rules",
                 namespace="rules"
             )
             if not content:
-                logger.debug(f"No rules found in cache for section {section_number}")
+                logger.debug("No rules found in cache for section {}", section_number)
                 return None
                 
             rules = self._markdown_to_rules(content, section_number)
             if rules:
-                logger.info(f"Successfully retrieved rules for section {section_number} from cache")
+                logger.info("Successfully retrieved rules for section {} from cache", section_number)
                 return rules
                 
-            logger.warning(f"Failed to parse cached rules for section {section_number}")
+            logger.warning("Failed to parse cached rules for section {}", section_number)
             return None
             
         except KeyError:
-            logger.warning(f"Invalid namespace for section {section_number}")
+            logger.warning("Invalid namespace for section {}", section_number)
             return None
         except Exception as e:
-            logger.error(f"Error retrieving cached rules: {str(e)}")
+            logger.error("Error retrieving cached rules: {}", str(e))
             return None
 
     async def get_raw_content(self, section_number: int) -> Union[str, RulesError]:
         """Get raw content from storage."""
-        logger.info(f"Getting raw content for section {section_number}")
+        logger.info("Getting raw content for section {}", section_number)
         
         try:
+            # Vérifie dans le namespace raw_content
             if not await self.cache.exists_raw_content(
-                key=str(section_number),
-                namespace="sections"
+                key=str(section_number),  # Juste le numéro de section car c'est le même raw_content
+                namespace="raw_content"
             ):
-                logger.warning(f"No raw content found for section {section_number}")
+                logger.warning("No raw content found for section {}", section_number)
                 return RulesError(
                     section_number=section_number,
                     message=f"No raw content found for section {section_number}"
                 )
                 
             content = await self.cache.load_raw_content(
-                key=str(section_number),
-                namespace="sections"
+                key=str(section_number),  # Juste le numéro de section car c'est le même raw_content
+                namespace="raw_content"
             )
             if content:
-                logger.debug(f"Found raw content for section {section_number}")
+                logger.debug("Found raw content for section {}", section_number)
                 return content
                 
-            logger.warning(f"Failed to load raw content for section {section_number}")
+            logger.warning("Failed to load raw content for section {}", section_number)
             return RulesError(
                 section_number=section_number,
                 message=f"Failed to load raw content for section {section_number}"
             )
             
         except KeyError:
-            logger.error(f"Invalid namespace for section {section_number}")
+            logger.error("Invalid namespace for section {}", section_number)
             return RulesError(
                 section_number=section_number,
                 message="Invalid namespace configuration"
             )
         except Exception as e:
-            logger.error(f"Error loading raw content: {str(e)}")
+            logger.error("Error loading raw content: {}", str(e))
             return RulesError(
                 section_number=section_number,
-                message=f"Error loading raw content: {str(e)}"
+                message=str(e)
             )
 
     async def save_rules(self, rules: RulesModel) -> Union[RulesModel, RulesError]:
         """Save rules to cache."""
-        logger.info(f"Saving rules for section {rules.section_number}")
+        logger.info("Saving rules for section {}", rules.section_number)
         
         try:
             content = self._rules_to_markdown(rules)
-            await self.cache.save_cached_content(
+            await self.cache.save_cached_data(
                 key=f"section_{rules.section_number}_rules",
                 namespace="rules",
                 data=content
             )
-            logger.debug(f"Rules saved successfully for section {rules.section_number}")
+            logger.debug("Rules saved successfully for section {}", rules.section_number)
             return rules
             
         except KeyError:
-            logger.error(f"Invalid namespace for section {rules.section_number}")
+            logger.error("Invalid namespace for section {}", rules.section_number)
             return RulesError(
                 section_number=rules.section_number,
                 message="Invalid namespace configuration"
             )
         except Exception as e:
-            logger.error(f"Error saving rules: {str(e)}")
+            logger.error("Error saving rules: {}", str(e))
             return RulesError(
                 section_number=rules.section_number,
-                message=f"Error saving rules: {str(e)}"
+                message=str(e)
             )
 
-    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
-        """Get existing rules for a section."""
-        logger.info(f"Getting existing rules for section {section_number}")
-        
-        # Try to get from cache first
-        logger.debug(f"Attempting to get rules from cache for section {section_number}")
-        rules = await self.get_cached_rules(section_number)
-        if rules:
-            logger.info(f"Successfully retrieved rules for section {section_number} from cache")
-            return rules
-
-        # If not in cache, check if raw rules exist
-        logger.debug(f"Rules not found in cache for section {section_number}, checking raw storage")
-        raw_content = await self.get_raw_content(section_number)
-        if isinstance(raw_content, RulesError):
-            logger.warning(f"Rules not found in raw storage for section {section_number}")
-            return raw_content
-
-        # Parse and save rules
-        logger.debug(f"Parsing raw rules content for section {section_number}")
-        rules = self._markdown_to_rules(raw_content, section_number)
-        if not rules:
-            logger.error(f"Failed to parse rules for section {section_number}")
-            return RulesError(
-                section_number=section_number,
-                message=f"Error parsing rules for section {section_number}"
-            )
-
-        logger.debug(f"Saving parsed rules to cache for section {section_number}")
-        await self.save_rules(rules)
-        logger.info(f"Successfully retrieved, parsed and cached rules for section {section_number}")
-        return rules
 
     def _rules_to_markdown(self, rules: RulesModel) -> str:
         """Convert rules to markdown format."""
-        logger.debug("Converting rules to markdown for section %d", rules.section_number)
+        logger.debug("Converting rules to markdown for section {}", rules.section_number)
         
         # Extraire les sections cibles des choix
         target_sections = [str(choice.target_section) for choice in rules.choices if choice.target_section is not None]
@@ -199,7 +168,7 @@ class RulesManager(RulesManagerProtocol):
 
     def _format_choices(self, choices) -> str:
         """Format choices for markdown display."""
-        logger.debug("Formatting %d choices", len(choices))
+        logger.debug("Formatting {} choices", len(choices))
         if not choices:
             return "No choices available"
             
@@ -229,7 +198,7 @@ class RulesManager(RulesManagerProtocol):
         
         for match in re.finditer(choice_pattern, content):
             text, choice_type, details = match.groups()
-            logger.debug("Parsing choice: '%s'", text)
+            logger.debug("Parsing choice: '{}'", text)
             
             # Parse details
             conditions = []
@@ -242,10 +211,10 @@ class RulesManager(RulesManagerProtocol):
                     line = line.strip()
                     if line.startswith('- Conditions:'):
                         conditions = [c.strip() for c in line[13:].split(',') if c.strip()]
-                        logger.debug("Parsed conditions: %s", conditions)
+                        logger.debug("Parsed conditions: {}", conditions)
                     elif line.startswith('- Dice_Type:'):
                         dice_type = DiceType(line[12:].strip().lower())
-                        logger.debug("Parsed dice type: %s", dice_type.value if dice_type else None)
+                        logger.debug("Parsed dice type: {}", dice_type.value if dice_type else None)
                     elif line.startswith('- Dice_Results:'):
                         # Parse dict format "{key: value}"
                         results_str = line[15:].strip()
@@ -254,7 +223,7 @@ class RulesManager(RulesManagerProtocol):
                             for pair in results_str.split(','):
                                 key, value = pair.split(':')
                                 dice_results[key.strip().strip("'")] = int(value.strip())
-                        logger.debug("Parsed dice results: %s", dice_results)
+                        logger.debug("Parsed dice results: {}", dice_results)
                     elif line.startswith('- Target:'):
                         # Extraire uniquement le nombre de la section
                         section_text = line[16:].strip()  # Skip "Section " prefix
@@ -262,9 +231,9 @@ class RulesManager(RulesManagerProtocol):
                             # Nettoyer le texte et extraire le nombre
                             section_num = ''.join(filter(str.isdigit, section_text))
                             target_section = int(section_num) if section_num else None
-                            logger.debug("Parsed target section: %d", target_section if target_section else 0)
+                            logger.debug("Parsed target section: {}", target_section if target_section else 0)
                         except ValueError as e:
-                            logger.error("Invalid section number in choice: %s - %s", section_text, str(e))
+                            logger.error("Invalid section number in choice: {} - {}", section_text, str(e))
                             target_section = None
             
             try:
@@ -277,17 +246,17 @@ class RulesManager(RulesManagerProtocol):
                     dice_results=dice_results
                 )
                 choices.append(choice)
-                logger.debug("Choice parsed successfully: '%s'", choice.text)
+                logger.debug("Choice parsed successfully: '{}'", choice.text)
             except Exception as e:
-                logger.error("Error creating choice: %s", str(e), exc_info=True)
+                logger.error("Error creating choice: {}", str(e), exc_info=True)
                 continue
             
-        logger.info("Successfully parsed %d choices", len(choices))
+        logger.info("Successfully parsed {} choices", len(choices))
         return choices
 
     def _markdown_to_rules(self, content: str, section_number: int) -> Optional[RulesModel]:
         """Parse markdown content to RulesModel."""
-        logger.debug("Parsing markdown content for section %d", section_number)
+        logger.debug("Parsing markdown content for section {}", section_number)
         
         # Split content into sections
         sections = {}
@@ -306,13 +275,13 @@ class RulesManager(RulesManagerProtocol):
         if current_section:
             sections[current_section] = '\n'.join(current_content).strip()
         
-        logger.debug("Parsed sections: %s", list(sections.keys()))
+        logger.debug("Parsed sections: {}", list(sections.keys()))
         
         # Vérifier les sections requises
         required_sections = {'Metadata', 'Analysis', 'Choices', 'Summary'}
         missing_sections = required_sections - set(sections.keys())
         if missing_sections:
-            logger.error("Missing required sections: %s", ', '.join(missing_sections))
+            logger.error("Missing required sections: {}", ', '.join(missing_sections))
             return None
         
         # Parse metadata
@@ -325,9 +294,9 @@ class RulesManager(RulesManagerProtocol):
                         # Convertir la clé en snake_case
                         key = key.replace('_', ' ').lower().replace(' ', '_')
                         metadata[key] = value.strip()
-            logger.debug("Parsed metadata: %s", metadata)
+            logger.debug("Parsed metadata: {}", metadata)
         except Exception as e:
-            logger.error("Error parsing metadata section: %s", str(e), exc_info=True)
+            logger.error("Error parsing metadata section: {}", str(e), exc_info=True)
             return None
         
         # Parse analysis
@@ -345,9 +314,9 @@ class RulesManager(RulesManagerProtocol):
                         # Convertir la clé en snake_case
                         key = key.replace('_', ' ').lower().replace(' ', '_')
                         analysis[key] = value.strip()
-            logger.debug("Parsed analysis: %s", analysis)
+            logger.debug("Parsed analysis: {}", analysis)
         except Exception as e:
-            logger.error("Error parsing analysis section: %s", str(e), exc_info=True)
+            logger.error("Error parsing analysis section: {}", str(e), exc_info=True)
             return None
         
         # Parse choices
@@ -355,9 +324,9 @@ class RulesManager(RulesManagerProtocol):
         try:
             if 'Choices' in sections:
                 choices = self._parse_choices(sections['Choices'])
-            logger.debug("Parsed %d choices", len(choices))
+            logger.debug("Parsed {} choices", len(choices))
         except Exception as e:
-            logger.error("Error parsing choices section: %s", str(e), exc_info=True)
+            logger.error("Error parsing choices section: {}", str(e), exc_info=True)
             return None
         
         # Parse summary and error
@@ -372,15 +341,15 @@ class RulesManager(RulesManagerProtocol):
                 if error == 'None':
                     error = None
         except Exception as e:
-            logger.error("Error parsing summary/error sections: %s", str(e), exc_info=True)
+            logger.error("Error parsing summary/error sections: {}", str(e), exc_info=True)
             return None
 
         # Vérifier si toutes les clés requises sont présentes
         required_keys = ['dice_type', 'needs_dice', 'needs_user_response', 'next_action', 'conditions']
         missing_keys = [key for key in required_keys if key not in analysis]
         if missing_keys:
-            logger.error("Missing required keys in analysis: %s", ', '.join(missing_keys))
-            logger.error("Available keys: %s", list(analysis.keys()))
+            logger.error("Missing required keys in analysis: {}", ', '.join(missing_keys))
+            logger.error("Available keys: {}", list(analysis.keys()))
             return None
         
         # Create RulesModel
@@ -400,7 +369,7 @@ class RulesManager(RulesManagerProtocol):
                 "last_update": datetime.fromisoformat(metadata.get('last_update', datetime.now().isoformat()))
             }
             
-            logger.debug("Creating RulesModel with data: %s", {
+            logger.debug("Creating RulesModel with data: {}", {
                 "section_number": section_number,
                 "dice_type": model_data["dice_type"],
                 "needs_dice": model_data["needs_dice"],
@@ -412,8 +381,8 @@ class RulesManager(RulesManagerProtocol):
                 "source_type": model_data["source_type"]
             })
             model = RulesModel(**model_data)
-            logger.info("Successfully created RulesModel for section %d", section_number)
+            logger.info("Successfully created RulesModel for section {}", section_number)
             return model
         except Exception as e:
-            logger.error("Error creating RulesModel: %s", str(e), exc_info=True)
+            logger.error("Error creating RulesModel: {}", str(e), exc_info=True)
             return None

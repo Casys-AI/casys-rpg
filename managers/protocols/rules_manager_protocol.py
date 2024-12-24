@@ -7,6 +7,7 @@ from models.rules_model import RulesModel
 from models.errors_model import RulesError
 from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from models.game_state import GameState  # Added import for GameState
 
 @runtime_checkable
 class RulesManagerProtocol(Protocol):
@@ -52,14 +53,27 @@ class RulesManagerProtocol(Protocol):
         """
         ...
         
-    async def get_existing_rules(self, section_number: int) -> Union[RulesModel, RulesError]:
+    def _rules_to_markdown(self, rules: RulesModel) -> str:
         """
-        Get existing rules for a section.
+        Convert rules to markdown format.
         
         Args:
-            section_number: Section number to get rules for
+            rules: Rules model to convert
             
         Returns:
-            Union[RulesModel, RulesError]: Existing rules or error
+            str: Markdown formatted rules
+        """
+        ...
+        
+    def _markdown_to_rules(self, content: str, section_number: int) -> Optional[RulesModel]:
+        """
+        Convert markdown content to RulesModel.
+        
+        Args:
+            content: Markdown content to convert
+            section_number: Section number
+            
+        Returns:
+            Optional[RulesModel]: Converted model or None if failed
         """
         ...

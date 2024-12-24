@@ -52,51 +52,27 @@ class NarratorManagerProtocol(Protocol):
         """
         ...
         
-    def format_content(self, content: str, section_number: int) -> Union[NarratorModel, NarratorError]:
+    def _markdown_to_narrator(self, content: str, section_number: int) -> Optional[NarratorModel]:
         """
-        Format content into NarratorModel.
+        Convert markdown content to NarratorModel.
         
         Args:
-            content: Content to format
-            section_number: Section number for the content
+            content: Markdown content to convert
+            section_number: Section number
             
         Returns:
-            Union[NarratorModel, NarratorError]: Formatted content or error
+            Optional[NarratorModel]: Converted model or None if failed
         """
         ...
         
-    async def exists_raw_section(self, section_number: int) -> bool:
+    def _narrator_to_markdown(self, model: NarratorModel) -> Optional[str]:
         """
-        Check if raw section exists.
+        Convert NarratorModel to markdown format.
         
         Args:
-            section_number: Section number to check
+            model: Model to convert
             
         Returns:
-            bool: True if section exists, False otherwise
-        """
-        ...
-        
-    async def get_raw_section_content(self, section_number: int) -> Optional[str]:
-        """
-        Get raw section content.
-        
-        Args:
-            section_number: Section number to get content for
-            
-        Returns:
-            Optional[str]: Raw content if found, None otherwise
-        """
-        ...
-        
-    async def exists_section(self, section_number: int) -> bool:
-        """
-        Check if a section exists.
-        
-        Args:
-            section_number: Section number to check
-            
-        Returns:
-            bool: True if section exists, False otherwise
+            Optional[str]: Markdown content or None if failed
         """
         ...
