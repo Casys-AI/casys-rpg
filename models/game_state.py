@@ -1,60 +1,61 @@
 """Models for game state management."""
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Annotated
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 import uuid
+import operator
+from typing import Annotated
 
-from models.decision_model import DiceResult, DecisionModel
 from models.character_model import CharacterModel
-from models.narrator_model import NarratorModel, SourceType as NarratorSourceType
+from models.decision_model import DecisionModel
+from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, DiceType, SourceType as RulesSourceType
 from models.trace_model import TraceModel
 
+def first_not_none(a: Optional[str], b: Optional[str]) -> Optional[str]:
+    """Return the first non-None value."""
+    return a if a is not None else b
+
 class GameStateBase(BaseModel):
     """Base state model with common fields."""
-    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    source: RulesSourceType = RulesSourceType.RAW
-    last_update: datetime = Field(default_factory=datetime.now)
+    session_id: Annotated[str, first_not_none]  # Le session_id doit être fourni explicitement
     
     model_config = ConfigDict(
         json_encoders={
             datetime: lambda v: v.isoformat()
         },
         arbitrary_types_allowed=True
-    )
+    )   
 
 class GameStateInput(GameStateBase):
     """Input state for the game workflow."""
-    section_number: int = Field(default=1, ge=1, description="Current section number")
+    section_number: Annotated[int, operator.add] = Field(default=1, ge=1, description="Current section number")
     player_input: Optional[str] = None
     content: Optional[str] = None
-    effects: Dict[str, Any] = Field(default_factory=dict)
-    flags: Dict[str, Any] = Field(default_factory=dict)
 
 class GameStateOutput(GameStateBase):
     """Output state from the game workflow."""
-    narrative: Optional[NarratorModel] = None
-    rules: Optional[RulesModel] = None
+    narrative: Annotated[Optional[NarratorModel], operator.add] = None
+    rules: Annotated[Optional[RulesModel], operator.add] = None
     trace: Optional[TraceModel] = None
     character: Optional[CharacterModel] = None
-    dice_roll: Optional[DiceResult] = None
+    dice_roll: Optional[DecisionModel] = None
     decision: Optional[DecisionModel] = None
-    error: Optional[str] = None
+    error: Annotated[Optional[str], first_not_none] = None
     narrative_content: Optional[str] = None
     current_rules: Optional[Dict[str, Any]] = None
     current_decision: Optional[Dict[str, Any]] = None
+    source: Optional[RulesSourceType] = RulesSourceType.RAW  # Déplacé ici car utilisé principalement pour l'input
 
 class GameState(GameStateInput, GameStateOutput):
     """Complete game state at a point in time."""
     
     @property
     def state(self) -> Dict[str, Any]:
-        """Get the complete state as a dictionary.
-        
-        Returns:
-            Dict[str, Any]: Complete state
-        """
-        return self.model_dump()
+        """Get the complete state as a dictionary with explicit 'state' key."""
+        state_dict = self.model_dump()
+        return state_dict
+
     
     @model_validator(mode='after')
     def validate_state(self) -> 'GameState':
@@ -97,9 +98,7 @@ class GameState(GameStateInput, GameStateOutput):
         return GameStateInput(
             section_number=self.section_number,
             player_input=self.player_input,
-            content=self.content,
-            effects=self.effects,
-            flags=self.flags
+            content=self.content
         )
         
     def to_output(self) -> GameStateOutput:
@@ -127,31 +126,6 @@ class GameState(GameStateInput, GameStateOutput):
         )
 
     @classmethod
-    def create_initial_state(cls) -> "GameState":
-        """Create an initial game state with all models initialized."""
-        return cls(
-            section_number=1,
-            narrative=NarratorModel(
-                section_number=1,
-                content="",
-                source_type=NarratorSourceType.RAW
-            ),
-            rules=RulesModel(
-                section_number=1,
-                dice_type=DiceType.NONE,
-                needs_dice=False,
-                conditions=[],
-                next_sections=[],
-                choices=[]
-            ),
-            trace=TraceModel(
-                section_number=1,
-                actions=[],
-                decisions=[]
-            )
-        )
-
-    @classmethod
     def create_from_section(cls, section_number: int) -> 'GameState':
         """Create game state for a specific section.
         
@@ -166,11 +140,9 @@ class GameState(GameStateInput, GameStateOutput):
         """
         return cls(
             section_number=section_number,
-            source=RulesSourceType.RAW,
+            source=RulesSourceType.RAW, 
             player_input=None,
-            content=None,
-            effects={},
-            flags={}
+            content=None
         )
         
     @classmethod
@@ -200,8 +172,6 @@ class GameState(GameStateInput, GameStateOutput):
             error=error_message,
             player_input=None,
             content=None,
-            effects={},
-            flags={},
             narrative=None,
             rules=None,
             trace=None,

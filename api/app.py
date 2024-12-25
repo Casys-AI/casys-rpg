@@ -601,92 +601,34 @@ async def get_feedback(agent_mgr = Depends(get_agent_manager)):
             detail=str(e)
         )
 
+
+# Dans app.py
 @app.post("/api/game/initialize")
-async def initialize_game(
-    init_request: Optional[GameInitRequest] = None,
-    agent_mgr = Depends(get_agent_manager)
-) -> Dict[str, Any]:
+async def initialize_game(agent_mgr=Depends(get_agent_manager)) -> Dict[str, Any]:
     """
     Initialize a new game session.
-    
-    This endpoint:
-    1. Creates a new game session with the specified ID
-    2. Initializes the StoryGraph and all agents
-    3. Sets up the initial game state
-    4. Returns the session details and initial state
-    
-    If no init_request is provided, uses default parameters.
+
+    Directly calls AgentManager's initialize_game to set up a new game session.
     """
     try:
-        logger.info("Starting new game initialization")
-        
-        # Use default parameters if none provided
-        if not init_request:
-            logger.debug("No init request provided, using defaults")
-            init_request = GameInitRequest(
-                game_id=str(uuid.uuid4()),
-                player_id=None,
-                settings={}
-            )
-            logger.debug("Created default init request: %s", init_request)
-        
-        session_id = str(uuid.uuid4())
-        logger.info(f"Generated session ID: {session_id}")
-        
-        try:
-            # Initialize game components
-            logger.debug("Initializing game components")
-            await agent_mgr.initialize()
-            logger.debug("Game components initialized successfully")
-            
-            # Convert request to dict and filter out None values
-            logger.debug("Processing initialization request")
-            init_params = {
-                k: v for k, v in init_request.model_dump().items() 
-                if v is not None
-            }
-            logger.debug(f"Processed init parameters: {init_params}")
-            
-            # Initialize game state
-            logger.debug("Creating initial game state")
-            initial_state = await agent_mgr.initialize_game(
-                session_id=session_id,
-                init_params=init_params
-            )
-            logger.debug("Game state initialized successfully")
-            
-            # Prepare response
-            logger.debug("Preparing response")
-            response = {
-                "session_id": session_id,
-                "initial_state": initial_state.model_dump()
-            }
-            logger.info(f"Game initialization completed for session {session_id}")
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error during game initialization: {e}", exc_info=True)
-            raise GameError(f"Game initialization failed: {str(e)}")
-            
-    except ValueError as e:
-        logger.error(f"Validation error during game initialization: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except GameError as e:
-        logger.error(f"Game error during initialization: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        logger.info("Initializing a new game session")
+
+        # Appelle initialize_game sans arguments
+        initial_state = await agent_mgr.initialize_game()
+
+        # Retourne l'état initial
+        return {
+            "session_id": initial_state.session_id,
+            "initial_state": initial_state.model_dump()  # Dump du modèle GameState en dict
+        }
+
     except Exception as e:
-        logger.error(f"Unexpected error during game initialization: {e}")
-        logger.error("Stack trace:", exc_info=True)
+        logger.error(f"Error initializing game: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
 
 @app.post("/stop")
 async def stop_game(

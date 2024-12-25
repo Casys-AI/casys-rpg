@@ -327,22 +327,22 @@ class AgentManager:
             logger.error("Error getting game state: {}", str(e))
             return None
 
-    async def initialize_game(
-        self,
-        session_id: str,
-        init_params: Dict[str, Any]
-    ) -> GameState:
-        """Initialize a new game session.
-        
-        Args:
-            session_id: Unique session identifier
-            init_params: Initial game parameters
-            
+    async def initialize_game(self) -> GameState:
+        """Initialize and setup a new game instance.
+
+        This method performs the following steps:
+        1. Ensures the manager is initialized
+        2. Configures and sets up the story graph
+        3. Initializes the game workflow
+
         Returns:
-            GameState: Initial game state
+            GameState: The initial state of the game
+
+        Raises:
+            GameError: If story graph configuration fails or initialization encounters an error
         """
         try:
-            # Ensure manager is initialized
+            # Initialisation préalable
             if not self._initialized:
                 await self.initialize()
             
@@ -352,26 +352,21 @@ class AgentManager:
                 raise GameError("Story graph configuration failed")
             await self.story_graph._setup_workflow()
 
-            # Create initial state
-            initial_state = GameState(
-                session_id=session_id,
-                section_number=1,
-                last_update=self.managers.state_manager.get_current_timestamp(),
-                **init_params
-            )
-            
-            # Initialize and execute workflow
+            # Création d'un état initial
+            initial_state = await self.managers.state_manager.create_initial_state()
+
+            logger.info(f"Initial state created: {initial_state}")
+
+            # Initialisation et exécution du workflow initial
             await self.managers.workflow_manager.initialize_workflow(initial_state)
             updated_state = await self.managers.workflow_manager.execute_workflow(
-                state=initial_state,
-                user_input=None,
-                story_graph=self.story_graph
+                state=initial_state, user_input=None, story_graph=self.story_graph
             )
-            
+
+            logger.info("Game initialization completed successfully")
             return updated_state
-            
         except Exception as e:
-            logger.error("Error during game initialization: {}", str(e))
+            logger.error(f"Error during game initialization: {e}")
             raise GameError(f"Failed to initialize game: {str(e)}")
 
     async def stream_game_state(self) -> AsyncGenerator[Dict, None]:

@@ -97,7 +97,7 @@ Tests et Qualité
 PyTest : Tests unitaires et d'intégration
 Black : Formatage de code
 MkDocs : Documentation
-Logging avancé
+Logging avancé avec loguru
 PATTERNS ET PRINCIPES
 
 Design Patterns

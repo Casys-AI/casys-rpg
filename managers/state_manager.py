@@ -24,6 +24,9 @@ def _json_serial(obj):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
 
+
+
+
 class StateManager(StateManagerProtocol):
     """Manages game state persistence and basic validation."""
     
@@ -64,6 +67,11 @@ class StateManager(StateManagerProtocol):
     async def get_game_id(self) -> Optional[str]:
         """Get current game ID."""
         return self._game_id
+
+    @staticmethod
+    def generate_session_id() -> str:
+        """Generate a unique session ID."""
+        return str(uuid.uuid4())
 
     @property
     def current_state(self) -> Optional[GameState]:
@@ -245,68 +253,59 @@ class StateManager(StateManagerProtocol):
         """Clear current state."""
         self._current_state = None
 
-    async def create_initial_state(
-        self,
-        session_id: str,
-        **init_params: Dict[str, Any]
-    ) -> GameState:
-        """Create and return initial game state.
-        
+    async def create_initial_state(self, **init_params: Dict[str, Any]) -> GameState:
+        """Create and return the initial game state.
+
         Args:
-            session_id: Unique session identifier
-            **init_params: Additional initialization parameters
-            
+            **init_params: Additional parameters for initializing the state
+
         Returns:
-            GameState: Initial state
-            
-        Raises:
-            StateError: If creation fails
+            GameState: The initial state
         """
         try:
             if not self._game_id:
                 await self.initialize()
-                
-            logger.info("Creating initial state for session '{}'", session_id)
-            
-            # Create initial character with default stats
+
+            # Générer automatiquement un session_id via la méthode statique
+            session_id = self.generate_session_id()
+            logger.info(f"Creating initial state with session_id: {session_id}")
+
+            # Créer et sauvegarder le personnage initial
             initial_character = CharacterModel(
                 stats=CharacterStats(
-                    endurance=20,  # Default starting stats
+                    endurance=20,
                     chance=20,
                     skill=20
                 )
             )
-            
-            # Save initial character
             await self.cache.save_cached_data(
-                key="current",  # Use "current" as key for active character
+                key="current",
                 namespace="characters",
                 data=initial_character.model_dump()
             )
-            
-            # Create initial state with section 1
+
+            # Définir les paramètres nécessaires pour GameState
             params = {
                 'section_number': 1,
                 'session_id': session_id,
                 'last_update': self.get_current_timestamp(),
-                'character_id': "current",  # Link to the current character
-                **init_params
+                'character_id': "current",
+                **init_params  # Ajouter tout paramètre supplémentaire
             }
-            
+
+            # Créer l'état initial
+            logger.debug(f"Parameters for initial GameState: {params}")
             initial_state = GameState(**params)
-            
-            logger.debug("Initial state created: section={}, session={}",
-                        initial_state.section_number, session_id)
-            
-            # Save initial state
+
+            # Sauvegarder l'état initial
             saved_state = await self.save_state(initial_state)
             self._current_state = saved_state
-            
+
             return saved_state
-            
+
         except Exception as e:
-            logger.error("Failed to create initial state: {}", str(e), exc_info=True)
-            raise StateError(f"Failed to create initial state: {str(e)}")
+            logger.error(f"Failed to create initial state: {e}", exc_info=True)
+            raise StateError(f"Failed to create initial state: {e}")
 
     async def create_error_state(self, error_message: str) -> GameState:
         """Create error state.

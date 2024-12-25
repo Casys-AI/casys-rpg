@@ -2,8 +2,7 @@
 State Manager Protocol
 Defines the interface for state management.
 """
-from typing import Dict, Any, Optional, List, Union, Protocol, runtime_checkable
-from datetime import datetime
+from typing import Dict, Any, Optional, Protocol, runtime_checkable
 from models.game_state import GameState
 from models.errors_model import StateError
 from config.storage_config import StorageConfig
@@ -14,7 +13,34 @@ class StateManagerProtocol(Protocol):
     """Protocol defining the interface for state management."""
     
     def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol) -> None:
-        """Initialize with configuration and cache manager."""
+        """Initialize with configuration and cache manager.
+        
+        Args:
+            config: Storage configuration
+            cache_manager: Cache manager for state storage
+        """
+        ...
+    
+    async def initialize(self, game_id: Optional[str] = None) -> None:
+        """Initialize state manager and generate game ID.
+        
+        Args:
+            game_id: Optional game ID to use. If not provided, a new one will be generated.
+        """
+        ...
+    
+    @property
+    def game_id(self) -> Optional[str]:
+        """Get current game ID."""
+        ...
+    
+    async def get_game_id(self) -> Optional[str]:
+        """Get current game ID."""
+        ...
+    
+    @staticmethod
+    def generate_session_id() -> str:
+        """Generate a unique session ID."""
         ...
     
     @property
@@ -22,36 +48,22 @@ class StateManagerProtocol(Protocol):
         """Get current game state."""
         ...
     
-    async def initialize(self, game_id: Optional[str] = None) -> None:
-        """Initialize the state manager and generate game_id.
-        
-        Args:
-            game_id: Optional game ID to use. If not provided, a new one will be generated.
-        """
-        ...
-    
-    async def get_game_id(self) -> Optional[str]:
-        """Get current game ID."""
-        ...
-    
     async def save_state(self, state: GameState) -> GameState:
-        """
-        Save the current game state.
+        """Save state with basic validation.
         
         Args:
-            state: The game state to save
+            state: State to save
             
         Returns:
-            GameState: The saved game state
+            GameState: Saved state
             
         Raises:
             StateError: If validation or save fails
         """
         ...
-
+    
     async def load_state(self, section_number: int) -> Optional[GameState]:
-        """
-        Load state for a specific section.
+        """Load state for a specific section.
         
         Args:
             section_number: Section number to load
@@ -63,52 +75,28 @@ class StateManagerProtocol(Protocol):
             StateError: If load fails
         """
         ...
-
+    
     async def get_current_state(self) -> Optional[GameState]:
-        """
-        Get the current game state.
-        
-        Returns:
-            Optional[GameState]: The current game state, or None if not found
-            
-        Raises:
-            StateError: If retrieval fails
-        """
+        """Get current game state."""
         ...
     
     async def clear_state(self) -> None:
         """Clear current state."""
         ...
     
-    async def get_session(self, game_id: str) -> str:
-        """Get or create session ID for a game.
+    async def create_initial_state(self, **init_params: Dict[str, Any]) -> GameState:
+        """Create and return the initial game state.
         
         Args:
-            game_id: The game ID to get/create session for
+            **init_params: Additional parameters for initializing the state
             
         Returns:
-            str: The session ID
-        """
-        ...
-
-    async def create_initial_state(self, session_id: str, **init_params: Dict[str, Any]) -> GameState:
-        """Create and return initial game state.
-        
-        Args:
-            session_id: Unique session identifier
-            **init_params: Additional initialization parameters
-            
-        Returns:
-            GameState: Initial state
-            
-        Raises:
-            StateError: If creation fails
+            GameState: The initial state
         """
         ...
     
     async def create_error_state(self, error_message: str) -> GameState:
-        """
-        Create error state.
+        """Create error state.
         
         Args:
             error_message: Error message
@@ -121,13 +109,8 @@ class StateManagerProtocol(Protocol):
         """
         ...
     
-    async def bind_session(self, game_id: str, session_id: str) -> None:
-        """Bind an existing session ID to a game ID."""
-        ...
-
     def get_current_timestamp(self) -> str:
-        """
-        Get current timestamp in ISO format.
+        """Get current timestamp in ISO format.
         
         Returns:
             str: Current timestamp in ISO format

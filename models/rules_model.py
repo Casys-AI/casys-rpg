@@ -1,5 +1,5 @@
 """Models for the rules agent."""
-from typing import List, Optional, Dict, Union, Literal
+from typing import List, Optional, Dict, Union, Literal, Annotated
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
@@ -62,7 +62,7 @@ class Choice(BaseModel):
 
 class RulesModel(BaseModel):
     """Current rules being processed."""
-    section_number: int = Field(gt=0, description="Current section number")
+    section_number: Annotated[int, Field(gt=0, description="Current section number")]
     dice_type: DiceType = Field(default=DiceType.NONE, description="Type of dice roll needed")
     needs_dice: bool = Field(default=False, description="Indicates if a dice roll is needed")
     needs_user_response: bool = Field(
@@ -97,10 +97,7 @@ class RulesModel(BaseModel):
         default=SourceType.RAW,
         description="Type of source for the content"
     )
-    last_update: datetime = Field(
-        default_factory=datetime.now,
-        description="Last update timestamp"
-    )
+    last_update: datetime = Field(default_factory=datetime.now, description="Date de mise à jour spécifique aux règles")
     
     @model_validator(mode='after')
     def validate_rules(self) -> 'RulesModel':
@@ -135,7 +132,6 @@ class RulesModel(BaseModel):
         """Configuration for the model."""
         json_schema_extra = {
             "example": {
-                "section_number": 1,
                 "dice_type": "none",
                 "needs_dice": False,
                 "needs_user_response": True,
