@@ -5,7 +5,7 @@ Defines the model for narrative content.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Annotated
 from pydantic import BaseModel, Field
 
 class SourceType(str, Enum):
@@ -17,11 +17,12 @@ class SourceType(str, Enum):
 class NarratorModel(BaseModel):
     """Model for a narrative section."""
     
-    section_number: int = Field(..., gt=0, description="Section number")
+    section_number: Annotated[int, Field(..., gt=0, description="Section number")]
     content: str = Field(default="", description="Section content")
     source_type: SourceType = Field(default=SourceType.RAW, description="Source type")
     error: Optional[str] = Field(default=None, description="Error message if present")
     timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp")
+    last_update: datetime = Field(default_factory=datetime.now, description="Date de mise à jour spécifique à la narration")
 
     class Config:
         """Model configuration."""

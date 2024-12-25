@@ -51,38 +51,58 @@ class TraceManager(TraceManagerProtocol):
         
         self.logger.info(f"Started new session {session_id} for game {self._current_game_id}")
 
+    
+    
     async def process_trace(self, state: GameState, action: Dict[str, Any]) -> None:
         """Process and store a game trace."""
-        if not self._current_trace:
-            await self.start_session()
-            
-        # Créer une copie des détails sans le type d'action
-        details = action.copy()
-        action_type = ActionType(details.pop("type", ActionType.ERROR))
-            
-        trace_action = TraceAction(
-            timestamp=datetime.now(),
-            section=state.section_number,
-            action_type=action_type,
-            details=details
-        )
-        
-        # Créer une nouvelle trace avec l'action ajoutée
-        new_history = list(self._current_trace.history)
-        new_history.append(trace_action)
-        self._current_trace = TraceModel(
-            game_id=self._current_trace.game_id,
-            session_id=self._current_trace.session_id,
-            section_number=state.section_number,  
-            start_time=self._current_trace.start_time,
-            history=new_history,
-            current_section=self._current_trace.current_section,
-            current_rules=self._current_trace.current_rules,
-            character=self._current_trace.character,
-            error=self._current_trace.error
-        )
-        
-        await self.save_trace()
+        try:
+            if not self._current_trace:
+                self.logger.warning("No current trace found, starting a new session.")
+                await self.start_session()
+
+            # Vérifier la cohérence des session_id
+            if self._current_trace.session_id != state.session_id:
+                raise TraceError(
+                    f"Inconsistent session_id: TraceManager has {self._current_trace.session_id}, "
+                    f"but GameState has {state.session_id}."
+                )
+
+            # Créer une copie des détails sans le type d'action
+            details = action.copy()
+            action_type = ActionType(details.pop("type", ActionType.ERROR))
+
+            trace_action = TraceAction(
+                timestamp=datetime.now(),
+                section=state.section_number,
+                action_type=action_type,
+                details=details
+            )
+
+            # Ajouter l'action à l'historique
+            new_history = list(self._current_trace.history)
+            new_history.append(trace_action)
+            self._current_trace = TraceModel(
+                game_id=self._current_trace.game_id,
+                session_id=self._current_trace.session_id,
+                section_number=state.section_number,
+                start_time=self._current_trace.start_time,
+                history=new_history,
+                current_section=self._current_trace.current_section,
+                current_rules=self._current_trace.current_rules,
+                character=self._current_trace.character,
+                error=self._current_trace.error
+            )
+
+            await self.save_trace()
+            self.logger.info(f"Processed trace for section {state.section_number} successfully.")
+
+        except TraceError as e:
+            self.logger.error(f"Trace error: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error processing trace: {e}")
+            raise TraceError(f"Failed to process trace: {e}")
+
 
     async def save_trace(self) -> None:
         """Save current trace to storage."""

@@ -18,7 +18,16 @@ class AgentManagerProtocol(Protocol):
         managers: GameManagers,
         story_graph_config: Optional[AgentConfigBase] = None
     ) -> None:
-        """Initialize agent manager."""
+        """Initialize agent manager.
+        
+        Args:
+            agents: Container with all game agents
+            managers: Container with all game managers
+            story_graph_config: Optional configuration for story graph
+            
+        Raises:
+            GameError: If any required component is missing or not properly initialized
+        """
         ...
         
     async def execute_workflow(
@@ -26,8 +35,7 @@ class AgentManagerProtocol(Protocol):
         state: Optional[GameState] = None,
         user_input: Optional[str] = None
     ) -> GameState:
-        """
-        Execute game workflow.
+        """Execute game workflow.
         
         Args:
             state: Optional current game state
@@ -39,8 +47,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def process_user_input(self, input_text: str) -> GameState:
-        """
-        Process user input and update game state.
+        """Process user input and update game state.
         
         Args:
             input_text: User input text
@@ -51,8 +58,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def navigate_to_section(self, section_number: int) -> GameState:
-        """
-        Navigate to a specific section.
+        """Navigate to a specific section.
         
         Args:
             section_number: Target section number
@@ -63,8 +69,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def perform_action(self, action: Dict[str, Any]) -> GameState:
-        """
-        Process a user's game action.
+        """Process a user's game action.
         
         Args:
             action: Action details
@@ -75,8 +80,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def submit_response(self, response: str) -> GameState:
-        """
-        Process a user's response or decision.
+        """Process a user's response or decision.
         
         Args:
             response: User response
@@ -87,8 +91,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def process_section(self, section_number: int) -> GameState:
-        """
-        Process a new game section.
+        """Process a new game section.
         
         Args:
             section_number: Section number to process
@@ -103,43 +106,42 @@ class AgentManagerProtocol(Protocol):
         ...
         
     async def get_state(self) -> Optional[GameState]:
-        """
-        Get current game state.
+        """Get current game state.
         
         Returns:
             Optional[GameState]: Current game state or None
         """
         ...
         
-    async def initialize_game(
-        self,
-        session_id: str,
-        init_params: Dict[str, Any]
-    ) -> GameState:
-        """
-        Initialize a new game session.
+    async def initialize_game(self) -> GameState:
+        """Initialize and setup a new game instance.
         
-        Args:
-            session_id: Unique session identifier
-            init_params: Initial game parameters
-            
+        This method performs the following steps:
+        1. Ensures the manager is initialized
+        2. Configures and sets up the story graph
+        3. Initializes the game workflow
+        
         Returns:
-            GameState: Initial game state
+            GameState: The initial state of the game
+            
+        Raises:
+            GameError: If story graph configuration fails or initialization encounters an error
         """
         ...
         
     async def stream_game_state(self) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        Stream game state updates.
+        """Stream game state updates.
         
         Yields:
             Dict: Game state updates
+            
+        Raises:
+            GameError: If streaming fails
         """
         ...
         
     async def get_feedback(self) -> str:
-        """
-        Get feedback about the current game state.
+        """Get feedback about the current game state.
         
         Returns:
             str: Formatted feedback
@@ -147,8 +149,7 @@ class AgentManagerProtocol(Protocol):
         ...
         
     def should_continue(self, state: GameState) -> bool:
-        """
-        Check if the game should continue.
+        """Check if the game should continue.
         
         Args:
             state: Current game state
@@ -157,31 +158,32 @@ class AgentManagerProtocol(Protocol):
             bool: True if game should continue
         """
         ...
-        
+    
     async def process_section_with_updates(self, section_number: int) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        Process a section with streaming state updates.
+        """Process a section with streaming state updates.
         
         Args:
             section_number: Section number to process
             
         Yields:
-            Dict: State updates
+            Dict: State updates during processing
         """
         ...
-        
+    
     async def stop_game(self) -> None:
         """Stop the game and save final state."""
         ...
-        
+    
     def get_agent(self, agent_type: str) -> BaseAgentProtocol:
-        """
-        Get agent instance by type.
+        """Get agent instance by type.
         
         Args:
             agent_type: Type of agent to get
             
         Returns:
             BaseAgentProtocol: Agent instance
+            
+        Raises:
+            ValueError: If agent type is not found
         """
         ...

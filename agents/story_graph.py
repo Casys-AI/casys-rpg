@@ -1,7 +1,7 @@
 """
 Story Graph Agent
 """
-from typing import Dict, Any, Optional, AsyncGenerator, List
+from typing import Dict, Any, Optional, AsyncGenerator, List, Annotated
 from loguru import logger
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END, START
@@ -10,8 +10,8 @@ from langgraph.prebuilt import ToolExecutor
 from agents.protocols.story_graph_protocol import StoryGraphProtocol
 from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
-from models.game_state import GameState, GameStateInput, GameStateOutput
-from models.errors_model import GameError, NarratorError
+from models.game_state import GameState
+from models.errors_model import GameError, NarratorError, RulesError
 from config.agents.agent_config_base import AgentConfigBase
 from agents.factories.game_factory import GameAgents, GameManagers
 
@@ -51,76 +51,41 @@ class StoryGraph(StoryGraphProtocol):
         self._current_section = 1
 
     async def _setup_workflow(self) -> None:
-        """Configure LangGraph workflow with parallel processing for rules and narrative."""
         try:
             logger.info("Setting up LangGraph workflow with parallel processing")
-            
-            # Create StateGraph with input/output models
-            self._graph = StateGraph(GameStateInput, output=GameStateOutput)
-            logger.debug("Created StateGraph with models")
-            
-            # Define node names
-            START_NODE = "node_start"
-            RULES_NODE = "node_rules"
-            NARRATOR_NODE = "node_narrator"
-            DECISION_NODE = "node_decision"
-            TRACE_NODE = "node_trace"
-            END_NODE = "node_end"
-            
-            logger.debug("Adding workflow nodes")
-            # Add workflow nodes
-            self._graph.add_node(START_NODE, self.workflow_manager.start_workflow)
-            self._graph.add_node(RULES_NODE, self._process_rules)
-            self._graph.add_node(NARRATOR_NODE, self._process_narrative)
-            self._graph.add_node(DECISION_NODE, self._process_decision)
-            self._graph.add_node(TRACE_NODE, self._process_trace)
-            self._graph.add_node(END_NODE, self.workflow_manager.end_workflow)
-            
-            logger.debug("Defining conditional routing functions")
-            # Define conditional routing based on state
-            def route_to_parallel(state: GameStateInput) -> List[str]:
-                """Route to both rules and narrator nodes."""
-                logger.debug("Routing to parallel nodes: {}, {}", RULES_NODE, NARRATOR_NODE)
-                return [RULES_NODE, NARRATOR_NODE]
-                
-            self.route_after_parallel = lambda state: self._route_after_parallel(state)
-            
-            logger.debug("Setting up workflow edges")
-            # Define workflow edges with parallel processing
-            self._graph.add_edge(START, START_NODE)
-            
-            # Start parallel processing
-            self._graph.add_conditional_edges(
-                START_NODE,
-                route_to_parallel
-            )
-            
-            # Wait for both processes to complete
-            self._graph.add_conditional_edges(
-                RULES_NODE,
-                self.route_after_parallel
-            )
-            self._graph.add_conditional_edges(
-                NARRATOR_NODE,
-                self.route_after_parallel
-            )
-            
-            # Continue with sequential flow
-            self._graph.add_edge(DECISION_NODE, TRACE_NODE)
-            self._graph.add_edge(TRACE_NODE, END_NODE)
-            self._graph.add_edge(END_NODE, END)
-            
-            # Compile graph
-            logger.debug("Compiling workflow graph")
+
+            self._graph = StateGraph(GameState, output=GameState)
+
+            # Ajouter les nœuds
+            self._graph.add_node("node_start", self.workflow_manager.start_workflow)
+            self._graph.add_node("node_rules", self._process_rules)
+            self._graph.add_node("node_narrator", self._process_narrative)
+            self._graph.add_node("node_decision", self._process_decision)
+            self._graph.add_node("node_end", self.workflow_manager.end_workflow)
+
+            # Ajouter les connexions
+            self._graph.add_edge(START, "node_start")
+            self._graph.add_edge("node_start", "node_rules")
+            self._graph.add_edge("node_start", "node_narrator")
+
+            # Fan-in : fusion des résultats de `rules` et `narrator` dans `decision`
+            self._graph.add_edge(["node_rules", "node_narrator"], "node_decision")
+
+            # Fin du workflow
+            self._graph.add_edge("node_decision", "node_end")
+            self._graph.add_edge("node_end", END)
+
+            # Compiler le graphe
             self._graph.compile()
-            
-            logger.success("LangGraph workflow setup completed successfully")
-            
+            logger.success("Workflow setup completed")
         except Exception as e:
-            logger.exception("Error setting up LangGraph workflow: {}", str(e))
+            logger.exception("Error setting up workflow: {}", str(e))
             raise
 
-    async def _process_rules(self, input_data: GameStateInput) -> GameStateOutput:
+
+
+
+    async def _process_rules(self, input_data: GameState) -> GameState:
         """Process game rules for the current state."""
         try:
             logger.info("Processing rules for section {}", input_data.section_number)
@@ -135,26 +100,28 @@ class StoryGraph(StoryGraphProtocol):
                     input_data.content
                 )
                 
-                output = GameStateOutput(
+                if isinstance(rules, RulesError):
+                    raise rules
+                
+                output = GameState(
                     session_id=input_data.session_id,
                     rules=rules,
                     narrative_content=input_data.content,
                     section_number=input_data.section_number,
-                    source=input_data.source
                 )
                 logger.debug("Rules processing completed for section {}", input_data.section_number)
                 return output
 
             logger.debug("No rules agent available, returning empty output")
-            return GameStateOutput(session_id=input_data.session_id)
+            return GameState(session_id=input_data.session_id)
         except Exception as e:
             logger.exception("Error processing rules: {}", str(e))
-            return GameStateOutput(
+            return GameState(
                 session_id=input_data.session_id,
                 error=str(e)
             )
 
-    async def _process_narrative(self, input_data: GameStateInput) -> GameStateOutput:
+    async def _process_narrative(self, input_data: GameState) -> GameState:
         """Process narrative for the current state."""
         try:
             logger.info("Processing narrative for section {}", input_data.section_number)
@@ -172,90 +139,73 @@ class StoryGraph(StoryGraphProtocol):
                 if isinstance(narrator_result, NarratorError):
                     raise narrator_result
                 
-                output = GameStateOutput(
+                output = GameState(
                     session_id=input_data.session_id,
                     narrative=narrator_result,
                     narrative_content=input_data.content,
                     section_number=input_data.section_number,
-                    source=input_data.source
                 )
                 logger.debug("Narrative processing completed for section {}", input_data.section_number)
                 return output
 
             logger.debug("No narrator agent available, returning empty output")
-            return GameStateOutput(session_id=input_data.session_id)
+            return GameState(session_id=input_data.session_id)
         except Exception as e:
             logger.exception("Error processing narrative: {}", str(e))
-            return GameStateOutput(
+            return GameState(
                 session_id=input_data.session_id,
                 error=str(e)
             )
 
-    def _route_after_parallel(self, state: Any) -> Optional[List[str]]:
-        """Route to decision after both processes complete."""
-        logger.debug("Checking parallel processes completion")
-        
-        # Log state details at trace level for debugging
-        logger.trace("Received state: type={}, content={}", 
-                    type(state).__name__,
-                    state.__dict__ if hasattr(state, '__dict__') else str(state))
 
-        # Si c'est un GameStateInput, on continue avec les deux branches
-        if isinstance(state, GameStateInput):
-            logger.debug("GameStateInput received, continuing parallel processing")
-            return ["node_rules", "node_narrator"]
-
-        # Si c'est un GameStateOutput, on vérifie qu'on a les deux résultats
-        if isinstance(state, GameStateOutput):
-            if state.rules is not None and state.narrative is not None:
-                logger.info("Both parallel processes complete, routing to decision node")
-                return ["node_decision"]
-            
-            logger.debug("Waiting for parallel processes to complete: rules={}, narrative={}", 
-                      state.rules is not None, 
-                      state.narrative is not None)
-            return ["node_rules", "node_narrator"]  # Continue parallel processing
-
-        # Pour tout autre type d'état, on continue le traitement parallèle
-        logger.warning("Unexpected state type in parallel routing: {}, continuing parallel processing", type(state).__name__)
-        return ["node_rules", "node_narrator"]
-
-    async def _process_decision(self, input_data: GameStateInput) -> GameStateOutput:
-        """Process decision for the current state."""
+    async def _process_decision(
+        self,
+        state: GameState
+    ) -> GameState:
+        """Merge results from parallel states and process decision."""
         try:
-            logger.info("Processing decision for section {}", input_data.section_number)
-            
-            if not input_data:
-                raise GameError("No input data available for decision processing")
+            logger.info("Processing decision with merged state")
 
+            # Vérifier si les données nécessaires sont présentes
+            rules_data = state.rules
+            narrative_data = state.narrative
+
+            if not rules_data or not narrative_data:
+                raise GameError("Missing required data for decision processing")
+
+            # Loguer les données reçues pour débogage
+            logger.debug(f"Rules Data: {rules_data}")
+            logger.debug(f"Narrative Data: {narrative_data}")
+
+            # Fusion des données (exemple : prioriser les données des règles)
+            final_state = GameState(
+                session_id=state.session_id,
+                rules=rules_data,
+                narrative=narrative_data,
+                decision=None,  # Initialement vide, à mettre à jour après analyse
+                error=None
+            )
+
+            # Processus de décision via l'agent de décision
             if self.decision_agent:
-                # Analyze decision
-                state = GameState(
-                    section_number=input_data.section_number,
-                    player_input=input_data.player_input,
-                    content=input_data.content,
-                    source=input_data.source,
-                    session_id=input_data.session_id
-                )
-                updated_state = await self.decision_agent.analyze_decision(state)
-                
-                return GameStateOutput(
-                    decision=updated_state.decision,
-                    section_number=updated_state.section_number,
-                    source=updated_state.source,
-                    session_id=updated_state.session_id
-                )
+                decision = await self.decision_agent.analyze_decision(final_state)
+                final_state.decision = decision
+                logger.info("Decision processed successfully")
 
-            logger.debug("No decision agent available, returning empty output")
-            return GameStateOutput(session_id=input_data.session_id)
+            else:
+                logger.warning("No decision agent available, returning merged state as is")
+
+            return final_state
+
         except Exception as e:
             logger.exception("Error processing decision: {}", str(e))
-            return GameStateOutput(
-                session_id=input_data.session_id,
+            return GameState(
+                session_id=state.session_id,
                 error=str(e)
             )
 
-    async def _process_trace(self, input_data: GameStateInput) -> GameStateOutput:
+
+    async def _process_trace(self, input_data: GameState) -> GameState:
         """Process trace for the current state."""
         try:
             logger.info("Processing trace for section {}", input_data.section_number)
@@ -270,18 +220,18 @@ class StoryGraph(StoryGraphProtocol):
                 # Analyze state
                 state = await self.trace_agent.analyze_state(input_data)
                 
-                return GameStateOutput(
+                return GameState(
+                    session_id=input_data.session_id,
                     trace=trace,
                     section_number=input_data.section_number,
                     source=input_data.source,
-                    session_id=input_data.session_id
                 )
 
             logger.debug("No trace agent available, returning empty output")
-            return GameStateOutput(session_id=input_data.session_id)
+            return GameState(session_id=input_data.session_id)
         except Exception as e:
             logger.exception("Error processing trace: {}", str(e))
-            return GameStateOutput(
+            return GameState(
                 session_id=input_data.session_id,
                 error=str(e)
             )
