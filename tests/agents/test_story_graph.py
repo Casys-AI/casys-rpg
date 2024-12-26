@@ -1,43 +1,49 @@
 """Tests for StoryGraph agent."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from loguru import logger
+from unittest.mock import AsyncMock
+from typing import Any, AsyncIterator
 
-from agents.story_graph import StoryGraph
 from models.game_state import GameStateInput, GameStateOutput
 from models.rules_model import RulesModel
 from models.narrator_model import NarratorModel
+from models.types.game_types import GameAgents, GameManagers
 from config.agents.agent_config_base import AgentConfigBase
-from agents.factories.game_factory import GameAgents, GameManagers
-
+from agents.story_graph import StoryGraph
 
 @pytest.fixture
 def mock_managers():
     """Create mock managers."""
-    managers = MagicMock(spec=GameManagers)
-    managers.state_manager = AsyncMock()
-    managers.workflow_manager = AsyncMock()
-    managers.rules_manager = AsyncMock()
-    managers.narrator_manager = AsyncMock()
-    managers.decision_manager = AsyncMock()
-    managers.trace_manager = AsyncMock()
+    managers = GameManagers(
+        state_manager=AsyncMock(),
+        workflow_manager=AsyncMock(),
+        rules_manager=AsyncMock(),
+        narrator_manager=AsyncMock(),
+        decision_manager=AsyncMock(),
+        trace_manager=AsyncMock(),
+        cache_manager=AsyncMock(),
+        character_manager=AsyncMock()
+    )
     return managers
 
 @pytest.fixture
 def mock_agents():
     """Create mock agents."""
-    agents = MagicMock(spec=GameAgents)
-    agents.rules_agent = AsyncMock()
-    agents.narrator_agent = AsyncMock()
-    agents.decision_agent = AsyncMock()
-    agents.trace_agent = AsyncMock()
+    agents = GameAgents(
+        rules_agent=AsyncMock(),
+        narrator_agent=AsyncMock(),
+        decision_agent=AsyncMock(),
+        trace_agent=AsyncMock()
+    )
+    # Configure default returns
+    agents.rules_agent.process_rules = AsyncMock(return_value=RulesModel())
+    agents.narrator_agent.generate_narrative = AsyncMock(return_value=NarratorModel())
     return agents
 
 @pytest.fixture
 def story_graph(mock_managers, mock_agents):
     """Create StoryGraph instance with mocked dependencies."""
     config = AgentConfigBase()
-    return StoryGraph(config, mock_managers, mock_agents)
+    return StoryGraph(config=config, managers=mock_managers, agents=mock_agents)
 
 @pytest.mark.asyncio
 async def test_process_rules(story_graph, mock_agents):
@@ -45,7 +51,7 @@ async def test_process_rules(story_graph, mock_agents):
     # Setup
     input_state = GameStateInput(section_number=1, content="test content")
     mock_rules = RulesModel(section_number=1, content="test rules")
-    mock_agents.rules_agent.process_section_rules.return_value = mock_rules
+    mock_agents.rules_agent.process_rules.return_value = mock_rules
 
     # Execute
     result = await story_graph._process_rules(input_state)
@@ -54,7 +60,7 @@ async def test_process_rules(story_graph, mock_agents):
     assert isinstance(result, GameStateOutput)
     assert result.rules == mock_rules
     assert result.section_number == input_state.section_number
-    mock_agents.rules_agent.process_section_rules.assert_called_once_with(
+    mock_agents.rules_agent.process_rules.assert_called_once_with(
         input_state.section_number,
         input_state.content
     )
@@ -65,7 +71,7 @@ async def test_process_narrative(story_graph, mock_agents):
     # Setup
     input_state = GameStateInput(section_number=1, content="test content")
     mock_narrative = NarratorModel(section_number=1, content="test narrative")
-    mock_agents.narrator_agent.process_section.return_value = mock_narrative
+    mock_agents.narrator_agent.generate_narrative.return_value = mock_narrative
 
     # Execute
     result = await story_graph._process_narrative(input_state)
@@ -74,7 +80,7 @@ async def test_process_narrative(story_graph, mock_agents):
     assert isinstance(result, GameStateOutput)
     assert result.narrative == mock_narrative
     assert result.section_number == input_state.section_number
-    mock_agents.narrator_agent.process_section.assert_called_once_with(
+    mock_agents.narrator_agent.generate_narrative.assert_called_once_with(
         input_state.section_number,
         input_state.content
     )
@@ -87,8 +93,8 @@ async def test_parallel_processing(story_graph, mock_agents):
     mock_rules = RulesModel(section_number=1, content="test rules")
     mock_narrative = NarratorModel(section_number=1, content="test narrative")
     
-    mock_agents.rules_agent.process_section_rules.return_value = mock_rules
-    mock_agents.narrator_agent.process_section.return_value = mock_narrative
+    mock_agents.rules_agent.process_rules.return_value = mock_rules
+    mock_agents.narrator_agent.generate_narrative.return_value = mock_narrative
 
     # Execute rules branch
     rules_result = await story_graph._process_rules(input_state)
@@ -107,5 +113,5 @@ async def test_parallel_processing(story_graph, mock_agents):
     assert narrative_result.rules is None  # No rules yet
 
     # Verify parallel execution
-    mock_agents.rules_agent.process_section_rules.assert_called_once()
-    mock_agents.narrator_agent.process_section.assert_called_once()
+    mock_agents.rules_agent.process_rules.assert_called_once()
+    mock_agents.narrator_agent.generate_narrative.assert_called_once()

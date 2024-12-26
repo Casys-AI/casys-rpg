@@ -129,9 +129,25 @@ class RulesModel(BaseModel):
         return self
         
     def __add__(self, other: 'RulesModel') -> 'RulesModel':
-        """Implement addition for LangGraph fan-in."""
+        """Merge two RulesModels for LangGraph parallel results.
+        Verifies section numbers match and takes the latest model.
+        
+        Args:
+            other: Another RulesModel to merge with
+            
+        Returns:
+            The latest RulesModel if sections match
+            
+        Raises:
+            AssertionError: If section numbers don't match
+        """
         if not isinstance(other, RulesModel):
             return self
+            
+        # Vérifier que les sections correspondent
+        assert self.section_number == other.section_number, \
+            f"Cannot add RulesModels with different section numbers: {self.section_number} != {other.section_number}"
+            
         # Prendre le dernier modèle
         return other
 

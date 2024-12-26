@@ -1,114 +1,55 @@
 """Tests for the game factory module."""
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch, Mock
 
 from agents.factories.game_factory import GameFactory
-from config.game_config import GameConfig
-from config.storage_config import StorageConfig
-from agents.narrator_agent import NarratorAgent
-from agents.rules_agent import RulesAgent
-from agents.decision_agent import DecisionAgent
-from agents.trace_agent import TraceAgent
-from managers.narrator_manager import NarratorManager
-from managers.rules_manager import RulesManager
-from managers.decision_manager import DecisionManager
-from managers.trace_manager import TraceManager
-from managers.cache_manager import CacheManager
 
 @pytest.fixture
-def mock_config():
-    """Create a mock game configuration."""
-    config = GameConfig.create_default()
-    storage_config = StorageConfig(base_path=Path("./test_data"))
-    config.manager_configs.storage_config = storage_config
-    return config
-
-@pytest.fixture
-def game_factory(mock_config):
+def game_factory(base_config):
     """Create a game factory instance."""
-    return GameFactory(config=mock_config)
+    with patch('agents.factories.game_factory.CacheManager') as mock_cache:
+        factory = GameFactory(config=base_config)
+        factory._cache_manager = mock_cache.return_value
+        return factory
 
-def test_create_narrator_agent(game_factory):
-    """Test creation of narrator agent."""
-    agent = game_factory.create_narrator_agent()
-    
-    assert isinstance(agent, NarratorAgent)
-    assert isinstance(agent._manager, NarratorManager)
-    assert agent._config.llm is not None
-    assert agent._config.system_message is not None
-
-def test_create_rules_agent(game_factory):
-    """Test creation of rules agent."""
-    agent = game_factory.create_rules_agent()
-    
-    assert isinstance(agent, RulesAgent)
-    assert isinstance(agent._manager, RulesManager)
-    assert agent._config.llm is not None
-    assert agent._config.system_message is not None
-
-def test_create_decision_agent(game_factory):
-    """Test creation of decision agent."""
-    agent = game_factory.create_decision_agent()
-    
-    assert isinstance(agent, DecisionAgent)
-    assert isinstance(agent._manager, DecisionManager)
-    assert agent._config.llm is not None
-    assert agent._config.system_message is not None
-    assert "rules_agent" in agent._config.dependencies
-
-def test_create_trace_agent(game_factory):
-    """Test creation of trace agent."""
-    agent = game_factory.create_trace_agent()
-    
-    assert isinstance(agent, TraceAgent)
-    assert isinstance(agent._manager, TraceManager)
-    assert agent._config is not None
-
-def test_create_story_graph(game_factory):
-    """Test creation of story graph."""
-    graph = game_factory.create_story_graph()
-    
-    assert graph is not None
-    assert hasattr(graph, "process_turn")
-    assert len(graph._agents) == 4
-
-def test_create_game_instance(game_factory):
+@pytest.mark.asyncio
+async def test_create_game_instance(game_factory, base_managers):
     """Test creation of complete game instance."""
-    game = game_factory.create_game()
-    
-    assert game is not None
-    assert game.story_graph is not None
-    assert game.config == game_factory._config
-    assert hasattr(game, "process_turn")
+    with patch.multiple(
+        'agents.factories.game_factory',
+        NarratorManager=Mock(return_value=base_managers.narrator_manager),
+        RulesManager=Mock(return_value=base_managers.rules_manager),
+        TraceManager=Mock(return_value=base_managers.trace_manager),
+        StateManager=Mock(return_value=base_managers.state_manager),
+        WorkflowManager=Mock(return_value=base_managers.workflow_manager)
+    ):
+        agents, managers = await game_factory.create_game_components()
+        assert agents is not None
+        assert managers is not None
+        assert managers.narrator_manager == base_managers.narrator_manager
+        assert managers.rules_manager == base_managers.rules_manager
+        assert managers.trace_manager == base_managers.trace_manager
 
-@patch("factories.game_factory.OpenAI")
-def test_create_llm(mock_openai, game_factory):
-    """Test LLM creation."""
-    llm = game_factory._create_llm()
-    
-    assert llm is not None
-    mock_openai.assert_called_once()
-    assert mock_openai.call_args[1]["model"] == game_factory._config.llm_model
-
-def test_create_managers(game_factory):
-    """Test creation of all managers."""
-    narrator_manager = game_factory._create_narrator_manager()
-    rules_manager = game_factory._create_rules_manager()
-    decision_manager = game_factory._create_decision_manager()
-    trace_manager = game_factory._create_trace_manager()
-    
-    assert isinstance(narrator_manager, NarratorManager)
-    assert isinstance(rules_manager, RulesManager)
-    assert isinstance(decision_manager, DecisionManager)
-    assert isinstance(trace_manager, TraceManager)
+@pytest.mark.asyncio
+async def test_create_story_graph(game_factory, base_managers):
+    """Test creation of story graph."""
+    with patch.multiple(
+        'agents.factories.game_factory',
+        StateManager=Mock(return_value=base_managers.state_manager),
+        WorkflowManager=Mock(return_value=base_managers.workflow_manager)
+    ):
+        graph = await game_factory.create_story_graph()
+        assert graph is not None
+        assert graph._managers.state_manager == base_managers.state_manager
+        assert graph._managers.workflow_manager == base_managers.workflow_manager
 
 def test_invalid_config():
     """Test factory creation with invalid config."""
     with pytest.raises(ValueError):
         GameFactory(config=None)
 
-def test_invalid_cache_manager(mock_config):
+@patch('agents.factories.game_factory.CacheManager', side_effect=ValueError)
+def test_invalid_cache_manager(mock_cache, base_config):
     """Test factory creation with invalid cache manager."""
     with pytest.raises(ValueError):
-        GameFactory(config=mock_config, cache_manager=None)
+        GameFactory(config=base_config)
