@@ -92,7 +92,7 @@ def base_agents(base_managers):
 @pytest.fixture
 def mock_managers():
     """Create mock managers for testing."""
-    from models.types.game_types import GameManagers
+    from models.types.manager_types import GameManagers
     
     state_manager = AsyncMock()
     rules_manager = AsyncMock()
@@ -119,7 +119,7 @@ def mock_managers():
 @pytest.fixture
 def mock_agents():
     """Create mock agents for testing."""
-    from models.types.game_types import GameAgents
+    from models.types.agent_types import GameAgents
     
     decision_agent = AsyncMockWithIter()
     rules_agent = AsyncMockWithIter()
@@ -140,10 +140,17 @@ def mock_agent_manager(mock_agents, mock_managers):
     """Create a mock agent manager for testing."""
     from managers.agent_manager import AgentManager
     from config.agents.agent_config_base import AgentConfigBase
+    from agents.factories.game_factory import GameFactory
+    from config.game_config import GameConfig
+    
+    # Create a mock game factory
+    config = GameConfig.create_default()
+    game_factory = GameFactory(config=config)
     
     agent_manager = AgentManager(
         agents=mock_agents,
         managers=mock_managers,
+        game_factory=game_factory,
         story_graph_config=AgentConfigBase()
     )
     

@@ -23,6 +23,8 @@ from agents.narrator_agent import NarratorAgent
 from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
 from agents.trace_agent import TraceAgent
+from agents.story_graph import StoryGraph
+from agents.protocols.story_graph_protocol import StoryGraphProtocol
 
 from models.types.agent_types import GameAgents
 from models.types.manager_types import GameManagers
@@ -93,17 +95,85 @@ class GameFactory:
             trace_agent=trace_agent
         )
         
+    def _validate_managers(self, managers: GameManagers) -> None:
+        """Validate that all required managers are present and properly initialized."""
+        required_managers = [
+            (managers.state_manager, "StateManager"),
+            (managers.cache_manager, "CacheManager"),
+            (managers.character_manager, "CharacterManager"),
+            (managers.trace_manager, "TraceManager"),
+            (managers.decision_manager, "DecisionManager"),
+            (managers.rules_manager, "RulesManager"),
+            (managers.narrator_manager, "NarratorManager"),
+            (managers.workflow_manager, "WorkflowManager")
+        ]
+        
+        for manager, name in required_managers:
+            if not manager:
+                raise Exception(f"Required manager {name} is not initialized")
+                
+    def _validate_agents(self, agents: GameAgents) -> None:
+        """Validate that all required agents are present and properly initialized."""
+        required_agents = [
+            (agents.narrator_agent, "NarratorAgent"),
+            (agents.rules_agent, "RulesAgent"),
+            (agents.decision_agent, "DecisionAgent"),
+            (agents.trace_agent, "TraceAgent")
+        ]
+        
+        for agent, name in required_agents:
+            if not agent:
+                raise Exception(f"Required agent {name} is not initialized")
+                
     def create_game_components(self) -> tuple[GameAgents, GameManagers]:
         """Create all game components.
         
         Returns:
             tuple[GameAgents, GameManagers]: All game components
+            
+        Raises:
+            Exception: If component creation fails
         """
         try:
             managers = self._create_managers()
+            self._validate_managers(managers)
+            
             agents = self._create_agents(managers)
+            self._validate_agents(agents)
+            
             return agents, managers
             
         except Exception as e:
-            logger.error(f"Error creating game components: {e}")
-            raise
+            logger.error("Error creating game components: {}", str(e))
+            raise Exception(f"Failed to create game components: {str(e)}")
+
+    def create_story_graph(self, config: AgentConfigBase, managers: GameManagers, agents: GameAgents) -> StoryGraphProtocol:
+        """Create and configure story graph.
+        
+        Args:
+            config: Configuration for story graph
+            managers: Container with all managers
+            agents: Container with all agents
+            
+        Returns:
+            StoryGraphProtocol: Configured story graph instance
+            
+        Raises:
+            Exception: If story graph creation fails
+        """
+        try:
+            logger.debug("Creating story graph")
+            
+            # Create story graph with dependencies
+            story_graph = StoryGraph(
+                config=config,
+                managers=managers,
+                agents=agents
+            )
+            
+            logger.debug("Story graph created successfully")
+            return story_graph
+            
+        except Exception as e:
+            logger.error("Error creating story graph: {}", str(e))
+            raise Exception(f"Failed to create story graph: {str(e)}")
