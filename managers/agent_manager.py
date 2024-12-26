@@ -45,10 +45,12 @@ from agents.protocols.decision_agent_protocol import DecisionAgentProtocol
 from agents.protocols.trace_agent_protocol import TraceAgentProtocol
 from agents.protocols.base_agent_protocol import BaseAgentProtocol
 
-from agents.factories.game_factory import GameFactory, GameAgents, GameManagers
+from agents.factories.game_factory import GameFactory
+from models.types.agent_types import GameAgents
+from models.types.manager_types import GameManagers
 from config.agents.agent_config_base import AgentConfigBase
 
-from models.game_state import GameState, GameStateInput, GameStateOutput
+from models.game_state import GameState
 from models.errors_model import GameError
 
 from config.storage_config import StorageConfig
@@ -78,7 +80,7 @@ def get_agent_manager(
         logger.info("Creating new AgentManager instance")
         managers = game_factory._create_managers()
         agents = game_factory._create_agents(managers)
-        _agent_manager = AgentManager(agents, managers)
+        _agent_manager = AgentManager(agents, managers, game_factory)
         logger.debug("AgentManager initialized with factory: %s and config: %s", 
                     game_factory.__class__.__name__, 
                     storage_config.__class__.__name__)
@@ -98,40 +100,11 @@ class AgentManager:
     - Traitement des entrées utilisateur
     """
     
-    def _validate_managers(self, managers: GameManagers) -> None:
-        """Validate that all required managers are present and properly initialized."""
-        required_managers = [
-            (managers.state_manager, "StateManager"),
-            (managers.cache_manager, "CacheManager"),
-            (managers.character_manager, "CharacterManager"),
-            (managers.trace_manager, "TraceManager"),
-            (managers.decision_manager, "DecisionManager"),
-            (managers.rules_manager, "RulesManager"),
-            (managers.narrator_manager, "NarratorManager"),
-            (managers.workflow_manager, "WorkflowManager")
-        ]
-        
-        for manager, name in required_managers:
-            if not manager:
-                raise GameError(f"Required manager {name} is not initialized")
-                
-    def _validate_agents(self, agents: GameAgents) -> None:
-        """Validate that all required agents are present and properly initialized."""
-        required_agents = [
-            (agents.narrator_agent, "NarratorAgent"),
-            (agents.rules_agent, "RulesAgent"),
-            (agents.decision_agent, "DecisionAgent"),
-            (agents.trace_agent, "TraceAgent")
-        ]
-        
-        for agent, name in required_agents:
-            if not agent:
-                raise GameError(f"Required agent {name} is not initialized")
-
     def __init__(
             self,
             agents: GameAgents,
             managers: GameManagers,
+            game_factory: GameFactory,
             story_graph_config: Optional[AgentConfigBase] = None
         ):
         """Initialize AgentManager.
@@ -139,36 +112,45 @@ class AgentManager:
         Args:
             agents: Container with all game agents
             managers: Container with all game managers
+            game_factory: GameFactory instance
             story_graph_config: Optional configuration for story graph
             
         Raises:
-            GameError: If any required component is missing or not properly initialized
+            GameError: If initialization fails
         """
         logger.info("Initializing AgentManager")
         try:
-            # Validate components
-            self._validate_managers(managers)
-            self._validate_agents(agents)
-            
             # Store containers and config
             self.managers = managers
             self.agents = agents
+            self.game_factory = game_factory
             self._story_graph_config = story_graph_config
-            self._initialized = False
             
-            # Story graph will be initialized in initialize_game()
+            # Story graph and workflow will be initialized in initialize_game()
             self.story_graph = None
-            
+            self._compiled_workflow = None
+
             logger.info("AgentManager initialization completed")
             
         except Exception as e:
             logger.error("Error initializing AgentManager: {}", str(e))
             raise GameError(f"Failed to initialize AgentManager: {str(e)}")
 
-    async def execute_workflow(self, state: Optional[GameState] = None, user_input: Optional[str] = None) -> GameState:
-        """Execute game workflow."""
+    async def process_game_state(self, state: Optional[GameState] = None, user_input: Optional[str] = None) -> GameState:
+        """Process game state through the workflow.
+        
+        Args:
+            state: Optional game state to use
+            user_input: Optional user input
+            
+        Returns:
+            GameState: Updated game state
+            
+        Raises:
+            GameError: If processing fails
+        """
         try:
-            logger.info("Starting workflow execution")
+            logger.info("Starting game state processing")
             logger.debug("Input state: {}, User input: {}", state, user_input)
             
             if not self.story_graph:
@@ -179,6 +161,7 @@ class AgentManager:
             if not state:
                 logger.debug("No state provided, getting current state")
                 state = await self.get_state()
+                
                 if not state and self.managers.state_manager:
                     logger.debug("Creating initial state")
                     state = await self.managers.state_manager.create_initial_state()
@@ -187,129 +170,21 @@ class AgentManager:
                 logger.error("No valid state available")
                 raise GameError("No valid state available")
                 
-            # Execute workflow through story graph
-            logger.debug("Executing game workflow through story graph")
-            state = await self.managers.workflow_manager.execute_workflow(
-                state=state,
-                user_input=user_input,
-                story_graph=self.story_graph
-            )
-            logger.info("Workflow execution completed successfully")
-            return state
+            # Compile workflow
+            workflow = await self.get_story_workflow()
+            
+            # Create input and execute
+            input_data = state.with_updates(player_input=user_input)
+            async for result in workflow.astream(input_data):
+                if isinstance(result, GameState):
+                    return result
+                    
+            logger.error("No valid result from workflow")
+            raise GameError("No valid result")
             
         except Exception as e:
-            logger.error("Error executing workflow: {}", str(e))
-            if isinstance(e, GameError):
-                error_message = str(e)
-            else:
-                error_message = f"Unexpected error: {str(e)}"
-                
-            if self.managers.state_manager:
-                logger.debug("Creating error state")
-                return await self.managers.state_manager.create_error_state(error_message)
-            raise GameError(error_message)
-
-    async def process_user_input(self, input_text: str) -> GameState:
-        """Process user input and update game state."""
-        try:
-            logger.info("Processing user input: {}", input_text)
-            result = await self.execute_workflow(user_input=input_text)
-            logger.debug("User input processing completed with result: {}", result)
-            return result
-            
-        except Exception as e:
-            logger.error("Error processing user input: {}", str(e))
-            raise
-
-    async def navigate_to_section(self, section_number: int) -> GameState:
-        """Navigate to a specific section."""
-        try:
-            logger.info("Navigating to section {}", section_number)
-            current_state = await self.get_state()
-            logger.debug("Current state: {}", current_state)
-            if current_state:
-                current_state.section_number = section_number
-            logger.debug("Updated state: {}", current_state)
-            result = await self.execute_workflow(state=current_state)
-            logger.debug("Navigation completed with result: {}", result)
-            return result
-            
-        except Exception as e:
-            logger.error("Error navigating to section: {}", str(e))
-            raise
-
-    async def perform_action(self, action: Dict[str, Any]) -> GameState:
-        """Process a user's game action."""
-        try:
-            logger.info("Performing action: {}", action)
-            input_text = str(action.get("response", ""))
-            logger.debug("Converting action to input: {}", input_text)
-            result = await self.execute_workflow(user_input=input_text)
-            logger.debug("Action processing completed with result: {}", result)
-            return result
-            
-        except Exception as e:
-            logger.error("Error performing action: {}", str(e))
-            raise
-
-    async def submit_response(self, response: str) -> GameState:
-        """Process a user's response or decision."""
-        try:
-            logger.info("Processing user response: {}", response)
-            result = await self.execute_workflow(user_input=response)
-            logger.debug("Response processing completed with result: {}", result)
-            return result
-            
-        except Exception as e:
-            logger.error("Error processing user response: {}", str(e))
-            raise
-
-    async def process_section(self, section_number: int) -> GameState:
-        """Process a new game section."""
-        try:
-            logger.info("Processing section {}", section_number)
-            current_state = await self.get_state()
-            logger.debug("Current state: {}", current_state)
-            if current_state:
-                current_state.section_number = section_number
-            logger.debug("Updated state: {}", current_state)
-            result = await self.execute_workflow(state=current_state)
-            logger.debug("Section processing completed with result: {}", result)
-            return result
-            
-        except Exception as e:
-            logger.error("Error processing section {}: {}", section_number, str(e))
-            raise
-
-    async def _initialize_components(self) -> None:
-        """Initialize all manager components that have an initialize method."""
-        logger.info("Initializing manager components")
-        
-        # Utilise les champs de la dataclass directement
-        for field in self.managers.__dataclass_fields__:
-            manager = getattr(self.managers, field)
-            if hasattr(manager, 'initialize'):
-                logger.debug("Initializing {}", field)
-                await manager.initialize()
-
-    async def initialize(self) -> None:
-        """Initialize the agent manager and its components."""
-        if self._initialized:
-            logger.debug("AgentManager already initialized")
-            return
-        
-        try:
-            logger.info("Starting AgentManager initialization")
-            
-            # Initialize all manager components
-            await self._initialize_components()
-            
-            self._initialized = True
-            logger.info("AgentManager initialization completed successfully")
-            
-        except Exception as e:
-            logger.error("Error during AgentManager initialization: {}", str(e))
-            raise GameError(f"Failed to initialize AgentManager: {str(e)}")
+            logger.error("Error processing game state: {}", str(e))
+            raise GameError(str(e))
 
     async def get_state(self) -> Optional[GameState]:
         """Get current game state."""
@@ -330,44 +205,78 @@ class AgentManager:
     async def initialize_game(self) -> GameState:
         """Initialize and setup a new game instance.
 
-        This method performs the following steps:
-        1. Ensures the manager is initialized
-        2. Configures and sets up the story graph
-        3. Initializes the game workflow
-
         Returns:
             GameState: The initial state of the game
 
         Raises:
-            GameError: If story graph configuration fails or initialization encounters an error
+            GameError: If initialization fails
         """
         try:
-            # Initialisation préalable
-            if not self._initialized:
-                await self.initialize()
+            logger.info("Initializing game")
             
-            # Configure story graph
-            self.story_graph = self._configure_story_graph()
-            if not self.story_graph:
-                raise GameError("Story graph configuration failed")
-            await self.story_graph._setup_workflow()
-
-            # Création d'un état initial
+            # Get workflow (will create story graph if needed)
+            workflow = await self.get_story_workflow()
+            
+            # Create initial state
             initial_state = await self.managers.state_manager.create_initial_state()
-
-            logger.info(f"Initial state created: {initial_state}")
-
-            # Initialisation et exécution du workflow initial
-            await self.managers.workflow_manager.initialize_workflow(initial_state)
-            updated_state = await self.managers.workflow_manager.execute_workflow(
-                state=initial_state, user_input=None, story_graph=self.story_graph
+            
+            # Create input data
+            input_data = GameState(
+                session_id=initial_state.session_id,
+                state=initial_state,
+                metadata={"node": "start"}
             )
-
-            logger.info("Game initialization completed successfully")
-            return updated_state
+            
+            # Execute workflow
+            result = await workflow.ainvoke(input_data.model_dump())
+            
+            if isinstance(result, dict):
+                state = GameState(**result)
+                await self.managers.state_manager.save_state(state)
+                logger.info("Game initialization completed successfully")
+                return state
+                
+            logger.error("Invalid workflow result type: {}", type(result))
+            raise GameError("Invalid workflow result")
+            
         except Exception as e:
-            logger.error(f"Error during game initialization: {e}")
+            logger.error("Error initializing game: {}", str(e))
             raise GameError(f"Failed to initialize game: {str(e)}")
+
+    async def get_story_workflow(self) -> Any:
+        """Get the compiled story workflow.
+        
+        This method should be called each time we want to start a new workflow instance.
+        The workflow will be compiled with the current configuration and managers.
+        
+        Returns:
+            Any: Compiled workflow ready for execution
+            
+        Raises:
+            GameError: If workflow creation fails
+        """
+        try:
+            logger.info("Getting story workflow")
+            
+            # Ensure story graph exists
+            if not self.story_graph:
+                logger.debug("Story graph not configured, configuring now")
+                self.story_graph = self.game_factory.create_story_graph(
+                    config=self._story_graph_config,
+                    managers=self.managers,
+                    agents=self.agents
+                )
+            
+            # Get or create compiled workflow
+            if not self._compiled_workflow:
+                logger.debug("Compiling workflow")
+                self._compiled_workflow = await self.story_graph.get_compiled_workflow()
+            
+            return self._compiled_workflow
+            
+        except Exception as e:
+            logger.error("Error getting story workflow: {}", str(e))
+            raise GameError(f"Failed to get story workflow: {str(e)}")
 
     async def stream_game_state(self) -> AsyncGenerator[Dict, None]:
         """Stream game state updates.
@@ -381,51 +290,45 @@ class AgentManager:
         try:
             logger.info("Starting game state streaming")
             
-            # Get initial state
-            logger.debug("Getting initial state")
-            initial_state = await self.managers.state_manager.get_current_state()
-            if not initial_state:
-                logger.debug("No current state found, creating initial state")
-                initial_state = await self.managers.state_manager.create_initial_state()
+            # Get current state
+            current_state = await self.get_state()
+            if not current_state:
+                logger.error("No current state available")
+                raise GameError("No current state available")
                 
-            # Create input data with timestamp
+            # Create input data
             logger.debug("Creating input data")
-            current_time = self.managers.state_manager.get_current_timestamp()
-            logger.debug("Current timestamp: {}", current_time)
-            input_data = GameStateInput(
-                state=initial_state,
-                metadata={"timestamp": current_time}
+            input_data = GameState(
+                session_id=current_state.session_id,
+                state=current_state,
+                metadata={"node": "stream"}
             )
             
-            # Initialize workflow if needed
-            if not self.story_graph or self.story_graph._graph is None:
-                logger.debug("Story graph not initialized, setting up workflow")
-                await self.story_graph._setup_workflow()
-            
             # Get workflow
-            logger.debug("Compiling workflow")
-            workflow = self.story_graph._graph.compile()
-            logger.debug("Executing workflow")
-            result = await workflow.ainvoke(input_data.model_dump())
+            logger.debug("Getting compiled workflow")
+            workflow = await self.get_story_workflow()
+            logger.debug("Starting workflow streaming")
             
-            if isinstance(result, dict):
-                logger.debug("Processing workflow result")
-                output = GameStateOutput(**result)
+            # Stream workflow results
+            async for result in workflow.astream(input_data.model_dump()):
+                if isinstance(result, dict):
+                    logger.debug("Processing workflow result")
+                    state = GameState(**result)
+                    
+                    # Check if game should continue
+                    if not await self.should_continue(state):
+                        logger.info("Game should not continue, stopping streaming")
+                        return
                 
-                # Update available transitions
-                logger.debug("Getting available transitions")
-                transitions = await self.managers.workflow_manager.get_available_transitions(output.state)
-                output.state.next_steps = transitions
+                    # Save state
+                    logger.debug("Saving updated state")
+                    await self.managers.state_manager.save_state(state)
+                    logger.debug("Yielding state update")
+                    yield state.model_dump()
+                else:
+                    logger.error("Invalid workflow result type: {}", type(result))
+                    raise GameError("Invalid workflow result")
             
-                # Save state
-                logger.debug("Saving updated state")
-                await self.managers.state_manager.save_state(output.state)
-                logger.info("State streaming completed successfully")
-                yield output.model_dump()
-            else:
-                logger.error("Invalid workflow result type: {}", type(result))
-                raise GameError("Invalid workflow result")
-                
         except Exception as e:
             logger.error("Error streaming game state: {}", str(e))
             raise GameError(f"Failed to stream game state: {str(e)}")
@@ -459,7 +362,7 @@ class AgentManager:
             if getattr(state, 'end_game', False):
                 logger.info("Game ended normally")
                 return False
-                
+            
             # Stop si on attend une réponse utilisateur
             if state.rules and state.rules.needs_user_response:
                 logger.info("Waiting for user input")
@@ -471,35 +374,6 @@ class AgentManager:
         except Exception as e:
             logger.error("Error checking game continuation: {}", str(e))
             return False
-
-    async def process_section_with_updates(self, section_number: int) -> AsyncGenerator[GameState, None]:
-        """Process a section with streaming state updates."""
-        try:
-            logger.info("Processing section {} with updates", section_number)
-            
-            # Initialize story graph if needed
-            if not self.story_graph:
-                logger.info("Story graph not initialized, initializing now")
-                await self.initialize()
-                
-            # Get initial state
-            initial_state = await self.get_state()
-            logger.debug("Initial state: {}", initial_state)
-            
-            if initial_state:
-                initial_state.section_number = section_number
-                await self.managers.state_manager.save_state(initial_state)
-            
-            # Stream updates via story graph
-            async for state in self.stream_game_state():
-                logger.debug("State update: {}", state)
-                if isinstance(state, dict):
-                    state = GameState(**state)
-                yield state
-                
-        except Exception as e:
-            logger.error("Error processing section with updates: {}", str(e))
-            raise
 
     async def stop_game(self) -> None:
         """Stop the game and save final state."""
@@ -516,58 +390,10 @@ class AgentManager:
             if current_state:
                 await self.managers.state_manager.save_state(current_state)
                 logger.info("Final game state saved successfully")
-            
+                
             logger.info("Game stopped successfully")
         except Exception as e:
             logger.error("Error stopping game: {}", str(e))
-            raise
-
-    def get_agent(self, agent_type: str) -> BaseAgentProtocol:
-        """Get agent instance by type.
-        
-        Args:
-            agent_type: Type of agent to get
-            
-        Returns:
-            BaseAgentProtocol: Agent instance
-            
-        Raises:
-            ValueError: If agent type is not found
-        """
-        try:
-            if not self.agents:
-                raise ValueError("Agents not initialized")
-                
-            if hasattr(self.agents, agent_type):
-                return getattr(self.agents, agent_type)
-            
-            raise ValueError(f"Unknown agent type: {agent_type}")
-            
-        except Exception as e:
-            logger.error("Error getting agent {}: {}", agent_type, str(e))
-            raise
-
-    def _configure_story_graph(self) -> StoryGraphProtocol:
-        """Configure the story graph with all dependencies.
-        
-        Returns:
-            StoryGraphProtocol: Configured story graph instance
-        """
-        try:
-            logger.debug("Configuring story graph")
-            
-            # Create story graph with config and managers
-            story_graph = StoryGraph(
-                config=self._story_graph_config,
-                managers=self.managers,
-                agents=self.agents
-            )
-            
-            logger.debug("Story graph configured successfully")
-            return story_graph
-            
-        except Exception as e:
-            logger.error("Error configuring story graph: {}", str(e))
             raise
 
 # Register protocols after class definition
@@ -581,6 +407,7 @@ RulesManagerProtocol.register(RulesManager)
 NarratorManagerProtocol.register(NarratorManager)
 WorkflowManagerProtocol.register(WorkflowManager)
 
+# Register agent protocols
 StoryGraphProtocol.register(StoryGraph)
 NarratorAgentProtocol.register(NarratorAgent)
 RulesAgentProtocol.register(RulesAgent)

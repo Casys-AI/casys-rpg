@@ -105,6 +105,7 @@ def get_agent_manager() -> AgentManager:
         _agent_manager = AgentManager(
             agents=agents,
             managers=managers,
+            game_factory=_game_factory,
             story_graph_config=_game_factory._config.agent_configs.story_graph_config
         )
         logger.info("AgentManager initialized successfully")
@@ -217,6 +218,7 @@ async def startup_event():
         _agent_manager = AgentManager(
             agents=agents,
             managers=managers,
+            game_factory=_game_factory,
             story_graph_config=_game_factory._config.agent_configs.story_graph_config
         )
         
