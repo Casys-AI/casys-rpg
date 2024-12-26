@@ -221,13 +221,25 @@ class WorkflowManager(WorkflowManagerProtocol):
                 state = await self.state_manager.create_initial_state()
             logger.debug("Validated state session_id: {}", state.session_id)
 
-            # Création de la sortie avec métadonnées en utilisant with_updates
+            # Gestion du next_section si présent dans la décision
+            if state.decision and state.decision.next_section is not None:
+                logger.debug("Found next_section in decision: {}", state.decision.next_section)
+                section_number = state.decision.next_section
+                # Réinitialiser next_section
+                state = state.with_updates(
+                    decision=state.decision.model_copy(update={'next_section': None})
+                )
+            else:
+                section_number = max(1, state.section_number)
+
+            # Création de la sortie avec métadonnées
             output = state.with_updates(
                 metadata={"node": "start"},
-                section_number=max(1, state.section_number)  # Ensure section_number is at least 1
+                section_number=section_number
             )
 
-            logger.info("Successfully created output with session_id: {}", output.session_id)
+            logger.info("Successfully created output with session_id: {} and section_number: {}", 
+                       output.session_id, output.section_number)
             return output
 
         except Exception as e:

@@ -72,12 +72,32 @@ class TraceAgent(BaseAgent):
             
         return details
 
+    async def _process_trace(
+        self,
+        section_number: int,
+        content: Optional[str] = None
+    ) -> Union[TraceModel, TraceError]:
+        """Process trace for a game section.
+        
+        Args:
+            section_number: Section number to process
+            content: Optional content to process
+            
+        Returns:
+            Union[TraceModel, TraceError]: Processed trace or error
+        """
+        try:
+            action = self._create_action_from_state(GameState(section_number=section_number, content=content))
+            await self.trace_manager.process_trace(GameState(section_number=section_number, content=content), action)
+            return await self.trace_manager.get_current_trace()
+        except Exception as e:
+            self.logger.error(f"Error processing trace: {e}")
+            return TraceError(message=f"Failed to process trace: {str(e)}")
+
     async def record_state(self, state: GameState) -> TraceModel:
         """Record game state and return trace."""
         try:
-            action = self._create_action_from_state(state)
-            await self.trace_manager.process_trace(state, action)
-            return await self.trace_manager.get_current_trace()
+            return await self._process_trace(state.section_number, state.content)
         except Exception as e:
             self.logger.error(f"Error recording state: {e}")
             raise TraceError(message=f"Failed to record state: {str(e)}")
@@ -86,7 +106,7 @@ class TraceAgent(BaseAgent):
         """Analyze state and add insights."""
         try:
             # Get current trace
-            trace = await self.trace_manager.get_current_trace()
+            trace = await self.record_state(state)
             
             # Add trace to state
             state.trace = trace
@@ -102,22 +122,43 @@ class TraceAgent(BaseAgent):
             self.logger.error(f"Error analyzing state: {e}")
             return state.with_error(str(e))
 
-    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-        """Process game state asynchronously."""
+    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict[str, Any], None]:
+        """Async invocation for trace processing."""
         try:
-            # Parse input state
-            state = GameState.model_validate(input_data)
+            state = GameState.model_validate(input_data.get("state", {}))
+            self.logger.debug("Processing trace for state: session={}, section={}", 
+                        state.session_id, state.section_number)
             
-            # Record and analyze state
-            trace = await self.record_state(state)
-            state.trace = trace
-            updated_state = await self.analyze_state(state)
+            # Process trace
+            trace = await self._process_trace(
+                state.section_number,
+                state.content
+            )
             
-            yield updated_state.model_dump()
-            
+            if isinstance(trace, TraceError):
+                self.logger.error("Error processing trace: {}", trace.message)
+                error_trace = TraceModel(
+                    section_number=state.section_number,
+                    content="",
+                    error=trace.message,
+                    source_type="ERROR",
+                    timestamp=datetime.now()
+                )
+                yield {"trace": error_trace}
+            else:
+                self.logger.debug("Trace processed successfully")
+                yield {"trace": trace}
+                
         except Exception as e:
-            self.logger.error(f"Error in TraceAgent.ainvoke: {e}")
-            yield {"error": str(e)}
+            self.logger.exception("Error in ainvoke: {}", str(e))
+            error_trace = TraceModel(
+                section_number=state.section_number,
+                content="",
+                error=str(e),
+                source_type="ERROR",
+                timestamp=datetime.now()
+            )
+            yield {"trace": error_trace}
 
 # Add runtime type checking for protocol
 TraceAgentProtocol.register(TraceAgent)
