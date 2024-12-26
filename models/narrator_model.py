@@ -38,14 +38,14 @@ class NarratorModel(BaseModel):
             The latest NarratorModel if sections match
             
         Raises:
-            ValueError: If section numbers don't match
+            AssertionError: If section numbers don't match
         """
         if not isinstance(other, NarratorModel):
             return self
             
         # Vérifier que les sections correspondent
-        if self.section_number != other.section_number:
-            raise ValueError(f"Cannot merge NarratorModels with different section numbers: {self.section_number} != {other.section_number}")
+        assert self.section_number == other.section_number, \
+            f"Cannot add NarratorModels with different section numbers: {self.section_number} != {other.section_number}"
             
         # Prendre le dernier modèle
         return other

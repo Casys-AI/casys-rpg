@@ -1,34 +1,29 @@
 """Tests for the trace agent module."""
 import pytest
-import pytest_asyncio
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 
-from agents.trace_agent import TraceAgent
-from config.agents.trace_agent_config import TraceAgentConfig
 from models.game_state import GameState
 from models.trace_model import TraceModel, TraceAction, ActionType
 from models.errors_model import TraceError
+from models.types.game_types import GameManagers
+from config.agents.trace_agent_config import TraceAgentConfig
+from agents.trace_agent import TraceAgent
 
 @pytest.fixture
 def mock_trace_manager():
     """Create a mock trace manager."""
-    manager = Mock()
-    manager.record_state = AsyncMock()
-    manager.analyze_state = AsyncMock()
-    manager.get_current_trace = AsyncMock()
-    return manager
+    trace_manager = AsyncMock()
+    trace_manager.record_state = AsyncMock()
+    trace_manager.analyze_state = AsyncMock()
+    trace_manager.get_current_trace = AsyncMock()
+    return trace_manager
 
 @pytest.fixture
-def config():
-    """Create a test trace agent config."""
-    return TraceAgentConfig()
-
-@pytest_asyncio.fixture
-async def trace_agent(config, mock_trace_manager):
+def trace_agent(mock_trace_manager):
     """Create a test trace agent."""
-    agent = TraceAgent(config=config, trace_manager=mock_trace_manager)
-    return agent
+    config = TraceAgentConfig()
+    return TraceAgent(config=config, trace_manager=mock_trace_manager)
 
 @pytest.fixture
 def sample_game_state():
@@ -49,8 +44,8 @@ def sample_trace_model():
             TraceAction(
                 timestamp=datetime.now(),
                 section=1,
-                action_type=ActionType.USER_INPUT,
-                details={"input": "test input"}
+                action_type=ActionType.PLAYER_INPUT,
+                details="test input"
             )
         ]
     )
@@ -122,15 +117,15 @@ async def test_create_action_from_state(trace_agent, sample_game_state):
     # Verify action
     assert isinstance(action, TraceAction)
     assert action.section == sample_game_state.section_number
-    assert action.action_type == ActionType.USER_INPUT
-    assert action.details["input"] == sample_game_state.player_input
+    assert action.action_type == ActionType.PLAYER_INPUT
+    assert action.details == sample_game_state.player_input
 
 @pytest.mark.asyncio
 async def test_determine_action_type(trace_agent, sample_game_state):
     """Test action type determination."""
     # Test user input
     action_type = trace_agent._determine_action_type(sample_game_state)
-    assert action_type == ActionType.USER_INPUT
+    assert action_type == ActionType.PLAYER_INPUT
     
     # Test error
     sample_game_state.error = "Test error"
