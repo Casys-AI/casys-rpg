@@ -28,8 +28,24 @@ class NarratorModel(BaseModel):
         """Model configuration."""
 
     def __add__(self, other: 'NarratorModel') -> 'NarratorModel':
-        """Implement addition for LangGraph fan-in."""
+        """Merge two NarratorModels for LangGraph parallel results.
+        Verifies section numbers match and takes the latest model.
+        
+        Args:
+            other: Another NarratorModel to merge with
+            
+        Returns:
+            The latest NarratorModel if sections match
+            
+        Raises:
+            ValueError: If section numbers don't match
+        """
         if not isinstance(other, NarratorModel):
             return self
+            
+        # Vérifier que les sections correspondent
+        if self.section_number != other.section_number:
+            raise ValueError(f"Cannot merge NarratorModels with different section numbers: {self.section_number} != {other.section_number}")
+            
         # Prendre le dernier modèle
         return other
