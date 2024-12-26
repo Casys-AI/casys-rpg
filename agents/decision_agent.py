@@ -75,8 +75,12 @@ class DecisionAgent(BaseAgent):
             # Parser la réponse
             try:
                 result = json.loads(response.content)
+                next_section = result.get("next_section")
+                if next_section is None:
+                    raise DecisionError("Missing next_section in LLM response")
+                    
                 return AnalysisResult(
-                    next_section=result.get("next_section"),
+                    next_section=next_section,
                     conditions=result.get("conditions", []),
                     analysis=result.get("analysis", "")
                 )

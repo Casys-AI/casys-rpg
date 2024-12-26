@@ -4,7 +4,6 @@ Creates and configures game components.
 """
 
 import logging
-from dataclasses import dataclass
 from typing import Optional
 
 from config.game_config import GameConfig
@@ -25,36 +24,10 @@ from agents.rules_agent import RulesAgent
 from agents.decision_agent import DecisionAgent
 from agents.trace_agent import TraceAgent
 
-from managers.protocols.state_manager_protocol import StateManagerProtocol
-from managers.protocols.cache_manager_protocol import CacheManagerProtocol
-from managers.protocols.character_manager_protocol import CharacterManagerProtocol
-from managers.protocols.trace_manager_protocol import TraceManagerProtocol
-from managers.protocols.rules_manager_protocol import RulesManagerProtocol
-from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
-from managers.protocols.narrator_manager_protocol import NarratorManagerProtocol
-from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
+from models.types.agent_types import GameAgents
+from models.types.manager_types import GameManagers
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class GameManagers:
-    """Container for all game managers."""
-    state_manager: StateManagerProtocol
-    cache_manager: CacheManagerProtocol
-    character_manager: CharacterManagerProtocol
-    trace_manager: TraceManagerProtocol
-    rules_manager: RulesManagerProtocol
-    decision_manager: DecisionManagerProtocol
-    narrator_manager: NarratorManagerProtocol
-    workflow_manager: WorkflowManagerProtocol
-
-@dataclass
-class GameAgents:
-    """Container for all game agents."""
-    narrator_agent: Optional[NarratorAgent] = None
-    rules_agent: Optional[RulesAgent] = None
-    decision_agent: Optional[DecisionAgent] = None
-    trace_agent: Optional[TraceAgent] = None
 
 class GameFactory:
     """Factory for creating game components."""

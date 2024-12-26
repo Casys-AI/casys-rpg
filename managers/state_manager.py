@@ -323,7 +323,13 @@ class StateManager(StateManagerProtocol):
             if not self._game_id:
                 await self.initialize()
                 
+            # Générer un nouveau session_id si pas d'état courant
+            session_id = (self._current_state.session_id 
+                        if self._current_state 
+                        else await self.generate_session_id())
+                
             error_state = GameState(
+                session_id=session_id,
                 section_number=self._current_state.section_number if self._current_state else 1,
                 error=error_message
             )
