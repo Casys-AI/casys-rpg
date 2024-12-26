@@ -1,12 +1,15 @@
 """
 Agent Manager Protocol
-Defines the interface for agent management and coordination.
+Defines the interface for agent management operations.
 """
-from typing import Dict, Optional, Any, AsyncGenerator, Protocol, runtime_checkable
+from typing import Dict, Optional, Any, AsyncGenerator, Protocol, runtime_checkable, TYPE_CHECKING
 from models.game_state import GameState
-from agents.protocols.base_agent_protocol import BaseAgentProtocol
-from agents.factories.game_factory import GameAgents, GameManagers
 from config.agents.agent_config_base import AgentConfigBase
+from agents.factories.game_factory import GameFactory
+
+if TYPE_CHECKING:
+    from models.types.agent_types import GameAgents
+    from models.types.manager_types import GameManagers
 
 @runtime_checkable
 class AgentManagerProtocol(Protocol):
@@ -14,8 +17,9 @@ class AgentManagerProtocol(Protocol):
     
     def __init__(
         self,
-        agents: GameAgents,
-        managers: GameManagers,
+        agents: 'GameAgents',
+        managers: 'GameManagers',
+        game_factory: GameFactory,
         story_graph_config: Optional[AgentConfigBase] = None
     ) -> None:
         """Initialize agent manager.
@@ -23,29 +27,51 @@ class AgentManagerProtocol(Protocol):
         Args:
             agents: Container with all game agents
             managers: Container with all game managers
+            game_factory: GameFactory instance
             story_graph_config: Optional configuration for story graph
             
         Raises:
-            GameError: If any required component is missing or not properly initialized
+            GameError: If initialization fails
         """
         ...
+
+    async def initialize_game(self) -> GameState:
+        """Initialize and setup a new game instance.
+
+        Returns:
+            GameState: The initial state of the game
+
+        Raises:
+            GameError: If initialization encounters an error
+        """
+        ...
+
+    async def get_story_workflow(self) -> Any:
+        """Get the compiled story workflow.
         
-    async def execute_workflow(
-        self,
-        state: Optional[GameState] = None,
-        user_input: Optional[str] = None
-    ) -> GameState:
-        """Execute game workflow.
+        Returns:
+            Any: Compiled workflow ready for execution
+            
+        Raises:
+            GameError: If workflow creation fails
+        """
+        ...
+
+    async def process_game_state(self, state: Optional[GameState] = None, user_input: Optional[str] = None) -> GameState:
+        """Process game state through the workflow.
         
         Args:
-            state: Optional current game state
+            state: Optional game state to use
             user_input: Optional user input
             
         Returns:
             GameState: Updated game state
+            
+        Raises:
+            GameError: If processing fails
         """
         ...
-        
+
     async def process_user_input(self, input_text: str) -> GameState:
         """Process user input and update game state.
         
@@ -54,81 +80,33 @@ class AgentManagerProtocol(Protocol):
             
         Returns:
             GameState: Updated game state
-        """
-        ...
-        
-    async def navigate_to_section(self, section_number: int) -> GameState:
-        """Navigate to a specific section.
-        
-        Args:
-            section_number: Target section number
-            
-        Returns:
-            GameState: Updated game state
-        """
-        ...
-        
-    async def perform_action(self, action: Dict[str, Any]) -> GameState:
-        """Process a user's game action.
-        
-        Args:
-            action: Action details
-            
-        Returns:
-            GameState: Updated game state
-        """
-        ...
-        
-    async def submit_response(self, response: str) -> GameState:
-        """Process a user's response or decision.
-        
-        Args:
-            response: User response
-            
-        Returns:
-            GameState: Updated game state
-        """
-        ...
-        
-    async def process_section(self, section_number: int) -> GameState:
-        """Process a new game section.
-        
-        Args:
-            section_number: Section number to process
-            
-        Returns:
-            GameState: Updated game state
-        """
-        ...
-        
-    async def initialize(self) -> None:
-        """Initialize the agent manager and its components."""
-        ...
-        
-    async def get_state(self) -> Optional[GameState]:
-        """Get current game state.
-        
-        Returns:
-            Optional[GameState]: Current game state or None
-        """
-        ...
-        
-    async def initialize_game(self) -> GameState:
-        """Initialize and setup a new game instance.
-        
-        This method performs the following steps:
-        1. Ensures the manager is initialized
-        2. Configures and sets up the story graph
-        3. Initializes the game workflow
-        
-        Returns:
-            GameState: The initial state of the game
             
         Raises:
-            GameError: If story graph configuration fails or initialization encounters an error
+            GameError: If input processing fails
         """
         ...
+
+    async def get_state(self) -> Optional[GameState]:
+        """Get current game state."""
+        ...
+
+    async def should_continue(self, state: GameState) -> bool:
+        """Check if the game should continue.
         
+        Args:
+            state: Current game state
+            
+        Returns:
+            bool: True if game should continue
+        """
+        ...
+
+
+        
+
+        
+
+
     async def stream_game_state(self) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream game state updates.
         
@@ -174,16 +152,3 @@ class AgentManagerProtocol(Protocol):
         """Stop the game and save final state."""
         ...
     
-    def get_agent(self, agent_type: str) -> BaseAgentProtocol:
-        """Get agent instance by type.
-        
-        Args:
-            agent_type: Type of agent to get
-            
-        Returns:
-            BaseAgentProtocol: Agent instance
-            
-        Raises:
-            ValueError: If agent type is not found
-        """
-        ...
