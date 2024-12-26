@@ -34,7 +34,7 @@ class NarratorAgent(BaseAgent):
         self.narrator_manager = narrator_manager
         self.logger = logger
 
-    async def process_section(self, section_number: int, content: Optional[str] = None) -> Union[NarratorModel, NarratorError]:
+    async def _process_section(self, section_number: int, content: Optional[str] = None) -> Union[NarratorModel, NarratorError]:
         """Process and format a game section.
         
         Args:
@@ -185,39 +185,37 @@ class NarratorAgent(BaseAgent):
             Dict[str, Any]: Updated narrative content
         """
         try:
-            game_state = GameState.model_validate(input_data)
+            state = GameState.model_validate(input_data.get("state", {}))
+            logger.debug("Processing narrative for state: session={}, section={}", 
+                        state.session_id, state.section_number)
             
             # Process current section
-            section_result = await self.process_section(game_state.section_number)
+            section_result = await self._process_section(state.section_number)
             
             if isinstance(section_result, NarratorError):
                 logger.error("Error processing section: {}", section_result.message)
                 error_model = NarratorModel(
-                    section_number=game_state.section_number,
+                    section_number=state.section_number,
                     content="",
                     error=section_result.message,
                     source_type=SourceType.ERROR,
                     timestamp=datetime.now()
                 )
-                yield {"narrative": error_model.model_dump()}
-                return
+                yield {"narrative": error_model}
+            else:
+                logger.debug("Section processed successfully")
+                yield {"narrative": section_result}
                 
-            # Update game state with processed content
-            game_state.narrative_content = section_result.content
-            game_state.last_update = datetime.now()
-            
-            yield {"narrative": section_result.model_dump()}
-            
         except Exception as e:
-            logger.error("Error in agent invocation: {}", str(e))
+            logger.exception("Error in ainvoke: {}", str(e))
             error_model = NarratorModel(
-                section_number=input_data.get("section_number", 1),
+                section_number=state.section_number,
                 content="",
-                error=f"Error in agent invocation: {str(e)}",
+                error=str(e),
                 source_type=SourceType.ERROR,
                 timestamp=datetime.now()
             )
-            yield {"narrative": error_model.model_dump()}
+            yield {"narrative": error_model}
 
 # Register NarratorAgent as implementing NarratorAgentProtocol
 NarratorAgentProtocol.register(NarratorAgent)

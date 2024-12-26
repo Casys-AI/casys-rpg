@@ -26,3 +26,10 @@ class NarratorModel(BaseModel):
 
     class Config:
         """Model configuration."""
+
+    def __add__(self, other: 'NarratorModel') -> 'NarratorModel':
+        """Implement addition for LangGraph fan-in."""
+        if not isinstance(other, NarratorModel):
+            return self
+        # Prendre le dernier modèle
+        return other

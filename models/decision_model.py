@@ -33,6 +33,8 @@ class AnalysisResult(BaseModel):
 class DecisionModel(BaseModel):
     """A decision made in the game."""
     section_number: int
+    next_section: Optional[int] = None
+    error: Optional[str] = None
     awaiting_action: ActionType = ActionType.USER_INPUT
     conditions: List[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -41,6 +43,12 @@ class DecisionModel(BaseModel):
     def validate_section_number(cls, v):
         if v < 1:
             raise ValueError("Section number must be positive")
+        return v
+        
+    @field_validator('next_section')
+    def validate_next_section(cls, v):
+        if v is not None and v < 1:
+            raise ValueError("Next section must be positive")
         return v
     
     @model_validator(mode='after')

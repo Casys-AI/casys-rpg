@@ -94,26 +94,27 @@ class StoryGraph(StoryGraphProtocol):
                 raise GameError("No input data available for rules processing")
 
             if self.rules_agent:
-                # Process rules directly through the agent
-                rules = await self.rules_agent.process_section_rules(
-                    input_data.section_number,
-                    input_data.content
-                )
-                
-                if isinstance(rules, RulesError):
-                    raise rules
-                
-                output = GameState(
-                    session_id=input_data.session_id,
-                    rules=rules,
-                    narrative_content=input_data.content,
-                    section_number=input_data.section_number,
-                )
-                logger.debug("Rules processing completed for section {}", input_data.section_number)
-                return output
+                async for result in self.rules_agent.ainvoke({"state": input_data}):
+                    if "rules" in result:
+                        rules = result["rules"]
+                        if isinstance(rules, RulesError):
+                            raise rules
+                        
+                        output = GameState(
+                            session_id=input_data.session_id,
+                            rules=rules,
+                            narrative_content=input_data.content,
+                            section_number=input_data.section_number,
+                        )
+                        logger.debug("Rules processing completed for section {}", 
+                                   input_data.section_number)
+                        return output
+                        
+                raise GameError("No valid rules result")
 
             logger.debug("No rules agent available, returning empty output")
             return GameState(session_id=input_data.session_id)
+            
         except Exception as e:
             logger.exception("Error processing rules: {}", str(e))
             return GameState(
@@ -131,22 +132,21 @@ class StoryGraph(StoryGraphProtocol):
 
             if self.narrator_agent:
                 # Process narrative through the agent
-                narrator_result = await self.narrator_agent.process_section(
-                    input_data.section_number,
-                    input_data.content
-                )
-                
-                if isinstance(narrator_result, NarratorError):
-                    raise narrator_result
-                
-                output = GameState(
-                    session_id=input_data.session_id,
-                    narrative=narrator_result,
-                    narrative_content=input_data.content,
-                    section_number=input_data.section_number,
-                )
-                logger.debug("Narrative processing completed for section {}", input_data.section_number)
-                return output
+                async for result in self.narrator_agent.ainvoke({"state": input_data}):
+                    if "narrative" in result:
+                        narrator_result = result["narrative"]
+                        if isinstance(narrator_result, NarratorError):
+                            raise narrator_result
+                        
+                        output = GameState(
+                            session_id=input_data.session_id,
+                            narrative=narrator_result,
+                            narrative_content=input_data.content,
+                            section_number=input_data.section_number,
+                        )
+                        logger.debug("Narrative processing completed for section {}", 
+                                   input_data.section_number)
+                        return output
 
             logger.debug("No narrator agent available, returning empty output")
             return GameState(session_id=input_data.session_id)
@@ -162,41 +162,30 @@ class StoryGraph(StoryGraphProtocol):
         self,
         state: GameState
     ) -> GameState:
-        """Merge results from parallel states and process decision."""
+        """Process decision node."""
         try:
-            logger.info("Processing decision with merged state")
-
-            # Vérifier si les données nécessaires sont présentes
-            rules_data = state.rules
-            narrative_data = state.narrative
-
-            if not rules_data or not narrative_data:
-                raise GameError("Missing required data for decision processing")
-
-            # Loguer les données reçues pour débogage
-            logger.debug(f"Rules Data: {rules_data}")
-            logger.debug(f"Narrative Data: {narrative_data}")
-
-            # Fusion des données (exemple : prioriser les données des règles)
-            final_state = GameState(
-                session_id=state.session_id,
-                rules=rules_data,
-                narrative=narrative_data,
-                decision=None,  # Initialement vide, à mettre à jour après analyse
-                error=None
+            if state.player_input:
+                logger.debug("Processing user input: {}", state.player_input)
+                async for result in self.decision_agent.ainvoke({"state": state}):
+                    if "decision" in result:
+                        decision = result["decision"]
+                        if isinstance(decision, DecisionError):
+                            raise decision
+                        
+                        output = state.with_updates(decision=decision)
+                        logger.debug("Decision processed: next_section={}", 
+                                   decision.next_section)
+                        return output
+                        
+                raise GameError("No valid decision result")
+                
+            # Si pas d'input, marquer qu'on en a besoin
+            logger.debug("No user input, waiting for response")
+            return state.with_updates(
+                section_number=state.section_number,
+                rules=state.rules.model_copy(update={'needs_user_response': True})
             )
-
-            # Processus de décision via l'agent de décision
-            if self.decision_agent:
-                decision = await self.decision_agent.analyze_decision(final_state)
-                final_state.decision = decision
-                logger.info("Decision processed successfully")
-
-            else:
-                logger.warning("No decision agent available, returning merged state as is")
-
-            return final_state
-
+            
         except Exception as e:
             logger.exception("Error processing decision: {}", str(e))
             return GameState(
@@ -214,21 +203,22 @@ class StoryGraph(StoryGraphProtocol):
                 raise GameError("No input data available for trace processing")
 
             if self.trace_agent:
-                # Record state
-                trace = await self.trace_agent.record_state(input_data)
-                
-                # Analyze state
-                state = await self.trace_agent.analyze_state(input_data)
-                
-                return GameState(
-                    session_id=input_data.session_id,
-                    trace=trace,
-                    section_number=input_data.section_number,
-                    source=input_data.source,
-                )
+                async for result in self.trace_agent.ainvoke({"state": input_data}):
+                    if "trace" in result:
+                        trace = result["trace"]
+                        if isinstance(trace, TraceError):
+                            raise trace
+                        
+                        output = input_data.with_updates(trace=trace)
+                        logger.debug("Trace processing completed for section {}", 
+                                   input_data.section_number)
+                        return output
+                        
+                raise GameError("No valid trace result")
 
             logger.debug("No trace agent available, returning empty output")
             return GameState(session_id=input_data.session_id)
+            
         except Exception as e:
             logger.exception("Error processing trace: {}", str(e))
             return GameState(

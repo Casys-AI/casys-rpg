@@ -128,6 +128,13 @@ class RulesModel(BaseModel):
             
         return self
         
+    def __add__(self, other: 'RulesModel') -> 'RulesModel':
+        """Implement addition for LangGraph fan-in."""
+        if not isinstance(other, RulesModel):
+            return self
+        # Prendre le dernier modèle
+        return other
+
     class Config:
         """Configuration for the model."""
         json_schema_extra = {

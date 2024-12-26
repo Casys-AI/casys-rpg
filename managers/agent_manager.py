@@ -460,9 +460,9 @@ class AgentManager:
                 logger.info("Game ended normally")
                 return False
                 
-            # Stop if no valid section
-            if not state.section_number:
-                logger.error("No valid section number")
+            # Stop si on attend une réponse utilisateur
+            if state.rules and state.rules.needs_user_response:
+                logger.info("Waiting for user input")
                 return False
                 
             logger.debug("Game should continue")

@@ -2,7 +2,7 @@
 Handles game rules analysis and validation using LLM.
 """
 
-from typing import Dict, Optional, Any, List, AsyncGenerator
+from typing import Dict, Optional, Any, List, AsyncGenerator, Union
 from datetime import datetime
 import json
 from pydantic import Field
@@ -33,15 +33,19 @@ class RulesAgent(BaseAgent):
         self.rules_manager = rules_manager
         self.logger = logger
 
-    async def process_section_rules(self, section_number: int, content: Optional[str] = None) -> RulesModel:
-        """Process and analyze rules for a game section.
+    async def _process_section_rules(
+        self, 
+        section_number: int,
+        content: Optional[str] = None
+    ) -> Union[RulesModel, RulesError]:
+        """Process rules for a game section.
         
         Args:
-            section_number: Section number
-            content: Optional section content
+            section_number: Section number to process
+            content: Optional content to process
             
         Returns:
-            RulesModel: Analyzed rules with dice requirements, conditions and choices
+            Union[RulesModel, RulesError]: Processed rules or error
         """
         try:
             self.logger.debug(f"Starting process_section_rules for section {section_number}")
@@ -223,41 +227,43 @@ class RulesAgent(BaseAgent):
                 last_update=datetime.now()
             )
 
-    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-        """Method for async interface."""
+    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
+        """Async invocation for rule processing."""
         try:
-            game_state = GameState(**input_data)
-            section_number = game_state.section_number
-            content = input_data.get("content")
+            state = GameState.model_validate(input_data.get("state", {}))
+            logger.debug("Processing rules for state: session={}, section={}", 
+                        state.session_id, state.section_number)
             
-            self.logger.debug(f"Processing section {section_number} with content: {content}")
-            
-            rules = await self.process_section_rules(section_number, content)
-            
-            yield {"rules": rules.model_dump()}
-            
-        except Exception as e:
-            self.logger.error(f"Error in RulesAgent.ainvoke: {e}")
-            error_rules = RulesModel(
-                section_number=input_data.get("section_number", 1),
-                error=f"Error in agent invocation: {str(e)}",
-                source="error",
-                source_type=SourceType.ERROR,
-                last_update=datetime.now()
+            # Process rules
+            rules = await self._process_section_rules(
+                state.section_number,
+                state.content
             )
-            yield {"rules": error_rules.model_dump()}
-
-    async def invoke(self, input_data: Dict, config: Optional[Dict] = None) -> Dict[str, GameState]:
-        """Synchronous invocation of the agent.
-        
-        Args:
-            input_data: Input data for rule validation
-            config: Optional configuration
             
-        Returns:
-            Dict[str, GameState]: Processing results and updated game state
-        """
-        raise NotImplementedError("Use ainvoke for rules processing")
+            if isinstance(rules, RulesError):
+                logger.error("Error processing rules: {}", rules.message)
+                error_rules = RulesModel(
+                    section_number=state.section_number,
+                    content="",
+                    error=rules.message,
+                    source_type=SourceType.ERROR,
+                    timestamp=datetime.now()
+                )
+                yield {"rules": error_rules}
+            else:
+                logger.debug("Rules processed successfully")
+                yield {"rules": rules}
+                
+        except Exception as e:
+            logger.exception("Error in ainvoke: {}", str(e))
+            error_rules = RulesModel(
+                section_number=state.section_number,
+                content="",
+                error=str(e),
+                source_type=SourceType.ERROR,
+                timestamp=datetime.now()
+            )
+            yield {"rules": error_rules}
 
 # Register RulesAgent as implementing RulesAgentProtocol
 RulesAgentProtocol.register(RulesAgent)

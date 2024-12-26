@@ -10,16 +10,4 @@ from agents.protocols.base_agent_protocol import BaseAgentProtocol
 @runtime_checkable
 class RulesAgentProtocol(BaseAgentProtocol, Protocol):
     """Protocol defining the interface for the Rules Agent."""
-    
-    async def process_section_rules(self, section_number: int, content: Optional[str] = None) -> RulesModel:
-        """
-        Process and analyze rules for a game section.
-        
-        Args:
-            section_number: Section number
-            content: Optional section content
-            
-        Returns:
-            RulesModel: Analyzed rules with dice requirements, conditions and choices
-        """
-        ...
+    pass
