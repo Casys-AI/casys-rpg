@@ -36,73 +36,6 @@ class WorkflowManager(WorkflowManagerProtocol):
                     state_manager.__class__.__name__, 
                     rules_manager.__class__.__name__)
 
-    async def execute_transition(self, from_state: GameState, to_state: GameState) -> GameState:
-        """Execute transition between states.
-
-        Args:
-            from_state: Source state
-            to_state: Target state (déjà validé par le DecisionAgent)
-
-        Returns:
-            GameState: Updated state after transition
-
-        Raises:
-            WorkflowError: If transition fails
-        """
-        try:
-            logger.info("Executing transition from section {} to {}", 
-                       from_state.section_number if from_state else None,
-                       to_state.section_number if to_state else None)
-
-            # Update state with transition info
-            to_state.last_state = from_state.section_number
-            to_state.timestamp = datetime.now()
-
-            # Save new state
-            logger.debug("Saving new state")
-            final_state = await self.state_manager.save_state(to_state)
-            logger.info("Transition completed successfully")
-            return final_state
-
-        except Exception as e:
-            logger.error("Error executing transition: {}", str(e), exc_info=True)
-            raise WorkflowError(f"Failed to execute transition: {str(e)}")
-
-    async def stream_workflow(self, initial_state: GameState) -> AsyncGenerator[GameState, None]:
-        """Stream workflow execution.
-
-        Args:
-            initial_state: Initial game state
-
-        Yields:
-            GameState: Updated game states
-
-        Raises:
-            WorkflowError: If streaming fails
-        """
-        try:
-            logger.info("Starting workflow streaming from section {}", initial_state.section_number)
-            current_state = initial_state
-
-            while True:
-                # 1. Get available transitions
-                logger.debug("Getting available transitions for section {}", current_state.section_number)
-                transitions = await self.get_available_transitions(current_state)
-
-                # 2. Update state with available transitions
-                logger.debug("Updating state with available transitions")
-                current_state.available_transitions = transitions
-                yield current_state
-
-                # 3. Check if workflow should continue
-                if not transitions:
-                    logger.info("No more transitions available, stopping workflow")
-                    break
-
-        except Exception as e:
-            logger.error("Error streaming workflow: {}", str(e), exc_info=True)
-            raise WorkflowError(f"Failed to stream workflow: {str(e)}")
-
     async def handle_error(self, error: Exception) -> GameState:
         """Handle workflow error.
 
@@ -114,77 +47,12 @@ class WorkflowManager(WorkflowManagerProtocol):
         """
         try:
             logger.error("Handling workflow error: {}", str(error))
-            error_message = str(error)
-            if isinstance(error, WorkflowError):
-                error_message = f"Workflow error: {error_message}"
-            return await self.state_manager.create_error_state(error_message)
-
+            return await self.state_manager.create_error_state(str(error))
+            
         except Exception as e:
-            logger.error("Error handling workflow error: {}", str(e), exc_info=True)
+            logger.error("Error handling workflow error: {}", str(e))
             return await self.state_manager.create_error_state(str(e))
 
-    async def execute_workflow(
-        self,
-        state: Optional[GameState] = None,
-        user_input: Optional[str] = None,
-        story_graph: Optional[StoryGraphProtocol] = None
-    ) -> GameState:
-        """Execute game workflow.
-
-        Args:
-            state: Optional game state to use
-            user_input: Optional user input
-            story_graph: Optional StoryGraph instance to use
-
-        Returns:
-            GameState: Updated game state
-
-        Raises:
-            WorkflowError: If workflow execution fails
-        """
-        try:
-            logger.info("Starting workflow execution")
-            logger.debug("Input state: {}, User input: {}", state, user_input)
-
-            if not state:
-                state = await self.state_manager.get_current_state()
-                if not state:
-                    raise WorkflowError("No current state available")
-
-            if not story_graph:
-                raise WorkflowError("No story graph provided")
-
-            # Setup and compile workflow
-            logger.debug("Setting up and compiling workflow")
-            workflow = await story_graph.get_compiled_workflow()
-
-            # Create input for story graph using with_updates to preserve session_id
-            input_data = state.with_updates(
-                player_input=user_input,
-                section_number=state.section_number,
-                content=state.narrative_content if hasattr(state, 'narrative_content') else None
-            )
-
-            # Execute workflow
-            logger.debug("Executing workflow")
-            # Pass GameState directly to workflow
-            async for result in workflow.astream(input_data):
-                logger.debug(f"Workflow execution result: {result}")
-                if isinstance(result, GameState):
-                    # Save state
-                    logger.debug("Saving new state")
-                    await self.state_manager.save_state(result)
-                    logger.info("Workflow execution completed successfully")
-                    return result
-                
-            logger.error("No valid result from workflow")
-            raise WorkflowError("No valid result from workflow execution")
-
-        except Exception as e:
-            logger.error("Error executing workflow: {}", str(e), exc_info=True)
-            raise WorkflowError(f"Failed to execute workflow: {str(e)}")
-
-    # Méthode modifiée sans création manuelle de session_id
     async def start_workflow(self, input_data: Any) -> GameState:
         """Start the workflow node.
 
@@ -221,26 +89,25 @@ class WorkflowManager(WorkflowManagerProtocol):
                 state = await self.state_manager.create_initial_state()
             logger.debug("Validated state session_id: {}", state.session_id)
 
-            # Gestion du next_section si présent dans la décision
+            # Mise à jour du section_number si next_section est présent dans la décision
+            section_number = state.section_number
             if state.decision and state.decision.next_section is not None:
                 logger.debug("Found next_section in decision: {}", state.decision.next_section)
                 section_number = state.decision.next_section
-                # Réinitialiser next_section
-                state = state.with_updates(
-                    decision=state.decision.model_copy(update={'next_section': None})
-                )
-            else:
-                section_number = max(1, state.section_number)
 
-            # Création de la sortie avec métadonnées
-            output = state.with_updates(
-                metadata={"node": "start"},
-                section_number=section_number
+            # Création de la sortie avec métadonnées et nouveau section_number
+            output = GameState(
+                session_id=state.session_id,
+                section_number=section_number,
+                metadata={"node": "start"}
             )
 
-            logger.info("Successfully created output with session_id: {} and section_number: {}", 
-                       output.session_id, output.section_number)
-            return output
+            # Sauvegarder l'état ici
+            saved_state = await self.state_manager.save_state(output)
+            
+            logger.info("Successfully created and saved output with session_id: {} and section_number: {}", 
+                       saved_state.session_id, saved_state.section_number)
+            return saved_state
 
         except Exception as e:
             logger.error("Error during start_workflow: {}", str(e), exc_info=True)
@@ -260,42 +127,21 @@ class WorkflowManager(WorkflowManagerProtocol):
         try:
             logger.info("Ending workflow with output: session={}, section={}", 
                        output_data.session_id, 
-                       output_data.state.section_number if output_data.state else None)
+                       output_data.section_number)
 
-            # Save final state if present
-            if output_data.state:
-                logger.debug("Saving final state")
-                output_data.state = await self.state_manager.save_state(output_data.state)
+            # Save final state
+            logger.debug("Saving final state")
+            saved_state = await self.state_manager.save_state(output_data)
 
             logger.info("Workflow ended successfully")
-            return output_data
+            return saved_state
 
         except Exception as e:
             logger.error("Error in end node: {}", str(e), exc_info=True)
+            # Créer un état d'erreur en utilisant le session_id de l'état courant si possible
+            session_id = output_data.session_id if output_data else await self.state_manager.generate_session_id()
             return GameState(
-                state=await self.state_manager.create_error_state(str(e)),
+                session_id=session_id,
+                section_number=output_data.section_number if output_data else 1,
                 error=str(e)
             )
-
-    async def initialize_workflow(self, initial_state: GameState) -> None:
-        """Initialize workflow with initial state.
-
-        Args:
-            initial_state: Initial game state to use
-
-        Raises:
-            WorkflowError: If initialization fails
-        """
-        try:
-            logger.info("Initializing workflow")
-            logger.debug(f"Initial state: {initial_state}")
-
-            # Save initial state
-            logger.debug("Saving initial state")
-            await self.state_manager.save_state(initial_state)
-
-            logger.info("Workflow initialization completed")
-
-        except Exception as e:
-            logger.error(f"Error initializing workflow: {e}", exc_info=True)
-            raise WorkflowError(f"Failed to initialize workflow: {str(e)}")

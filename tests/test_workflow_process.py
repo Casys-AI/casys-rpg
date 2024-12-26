@@ -1,13 +1,16 @@
 """Test the complete workflow process."""
 import pytest
 from unittest.mock import AsyncMock
+
+from models.types.agent_types import GameAgents
+from models.types.manager_types import GameManagers
 from models.game_state import GameState
 from models.decision_model import DecisionModel
 from models.rules_model import RulesModel
 from models.trace_model import TraceModel
 from models.narrator_model import NarratorModel
 from agents.story_graph import StoryGraph
-from config.agents.agent_config_base import AgentConfigBase
+from config.game_config import GameConfig
 
 @pytest.mark.asyncio
 async def test_complete_workflow_process(mock_agent_manager, mock_agents, mock_managers):
@@ -21,6 +24,11 @@ async def test_complete_workflow_process(mock_agent_manager, mock_agents, mock_m
     state_manager = mock_managers.state_manager
     trace_manager = mock_managers.trace_manager
     workflow_manager = mock_managers.workflow_manager
+    cache_manager = mock_managers.cache_manager
+    character_manager = mock_managers.character_manager
+    rules_manager = mock_managers.rules_manager
+    decision_manager = mock_managers.decision_manager
+    narrator_manager = mock_managers.narrator_manager
 
     # Get agent mocks
     decision_agent = mock_agents.decision_agent
@@ -40,12 +48,26 @@ async def test_complete_workflow_process(mock_agent_manager, mock_agents, mock_m
     # Initialize agent manager
     await mock_agent_manager.initialize()
 
-    # Initialize story graph
-    config = AgentConfigBase()
+    # Create story graph with config
+    config = GameConfig.create_default()
     story_graph = StoryGraph(
         config=config,
-        managers=mock_managers,
-        agents=mock_agents
+        managers=GameManagers(
+            state_manager=state_manager,
+            trace_manager=trace_manager,
+            workflow_manager=workflow_manager,
+            cache_manager=cache_manager,
+            character_manager=character_manager,
+            rules_manager=rules_manager,
+            decision_manager=decision_manager,
+            narrator_manager=narrator_manager
+        ),
+        agents=GameAgents(
+            decision_agent=decision_agent,
+            rules_agent=rules_agent,
+            narrator_agent=narrator_agent,
+            trace_agent=trace_agent
+        )
     )
     mock_agent_manager.story_graph = story_graph
     await story_graph._setup_workflow()
@@ -126,6 +148,3 @@ async def test_complete_workflow_process(mock_agent_manager, mock_agents, mock_m
     # Verify trace agent was called
     trace_agent.assert_called_once()
     trace_manager.save_trace.assert_called_once()
-
-if __name__ == "__main__":
-    pytest.main([__file__])

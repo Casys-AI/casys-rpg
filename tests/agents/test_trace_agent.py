@@ -6,7 +6,7 @@ from datetime import datetime
 from models.game_state import GameState
 from models.trace_model import TraceModel, TraceAction, ActionType
 from models.errors_model import TraceError
-from models.types.game_types import GameManagers
+from models.types.manager_types import GameManagers
 from config.agents.trace_agent_config import TraceAgentConfig
 from agents.trace_agent import TraceAgent
 

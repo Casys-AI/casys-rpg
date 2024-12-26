@@ -6,7 +6,8 @@ from typing import Any, AsyncIterator
 from models.game_state import GameStateInput, GameStateOutput
 from models.rules_model import RulesModel
 from models.narrator_model import NarratorModel
-from models.types.game_types import GameAgents, GameManagers
+from models.types.agent_types import GameAgents
+from models.types.manager_types import GameManagers
 from config.agents.agent_config_base import AgentConfigBase
 from agents.story_graph import StoryGraph
 
