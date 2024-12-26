@@ -15,8 +15,23 @@ def to_game_state(data: Dict[str, Any]) -> GameState:
 
 
 def from_game_state(state: GameState) -> Dict[str, Any]:
-    """Convert GameState model to API response data."""
-    return state.dict()
+    """
+    Convert GameState model to API response data.
+    
+    Uses model_dump() for proper serialization of all fields,
+    including nested Pydantic models.
+    
+    Args:
+        state: GameState instance to convert
+        
+    Returns:
+        Dict containing the serialized state
+    """
+    return state.model_dump(
+        exclude_none=True,    # Exclure les champs None
+        by_alias=True,        # Utiliser les alias pour la sérialisation
+        exclude_unset=True    # Exclure les champs non définis
+    )
 
 
 def to_domain_feedback(request: FeedbackRequest) -> DomainFeedbackRequest:

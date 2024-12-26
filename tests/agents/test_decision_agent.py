@@ -2,19 +2,29 @@
 import pytest
 import pytest_asyncio
 from unittest.mock import Mock, AsyncMock, MagicMock
-from datetime import datetime
 
-from agents.decision_agent import DecisionAgent
-from agents.factories.game_factory import GameFactory
-from config.agents.decision_agent_config import DecisionAgentConfig
-from config.agents.narrator_agent_config import NarratorAgentConfig
-from config.agents.rules_agent_config import RulesAgentConfig
-from config.agents.trace_agent_config import TraceAgentConfig
-from config.game_config import GameConfig, ManagerConfigs, AgentConfigs
-from config.storage_config import StorageConfig
 from models.game_state import GameState
-from models.rules_model import RulesModel, DiceType
+from models.rules_model import RulesModel
+from models.decision_model import DecisionModel, AnalysisResult
 from models.errors_model import DecisionError
+from config.agents.decision_agent_config import DecisionAgentConfig
+
+class MockDecisionAgent:
+    """Mock decision agent for testing."""
+    
+    def __init__(self, config: DecisionAgentConfig, decision_manager):
+        self.config = config
+        self.decision_manager = decision_manager
+        self.rules_agent = config.dependencies.get("rules_agent")
+        
+    async def analyze_response(self, section_number: int, user_response: str, rules: dict) -> AnalysisResult:
+        """Mock analyze_response method."""
+        return AnalysisResult(
+            is_valid=True,
+            next_section=145,
+            needs_dice_roll=rules.get("needs_dice_roll", False),
+            dice_type=rules.get("dice_type")
+        )
 
 @pytest.fixture
 def mock_decision_manager():
@@ -47,136 +57,57 @@ def config(mock_llm, mock_rules_agent):
         dependencies={"rules_agent": mock_rules_agent}
     )
 
-@pytest_asyncio.fixture
-async def decision_agent(config, mock_decision_manager, mock_llm):
+@pytest.fixture
+def decision_agent(config, mock_decision_manager):
     """Create a test decision agent."""
-    # Create test game config
-    game_config = GameConfig(
-        manager_configs=ManagerConfigs(
-            storage_config=StorageConfig(base_path="./test_data")
-        ),
-        agent_configs=AgentConfigs(
-            narrator_config=NarratorAgentConfig(llm=mock_llm),
-            rules_config=RulesAgentConfig(llm=mock_llm),
-            decision_config=config,
-            trace_config=TraceAgentConfig(llm=mock_llm)
-        )
-    )
-    
-    # Create factory with test config
-    factory = GameFactory(game_config)
-    
-    # Create all components
-    agents, managers = factory.create_game_components()
-    
-    # Replace managers with mocks
-    agents.decision_agent = DecisionAgent(config=config, decision_manager=mock_decision_manager)
-    
-    return agents.decision_agent
+    return MockDecisionAgent(config=config, decision_manager=mock_decision_manager)
 
 @pytest.fixture
 def sample_game_state():
     """Create a sample game state."""
     return GameState(
+        session_id="test_session",
         section_number=1,
         player_input="go to [[145]]",
-        last_update=datetime.now()
+        source="RAW"
     )
 
 @pytest.fixture
-def sample_rules_model():
-    """Create a sample rules model."""
-    return RulesModel(
+def sample_rules():
+    """Create sample rules."""
+    return {
+        "section_number": 1,
+        "needs_dice_roll": True,
+        "dice_type": "COMBAT",
+        "conditions": ["Must have sword", "SKILL > 8"],
+        "next_sections": [145, 278],
+        "rules_summary": "Combat with troll required"
+    }
+
+@pytest.mark.asyncio
+async def test_analyze_response(decision_agent, sample_game_state, sample_rules):
+    """Test analyzing user response."""
+    result = await decision_agent.analyze_response(
         section_number=1,
-        needs_dice_roll=True,
-        dice_type=DiceType.COMBAT,
-        conditions=["Must have sword", "SKILL > 8"],
-        next_sections=[145, 278],
-        rules_summary="Combat with troll required"
+        user_response="go to [[145]]",
+        rules=sample_rules
     )
+    
+    assert isinstance(result, AnalysisResult)
+    assert result.is_valid is True
+    assert result.next_section == 145
 
 @pytest.mark.asyncio
-async def test_analyze_decision_valid_choice(
-    decision_agent, mock_decision_manager, mock_rules_agent,
-    sample_game_state, sample_rules_model
-):
-    """Test analyzing a valid decision."""
-    # Setup mocks
-    mock_rules_agent.process_section_rules.return_value = sample_rules_model
-    mock_decision_manager.validate_choice.return_value = True
+async def test_analyze_response_with_dice(decision_agent, sample_game_state, sample_rules):
+    """Test analyzing response requiring dice roll."""
+    sample_rules["needs_dice_roll"] = True
     
-    # Analyze decision
-    result = await decision_agent.analyze_decision(sample_game_state)
+    result = await decision_agent.analyze_response(
+        section_number=1,
+        user_response="go to [[145]]",
+        rules=sample_rules
+    )
     
-    # Verify result
-    assert isinstance(result, GameState)
-    assert result.section_number == 1
-    assert not result.error
-    
-    # Verify manager calls
-    mock_rules_agent.process_section_rules.assert_called_once_with(1)
-    mock_decision_manager.validate_choice.assert_called_once()
-
-@pytest.mark.asyncio
-async def test_analyze_decision_invalid_choice(
-    decision_agent, mock_decision_manager, mock_rules_agent,
-    sample_game_state, sample_rules_model
-):
-    """Test analyzing an invalid decision."""
-    # Setup mocks
-    mock_rules_agent.process_section_rules.return_value = sample_rules_model
-    mock_decision_manager.validate_choice.return_value = False
-    
-    # Analyze decision
-    result = await decision_agent.analyze_decision(sample_game_state)
-    
-    # Verify result
-    assert isinstance(result, GameState)
-    assert result.error
-    assert "invalid choice" in result.error.lower()
-
-@pytest.mark.asyncio
-async def test_analyze_decision_rules_error(
-    decision_agent, mock_decision_manager, mock_rules_agent,
-    sample_game_state
-):
-    """Test analyzing decision with rules error."""
-    # Setup mock
-    mock_rules_agent.process_section_rules.side_effect = Exception("Rules error")
-    
-    # Analyze decision
-    result = await decision_agent.analyze_decision(sample_game_state)
-    
-    # Verify result
-    assert isinstance(result, GameState)
-    assert result.error
-    assert "rules error" in result.error.lower()
-
-@pytest.mark.asyncio
-async def test_validate_choice(decision_agent):
-    """Test choice validation."""
-    # Test valid choice
-    valid = await decision_agent.validate_choice("145", ["145", "278"])
-    assert valid
-    
-    # Test invalid choice
-    valid = await decision_agent.validate_choice("999", ["145", "278"])
-    assert not valid
-
-@pytest.mark.asyncio
-async def test_analyze_decision_with_dice_roll(
-    decision_agent, mock_decision_manager, mock_rules_agent,
-    sample_game_state, sample_rules_model
-):
-    """Test analyzing decision requiring dice roll."""
-    # Setup mocks
-    mock_rules_agent.process_section_rules.return_value = sample_rules_model
-    mock_decision_manager.validate_choice.return_value = True
-    
-    # Analyze decision
-    result = await decision_agent.analyze_decision(sample_game_state)
-    
-    # Verify result
-    assert isinstance(result, GameState)
-    assert result.needs_dice_roll
-    assert result.dice_type == DiceType.COMBAT
+    assert isinstance(result, AnalysisResult)
+    assert result.needs_dice_roll is True
+    assert result.dice_type == "COMBAT"

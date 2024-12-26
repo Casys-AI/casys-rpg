@@ -46,14 +46,8 @@ class Item(BaseModel):
 class Inventory(BaseModel):
     """Character's inventory."""
     items: Dict[str, Item] = Field(default_factory=dict)
-    capacity: int = 10
-    gold: int = 0
-    
-    @field_validator('capacity', 'gold')
-    def validate_positive_values(cls, v, field):
-        if v < 0:
-            raise ValueError(f"{field.name} must be positive")
-        return v
+    capacity: int = Field(default=10, ge=0)
+    gold: int = Field(default=0, ge=0)
     
     @model_validator(mode='after')
     def validate_inventory_size(self):
