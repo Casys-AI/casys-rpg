@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Optional, Tuple, AsyncGenerator
 import sys
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
+import json
 
 # Third-party imports
 from fastapi import FastAPI, WebSocket, HTTPException, Depends, status
@@ -331,6 +333,36 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+
+# Fonction pour sérialiser l'état du jeu
+def from_game_state(state: Any) -> dict:
+    """
+    Convert game state to JSON serializable format.
+    Handles datetime objects and other special types.
+    """
+    if isinstance(state, dict) or hasattr(state, 'items'):
+        # Gère à la fois les dict et les mappingproxy
+        return {k: from_game_state(v) for k, v in dict(state).items()}
+    elif isinstance(state, (list, tuple)):
+        return [from_game_state(item) for item in state]
+    elif isinstance(state, datetime):
+        return state.isoformat()
+    elif hasattr(state, "model_dump"):
+        # Pour les modèles Pydantic v2
+        return from_game_state(state.model_dump())
+    elif hasattr(state, "dict"):
+        # Pour les modèles Pydantic v1
+        return from_game_state(state.dict())
+    elif hasattr(state, "__dict__"):
+        # Pour les objets Python standards
+        return from_game_state(state.__dict__)
+    else:
+        # Convertir les types non-sérialisables en str si nécessaire
+        try:
+            json.dumps(state)
+            return state
+        except (TypeError, OverflowError):
+            return str(state)
 
 # WebSocket endpoint
 @app.websocket("/ws/game")

@@ -8,14 +8,18 @@ interface StoryContentProps {
   onNavigate$: QRL<(sectionNumber: string) => Promise<any>>;
   actionMessage?: string;
   onAction$?: QRL<(action: string) => void>;
+  loading?: boolean;
+  error?: string;
 }
 
 export const StoryContent = component$<StoryContentProps>(({ 
   content, 
-  choices, 
+  choices = [], 
   onNavigate$, 
   actionMessage,
-  onAction$ 
+  onAction$,
+  loading,
+  error 
 }) => {
   const dialogOpen = useSignal(false);
   const dialogMessage = useSignal('');
@@ -59,9 +63,9 @@ export const StoryContent = component$<StoryContentProps>(({
     
     if (!rawContent) {
       console.log('Content is null or undefined');
-      return '';
+      return 'Chargement du contenu...';
     }
-    
+
     // Si c'est une chaîne de caractères
     if (typeof rawContent === 'string') {
       console.log('Content is string:', rawContent);
@@ -84,6 +88,27 @@ export const StoryContent = component$<StoryContentProps>(({
     console.log('No valid content found, returning empty string');
     return '';
   };
+
+  // Si chargement
+  if (loading) {
+    return (
+      <div class="flex justify-center items-center h-64">
+        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900">
+          <span class="sr-only">Chargement...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Si erreur
+  if (error) {
+    return (
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong class="font-bold">Erreur! </strong>
+        <span class="block sm:inline">{error}</span>
+      </div>
+    );
+  }
 
   const processedContent = processContent(content);
 

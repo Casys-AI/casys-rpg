@@ -21,34 +21,20 @@ async function getAvailablePort() {
 }
 
 // Configuration par défaut
-const defaultConfig = {
-    development: {
-        BASE_URL: 'http://localhost:8000', // Port par défaut
-        WS_URL: 'ws://localhost:8000',
-        API_VERSION: 'v1',
-        HEALTH_CHECK_ENDPOINT: '/api/health',
-        GAME_WS_ENDPOINT: '/ws/game'
-    },
-    production: {
-        BASE_URL: env.VITE_API_URL || 'http://localhost:8000',
-        WS_URL: env.VITE_WS_URL || 'ws://localhost:8000',
-        API_VERSION: 'v1',
-        HEALTH_CHECK_ENDPOINT: '/api/health',
-        GAME_WS_ENDPOINT: '/ws/game'
-    }
-} as const;
-
-// Configuration dynamique qui sera mise à jour avec le bon port
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:8000',
-  WS_URL: 'ws://localhost:8000',
-  GAME_WS_ENDPOINT: '/ws/game',
-  HEALTH_CHECK_ENDPOINT: '/health',
-  FEEDBACK_ENDPOINT: '/feedback',
+    BASE_URL: isDev ? 'http://localhost:8000' : env.VITE_API_URL || '',
+    WS_URL: isDev ? 'ws://localhost:8000' : env.VITE_WS_URL || '',
+    DEFAULT_HEADERS: {
+        'Content-Type': 'application/json',
+    },
+    WS_ENDPOINT: '/ws/game'  // Endpoint WebSocket
 };
 
 // Fonction pour mettre à jour la configuration avec le bon port
 export async function updateApiConfig() {
-  // Pour l'instant, on utilise des valeurs statiques
-  return API_CONFIG;
+    if (isDev) {
+        const port = await getAvailablePort();
+        API_CONFIG.BASE_URL = `http://localhost:${port}`;
+        API_CONFIG.WS_URL = `ws://localhost:${port}`;
+    }
 }
