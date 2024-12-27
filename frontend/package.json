@@ -24,7 +24,9 @@
     "lint": "eslint \"src/**/*.ts*\"",
     "preview": "qwik build preview && vite preview --open",
     "start": "vite --open --mode ssr",
-    "qwik": "qwik"
+    "qwik": "qwik",
+    "clean": "rimraf dist tmp .vite .netlify node_modules/.vite",
+    "dev.clean": "npm run clean && npm run dev"
   },
   "devDependencies": {
     "@builder.io/qwik": "1.12.0",
@@ -38,6 +40,7 @@
     "eslint": "8.57.0",
     "eslint-plugin-qwik": "1.12.0",
     "prettier": "3.2.4",
+    "rimraf": "^5.0.5",
     "typescript": "5.3.3",
     "undici": "6.4.0",
     "vite": "5.0.12",

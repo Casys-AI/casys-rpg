@@ -10,38 +10,21 @@ export const useGameState = routeLoader$(async ({ cookie, redirect }) => {
   try {
     const sessionId = cookie.get('session_id')?.value;
     const gameId = cookie.get('game_id')?.value;
-    
-    // On a besoin des deux IDs
+
     if (!sessionId || !gameId) {
-      // Supprimer les cookies invalides
-      cookie.delete('session_id');
-      cookie.delete('game_id');
       throw redirect(302, '/game');
     }
 
-    // Récupérer l'état du jeu
-    try {
-      const gameState = await gameService.getGameState(sessionId, gameId);
-      if (!gameState) {
-        // Supprimer les cookies si l'état n'existe pas
-        cookie.delete('session_id');
-        cookie.delete('game_id');
-        throw redirect(302, '/game');
-      }
-      return gameState;
-    } catch (error) {
-      // Supprimer les cookies en cas d'erreur
-      cookie.delete('session_id');
-      cookie.delete('game_id');
+    const gameState = await gameService.getGameState(sessionId, gameId);
+    if (!gameState) {
       throw redirect(302, '/game');
     }
+
+    return gameState;
   } catch (error) {
     if (error instanceof Response && error.status === 302) {
       throw error;
     }
-    // Supprimer les cookies en cas d'erreur inattendue
-    cookie.delete('session_id');
-    cookie.delete('game_id');
     throw redirect(302, '/game');
   }
 });
@@ -56,14 +39,11 @@ export const useNavigateAction = routeAction$(async (
   try {
     const sessionId = cookie.get('session_id')?.value;
     const gameId = cookie.get('game_id')?.value;
+
     if (!sessionId || !gameId) {
-      // Supprimer les cookies invalides
-      cookie.delete('session_id');
-      cookie.delete('game_id');
       return fail(401, { message: 'Session invalide' });
     }
 
-    // Appeler le service de navigation
     const newState = await gameService.navigate(sessionId, gameId, target);
     return newState;
   } catch (error) {
@@ -79,36 +59,41 @@ export default component$(() => {
 
   if (!state.value) {
     return (
-      <div class="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        <div class="text-center">
-          <h1 class="text-4xl font-bold mb-8">Chargement...</h1>
-          <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto"></div>
+      <div class="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800">
+        <div class="text-center text-white">
+          <div class="mb-8">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500 mx-auto"></div>
+          </div>
+          <h1 class="text-3xl font-bold mb-4">Chargement de votre aventure</h1>
+          <p class="text-gray-400">Préparation du prochain chapitre...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div class="min-h-screen bg-white">
-      <GameBook 
-        gameState={state.value} 
-        onNavigate$={async (target) => {
-          const result = await navigate.submit({ target });
-          if (result.value && !result.value.failed) {
-            // Le state sera automatiquement mis à jour par le loader
-          }
-        }}
-      />
+    <div class="py-8">
+      <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl">
+        <GameBook 
+          gameState={state.value} 
+          onNavigate$={async (target) => {
+            const result = await navigate.submit({ target });
+            if (result.value && !result.value.failed) {
+              // Le state sera automatiquement mis à jour par le loader
+            }
+          }}
+        />
+      </div>
     </div>
   );
 });
 
 export const head: DocumentHead = {
-  title: 'Casys RPG - En jeu',
+  title: 'CASYS RPG - En jeu',
   meta: [
     {
       name: 'description',
-      content: 'Votre aventure est en cours'
+      content: 'Plongez dans votre aventure interactive'
     }
   ]
 };

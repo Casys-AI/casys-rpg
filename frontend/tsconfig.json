@@ -23,5 +23,6 @@
     "baseUrl": "."
   },
   "files": ["./.eslintrc.cjs"],
-  "include": ["src", "./*.d.ts", "./*.config.ts"]
+  "include": ["src", "./*.d.ts", "./*.config.ts"],
+  "exclude": ["node_modules", "dist", "tmp"]
 }

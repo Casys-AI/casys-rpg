@@ -5,11 +5,19 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import { resolve } from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '~': resolve(__dirname, './src')
+    }
+  },
   plugins: [
     qwikCity(),
     qwikVite({
       devTools: {
         clickToSource: false
+      },
+      entryStrategy: {
+        type: 'smart'
       }
     }),
     tsconfigPaths()
@@ -20,10 +28,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@builder.io/qwik', '@builder.io/qwik-city']
-  },
-  ssr: {
-    noExternal: ['@builder.io/qwik-city']
+    include: [
+      '@builder.io/qwik',
+      '@builder.io/qwik-city'
+    ]
   },
   build: {
     target: 'es2020',
@@ -31,27 +39,23 @@ export default defineConfig({
       polyfill: false
     },
     rollupOptions: {
-      input: ['@builder.io/qwik', '@builder.io/qwik-city'],
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        }
+      input: {
+        main: 'src/entry.ssr.tsx'
       }
     }
   },
   server: {
     port: 5173,
     host: true,
+    fs: {
+      strict: false,
+      allow: ['..']
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      },
-      '/ws': {
-        target: 'ws://localhost:8000',
+        secure: false,
         ws: true
       }
     }

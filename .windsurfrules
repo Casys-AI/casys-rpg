@@ -66,7 +66,6 @@ Stockage des règles en format Markdown
 
 TECHNOLOGIES UTILISÉES
 
-Backend (Python 3.8+)
 FastAPI : API REST et WebSocket
 Pydantic v2 : Validation de données et sérialisation
 LangGraph : Orchestration des agents
@@ -75,89 +74,64 @@ AsyncIO : Gestion asynchrone
 
 Frontend
 Qwik : Framework web moderne et performant
-Tailwind CSS : Styling utilitaire
-Websockets
 
-Composants personnalisés :
-Système de dés animé (TBD)
-Affichage du livre
-Interface de combat (TBD)
-TypeScript pour la type-safety
-Vite comme bundler
-Stockage et Cache
-Système de cache en mémoire
 
-Stockage fichier pour :
-Règles (Markdown)
-Historique des parties
-Feedback utilisateurs
-Sérialisation JSON
 
-Tests et Qualité
-PyTest : Tests unitaires et d'intégration
-Black : Formatage de code
-MkDocs : Documentation
-Logging avancé avec loguru
-PATTERNS ET PRINCIPES
 
-Design Patterns
-Factory Pattern : Création d'agents et managers
-Protocol Pattern : Interfaces et abstraction
-Architecture
-Clean Architecture avec séparation des responsabilités
-Domain-Driven Design pour la logique métier
-Event-Driven pour la communication
-Injection de dépendances
-Principes SOLID
-Single Responsibility : Agents et managers spécialisés
-Open/Closed : Extensions via protocols
-Liskov Substitution : Interfaces cohérentes
-Interface Segregation : Protocols spécifiques
-Dependency Inversion : Injection des dépendances
-STRUCTURE DU PROJET
+Bonnes pratiques et subtilités pour Qwik :
+Optimisation et $:
 
-casys-rpg/ 
-├── agents/ # Agents LLM spécialisés 
-├── models/ # Modèles de données 
-├── managers/ # Gestionnaires de composants 
-├── config/ # Configuration 
-├── data/ # Données du jeu
-├── docs/ # Documentation
-├── api/ # API REST et WebSocket
+Toujours suffixer les fonctions avec $ pour le lazy-loading.
+Utiliser $() uniquement lorsque nécessaire pour encapsuler une logique.
+Préférer inlinedQrl() pour les cas avancés de création de QRL.
+Réactivité :
 
- ├── frontend/ 
-├── tests/ # Tests 
-└── utils/ # Utilitaires
+Utiliser useSignal pour gérer des valeurs primitives réactives.
+Utiliser useStore pour des objets complexes réactifs.
+Surveiller les changements avec track() dans useTask$.
+Lifecycle :
 
-WORKFLOWS PRINCIPAUX
+useTask$ pour réagir aux changements réactifs.
+useVisibleTask$ pour exécuter du code lorsque le composant est visible.
+Routing :
 
-Flow de Jeu
-Entrée utilisateur → DecisionAgent
-DecisionAgent → RulesAgent
-RulesAgent → NarratorAgent
-NarratorAgent → Interface
-TraceAgent ← Tous les agents
-Traitement des Règles
-Requête → Cache
-Si absent → Analyse LLM
-Validation → Décision
-Mise en cache
-Mises à jour d'État
-Action → Validation
-Validation → Mise à jour
-Mise à jour → Événements
-Événements → Interface
+Utiliser routeLoader$ pour charger des données avant le rendu.
+Utiliser routeAction$ pour gérer des actions côté serveur.
+Exploiter le composant <Form> pour lier facilement des actions à un formulaire.
+Lazy-loading :
 
-DÉPENDANCES PRINCIPALES
+Découper les composants avec component$.
+Charger dynamiquement les sous-composants via lazy$.
+WebSockets et événements :
 
-langgraph
-fastapi
-pydantic
+Gérer les callbacks WebSocket avec $ pour qu'ils soient optimisés.
+Utiliser cleanup() dans useTask$ pour nettoyer les connexions.
+Structure des fichiers :
 
-openai
-pytest
-black
-@builder.io/qwik
-tailwindcss
-typescript
-vite
+Respecter la convention des répertoires (routes, components, services, etc.).
+Placer les loaders et actions directement dans les fichiers de route.
+Debugging et logs :
+
+Activer les logs en développement pour vérifier les optimisations.
+Toujours tester l'intégration des fonctions optimisées.
+Gestion des erreurs :
+
+Traiter les erreurs dans routeLoader$ et routeAction$.
+Afficher des messages d'erreur dans l'UI en cas de problèmes.
+Performance :
+
+Limiter les dépendances suivies par track() aux variables nécessaires.
+Supprimer les fonctions inutiles de $.
+Mise à jour :
+
+Utiliser les dernières versions de Qwik et vérifier la compatibilité des plugins.
+SEO :
+
+Configurer DocumentHead pour gérer les métadonnées SEO.
+Préférer le rendu statique lorsque possible.
+Configuration :
+
+Utiliser qwikVite pour configurer correctement l'optimiseur.
+Activer le mode SSR pour des performances accrues.
+
+
