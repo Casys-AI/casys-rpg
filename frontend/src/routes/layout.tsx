@@ -1,17 +1,32 @@
-import { component$, Slot } from "@builder.io/qwik";
-import type { RequestHandler } from "@builder.io/qwik-city";
+import { component$, Slot } from '@builder.io/qwik';
+import { routeLoader$ } from '@builder.io/qwik-city';
 
-export const onGet: RequestHandler = async ({ cacheControl }) => {
-  // Control caching for this request for best performance and to reduce hosting costs:
-  // https://qwik.dev/docs/caching/
-  cacheControl({
-    // Always serve a cached response by default, up to a week stale
-    staleWhileRevalidate: 60 * 60 * 24 * 7,
-    // Max once every 5 seconds, revalidate on the server to get a fresh version of this page
-    maxAge: 5,
-  });
-};
+/**
+ * Logger de session pour le debug
+ */
+export const useSessionLogger = routeLoader$(async ({ cookie, url }) => {
+  const sessionId = cookie.get('session_id')?.value;
+  const gameId = cookie.get('game_id')?.value;
+  
+  console.log(' [Layout] Route:', url.pathname);
+  console.log(' [Layout] SessionId:', sessionId);
+  console.log(' [Layout] GameId:', gameId);
+  
+  return {
+    hasSession: !!sessionId,
+    hasGame: !!gameId,
+    currentPath: url.pathname
+  };
+});
 
 export default component$(() => {
-  return <Slot />;
+  useSessionLogger();
+  
+  return (
+    <div class="min-h-screen bg-white">
+      <main class="container mx-auto">
+        <Slot />
+      </main>
+    </div>
+  );
 });

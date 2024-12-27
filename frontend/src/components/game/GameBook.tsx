@@ -1,31 +1,65 @@
-import { component$ } from "@builder.io/qwik";
-import { StoryContent } from "~/components/story/StoryContent";
-import { DiceRoller } from "~/components/dice/DiceRoller";
-import { useGameState } from "~/hooks/useGameState";
-import { useGameActions } from "~/hooks/useGameActions";
+import { component$, useSignal, useTask$, type QRL } from '@builder.io/qwik';
+import type { GameState } from '../../types/game';
+import { DiceRoller } from '../dice/DiceRoller';
 
-export const GameBook = component$(() => {
-  const { gameState } = useGameState();
-  const { handleNavigate$ } = useGameActions();
+interface GameBookProps {
+  gameState: GameState;
+  onNavigate$?: QRL<(target: string) => Promise<void>>;
+}
 
-  if (!gameState.value) {
-    return null;
-  }
+export const GameBook = component$<GameBookProps>(({ gameState, onNavigate$ }) => {
+  const contentRef = useSignal<HTMLDivElement>();
+  const showDice = useSignal(gameState.rules?.needs_dice || false);
 
-  const { narrative, rules } = gameState.value;
+  // Mettre à jour l'affichage des dés quand l'état change
+  useTask$(({ track }) => {
+    const state = track(() => gameState);
+    showDice.value = state.rules?.needs_dice || false;
+  });
 
   return (
-    <div class="min-h-screen bg-gray-50">
-      <div class="container mx-auto">
-        <StoryContent 
-          content={narrative.content}
-          choices={rules.choices || []}
-          onNavigate$={handleNavigate$}
-        />
-        {rules?.needs_dice && (
-          <div class="max-w-3xl mx-auto mt-8 bg-white p-6 rounded-lg shadow-sm">
-            <DiceRoller 
-              diceType={rules.dice_type}
+    <div class="min-h-screen bg-white">
+      <div class="w-full px-1 sm:px-2">
+        {/* Contenu principal */}
+        <div ref={contentRef} class="w-full max-w-5xl mx-auto">
+          <h1 class="text-4xl font-bold text-center mb-8">
+            Section {gameState.narrative.section_number}
+          </h1>
+          
+          <div class="prose prose-lg mx-auto text-justify w-full max-w-none">
+            {gameState.narrative.content.split('\n').map((line, index) => (
+              <p key={index} class="mb-6">{line}</p>
+            ))}
+          </div>
+
+          {/* Choix */}
+          {gameState.rules?.choices && gameState.rules.choices.length > 0 && (
+            <div class="mt-12 space-y-6">
+              <h2 class="text-2xl font-bold text-center text-black">
+                Que souhaitez-vous faire ?
+              </h2>
+              <div class="space-y-4">
+                {gameState.rules.choices.map((choice, index) => (
+                  <button
+                    key={index}
+                    onClick$={() => onNavigate$?.(choice.target)}
+                    class="w-full text-left p-4 rounded-lg border border-gray-200
+                           hover:bg-gray-50 transition-colors duration-200"
+                  >
+                    {choice.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dés */}
+        {showDice.value && (
+          <div class="fixed bottom-4 right-4">
+            <DiceRoller
+              diceType={gameState.rules?.dice_type || 'chance'}
+              gameState={gameState}
             />
           </div>
         )}

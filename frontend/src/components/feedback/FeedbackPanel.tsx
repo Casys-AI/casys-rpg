@@ -1,4 +1,5 @@
-import { component$, useSignal, $ } from '@builder.io/qwik';
+import { component$, useSignal } from '@builder.io/qwik';
+import { gameFeedback } from '~/signals/gameFeedback';
 
 interface FeedbackPanelProps {
   sectionNumber: number;
