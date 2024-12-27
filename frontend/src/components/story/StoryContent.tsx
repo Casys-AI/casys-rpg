@@ -1,39 +1,46 @@
-import { component$, $, useSignal, useOnDocument, type QRL } from '@builder.io/qwik';
+import { component$, useSignal, $ } from "@builder.io/qwik";
+import type { QRL } from "@builder.io/qwik";
 import type { Choice } from '~/types/game';
 import { ActionDialog } from '../dialog/ActionDialog';
 
 interface StoryContentProps {
   content: string;
   choices?: Choice[];
-  onNavigate$?: QRL<(sectionNumber: string) => Promise<any>>;
-  actionMessage?: string;
-  onAction$?: QRL<(action: string) => void>;
-  loading?: boolean;
-  error?: string;
+  onNavigate$?: QRL<(sectionNumber: string) => Promise<void>>;
+}
+
+interface ContentSignals {
+  dialogOpen: boolean;
+  dialogMessage: string;
+  scrollPosition: number;
 }
 
 export const StoryContent = component$<StoryContentProps>(({ 
   content, 
   choices = [], 
-  onNavigate$, 
-  actionMessage,
-  onAction$,
-  loading,
-  error 
+  onNavigate$ 
 }) => {
-  const dialogOpen = useSignal(false);
-  const dialogMessage = useSignal('');
   const contentRef = useSignal<HTMLDivElement>();
-
-  // Fonction pour afficher un message dans la boîte de dialogue
-  const showDialog = $((message: string) => {
-    dialogMessage.value = message;
-    dialogOpen.value = true;
+  const signals = useSignal<ContentSignals>({
+    dialogOpen: false,
+    dialogMessage: '',
+    scrollPosition: 0
   });
 
-  // Fonction pour fermer la boîte de dialogue
+  // Gestion de la boîte de dialogue
+  const showDialog = $((message: string) => {
+    signals.value = {
+      ...signals.value,
+      dialogMessage: message,
+      dialogOpen: true
+    };
+  });
+
   const closeDialog = $(() => {
-    dialogOpen.value = false;
+    signals.value = {
+      ...signals.value,
+      dialogOpen: false
+    };
   });
 
   // Gestion des clics sur les liens
@@ -45,95 +52,55 @@ export const StoryContent = component$<StoryContentProps>(({
     if (href?.startsWith('#') && onNavigate$) {
       e.preventDefault();
       const sectionNumber = href.substring(1);
+      
+      // Sauvegarder la position de défilement
+      signals.value = {
+        ...signals.value,
+        scrollPosition: window.scrollY
+      };
+      
       onNavigate$(sectionNumber);
     }
   });
 
-  useOnDocument('click', handleClick$);
-
-  // Si chargement
-  if (loading) {
-    return (
-      <div class="flex justify-center items-center h-64">
-        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900">
-          <span class="sr-only">Chargement...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Si erreur
-  if (error) {
-    return (
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-        <strong class="font-bold">Erreur : </strong>
-        <span class="block sm:inline">{error}</span>
-      </div>
-    );
-  }
-
-  // Si pas de contenu
-  if (!content) {
-    return (
-      <div class="text-center py-8">
-        <p class="text-gray-600">Aucun contenu disponible</p>
-      </div>
-    );
-  }
-
   return (
-    <div class="pt-8">
-      {/* Contenu narratif */}
-      <div 
-        class="max-w-3xl mx-auto text-justify leading-relaxed mb-8 whitespace-pre-wrap bg-white text-gray-900 p-8 rounded-lg shadow-sm"
+    <div class="max-w-3xl mx-auto py-8 px-4 bg-white dark:bg-gray-900">
+      {/* Contenu principal */}
+      <div
         ref={contentRef}
-      >
-        {content}
-      </div>
-      
-      {/* Choix disponibles */}
-      {choices && choices.length > 0 && (
-        <div class="max-w-3xl mx-auto mt-8 space-y-4 bg-white p-6 rounded-lg shadow-sm">
-          {choices.map((choice) => (
-            <button
-              key={choice.target}
-              class="w-full text-left px-6 py-3 bg-gray-50 hover:bg-gray-100 text-gray-900 rounded-lg transition-colors"
-              onClick$={() => onNavigate$?.(choice.target)}
-            >
-              {choice.text}
-            </button>
-          ))}
+        class="prose prose-lg dark:prose-invert mx-auto text-justify space-y-6"
+        dangerouslySetInnerHTML={content}
+        onClick$={handleClick$}
+      />
+
+      {/* Liste des choix */}
+      {choices.length > 0 && (
+        <div class="mt-12 space-y-6">
+          <h2 class="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
+            Que souhaitez-vous faire ?
+          </h2>
+          <div class="space-y-4">
+            {choices.map((choice) => (
+              <button
+                key={choice.target}
+                onClick$={() => onNavigate$?.(choice.target)}
+                class="w-full text-left p-4 rounded-lg bg-gray-100 dark:bg-gray-800 
+                       shadow-md hover:shadow-lg transition-all duration-200
+                       text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                {choice.text}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Feedback */}
-      <div class="max-w-3xl mx-auto mt-8 p-6 border-t border-gray-200 bg-white rounded-lg shadow-sm">
-        <p class="text-gray-900 mb-4">Comment trouvez-vous ce passage ?</p>
-        <div class="flex space-x-4">
-          <button
-            class="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-            onClick$={() => showDialog('Merci pour votre retour positif !')}
-          >
-            👍 J'aime
-          </button>
-          <button
-            class="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-            onClick$={() => showDialog('Merci pour votre retour, nous allons l\'analyser.')}
-          >
-            👎 Je n'aime pas
-          </button>
-        </div>
-      </div>
-
-      {/* Boîte de dialogue pour les actions */}
-      {actionMessage && (
-        <ActionDialog
-          open={dialogOpen.value}
-          message={dialogMessage.value}
-          onClose={closeDialog}
-          onAction={onAction$}
-        />
-      )}
+      {/* Boîte de dialogue */}
+      <ActionDialog
+        isOpen={signals.value.dialogOpen}
+        message={signals.value.dialogMessage}
+        onClose$={closeDialog}
+      />
     </div>
   );
 });

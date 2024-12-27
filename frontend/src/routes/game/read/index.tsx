@@ -1,84 +1,114 @@
-import { component$ } from "@builder.io/qwik";
-import type { DocumentHead } from "@builder.io/qwik-city";
-import { GameBook } from "~/components/game/GameBook";
-import { NavBar } from "~/components/navigation/NavBar";
-import { useGameState } from "~/hooks/useGameState";
-import { useNavigate } from "@builder.io/qwik-city";
+import { component$ } from '@builder.io/qwik';
+import { routeLoader$, routeAction$, type DocumentHead } from '@builder.io/qwik-city';
+import { GameBook } from '~/components/game/GameBook';
+import { gameService } from '~/services/gameService';
+
+/**
+ * Loader pour l'état du jeu
+ */
+export const useGameState = routeLoader$(async ({ cookie, redirect }) => {
+  try {
+    const sessionId = cookie.get('session_id')?.value;
+    const gameId = cookie.get('game_id')?.value;
+    
+    // On a besoin des deux IDs
+    if (!sessionId || !gameId) {
+      // Supprimer les cookies invalides
+      cookie.delete('session_id');
+      cookie.delete('game_id');
+      throw redirect(302, '/game');
+    }
+
+    // Récupérer l'état du jeu
+    try {
+      const gameState = await gameService.getGameState(sessionId, gameId);
+      if (!gameState) {
+        // Supprimer les cookies si l'état n'existe pas
+        cookie.delete('session_id');
+        cookie.delete('game_id');
+        throw redirect(302, '/game');
+      }
+      return gameState;
+    } catch (error) {
+      // Supprimer les cookies en cas d'erreur
+      cookie.delete('session_id');
+      cookie.delete('game_id');
+      throw redirect(302, '/game');
+    }
+  } catch (error) {
+    if (error instanceof Response && error.status === 302) {
+      throw error;
+    }
+    // Supprimer les cookies en cas d'erreur inattendue
+    cookie.delete('session_id');
+    cookie.delete('game_id');
+    throw redirect(302, '/game');
+  }
+});
+
+/**
+ * Action de navigation
+ */
+export const useNavigateAction = routeAction$(async (
+  { target }: { target: string },
+  { cookie, fail }
+) => {
+  try {
+    const sessionId = cookie.get('session_id')?.value;
+    const gameId = cookie.get('game_id')?.value;
+    if (!sessionId || !gameId) {
+      // Supprimer les cookies invalides
+      cookie.delete('session_id');
+      cookie.delete('game_id');
+      return fail(401, { message: 'Session invalide' });
+    }
+
+    // Appeler le service de navigation
+    const newState = await gameService.navigate(sessionId, gameId, target);
+    return newState;
+  } catch (error) {
+    return fail(500, {
+      message: error instanceof Error ? error.message : 'Erreur de navigation'
+    });
+  }
+});
 
 export default component$(() => {
-  const nav = useNavigate();
-  const { gameState, error, isInitializing } = useGameState();
+  const state = useGameState();
+  const navigate = useNavigateAction();
 
-  // Si on a une erreur, afficher le message d'erreur
-  if (error?.value) {
-    console.error('Erreur détectée:', error.value);
+  if (!state.value) {
     return (
-      <div class="container mx-auto p-4">
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong class="font-bold">Erreur de chargement : </strong>
-          <span class="block sm:inline">{error.value}</span>
-          <div class="mt-4">
-            <pre class="text-sm bg-red-50 p-2 rounded overflow-auto max-h-96">
-              {JSON.stringify(gameState.value, null, 2)}
-            </pre>
-          </div>
-          <button
-            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded mt-4"
-            onClick$={() => nav('/')}
-          >
-            Retour à l'accueil
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Si on est en train d'initialiser, afficher le loader
-  if (isInitializing.value) {
-    return (
-      <div class="flex items-center justify-center h-screen">
-        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900">
-          <span class="sr-only">Chargement...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Si on n'a pas d'état de jeu, afficher le message
-  if (!gameState.value) {
-    return (
-      <div class="flex items-center justify-center h-screen">
+      <div class="min-h-screen flex items-center justify-center bg-gray-900 text-white">
         <div class="text-center">
-          <h2 class="text-xl font-bold mb-4">Aucune partie en cours</h2>
-          <p class="text-gray-600 mb-4">Veuillez commencer une nouvelle partie depuis l'accueil.</p>
-          <button
-            onClick$={() => nav('/')}
-            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
-          >
-            Retour à l'accueil
-          </button>
+          <h1 class="text-4xl font-bold mb-8">Chargement...</h1>
+          <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto"></div>
         </div>
       </div>
     );
   }
 
-  // Si tout est ok, afficher le jeu
   return (
-    <div class="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      <NavBar />
-      <main class="flex-1">
-        <GameBook />
-      </main>
+    <div class="min-h-screen bg-white">
+      <GameBook 
+        gameState={state.value} 
+        onNavigate$={async (target) => {
+          const result = await navigate.submit({ target });
+          if (result.value && !result.value.failed) {
+            // Le state sera automatiquement mis à jour par le loader
+          }
+        }}
+      />
     </div>
   );
 });
 
 export const head: DocumentHead = {
-  title: "Casys RPG - Lecture",
+  title: 'Casys RPG - En jeu',
   meta: [
     {
-      name: "description",
-      content: "Lisez votre aventure et faites vos choix",
-    },
-  ],
+      name: 'description',
+      content: 'Votre aventure est en cours'
+    }
+  ]
 };

@@ -1,61 +1,40 @@
-// Configuration de l'API
+/**
+ * Configuration de l'API
+ * Centralise les paramètres de connexion et les utilitaires URL
+ */
 import { API_ROUTES } from './routes';
 
-const env = import.meta.env;
-const isDev = true; // En mode développement pour l'instant
-
-// Configuration par défaut
-const API_BASE = 'http://127.0.0.1:8000';  // IPv4 explicite
-const WS_BASE = 'ws://127.0.0.1:8000';     // IPv4 explicite
-
-export const API_CONFIG = {
-    BASE_URL: API_BASE,
-    WS_URL: WS_BASE,
+// Configuration de base
+const API_CONFIG = {
+    BASE_URL: 'http://127.0.0.1:8000',
+    WS_URL: 'ws://127.0.0.1:8000',
     DEFAULT_HEADERS: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
     },
     ROUTES: API_ROUTES,
     WS_ENDPOINT: API_ROUTES.WS.GAME
-};
+} as const;
 
-// Fonction pour tester la disponibilité du serveur
-async function getAvailablePort(): Promise<number> {
-    const ports = [8001, 8000];  // Essaie d'abord 8001, puis 8000
-    for (const port of ports) {
-        try {
-            const response = await fetch(`http://127.0.0.1:${port}${API_ROUTES.SYSTEM.HEALTH}`);
-            if (response.ok) {
-                console.log(`✅ Port ${port} disponible et répond`);
-                return port;
-            }
-        } catch (e) {
-            console.log(`❌ Port ${port} non disponible`);
-        }
-    }
-    console.log('⚠️ Aucun port disponible, utilisation du port par défaut 8001');
-    return 8001; // Port par défaut si aucun n'est disponible
-}
-
-// Fonction pour mettre à jour la configuration avec le bon port
-export async function updateApiConfig() {
-    if (isDev) {
-        const port = await getAvailablePort();
-        API_CONFIG.BASE_URL = `http://127.0.0.1:${port}`;
-        API_CONFIG.WS_URL = `ws://127.0.0.1:${port}`;
-    }
-}
-
-// Fonction utilitaire pour construire les URLs complets
+/**
+ * Construit une URL complète pour l'API REST
+ * @param path - Chemin de l'endpoint
+ * @param params - Paramètres optionnels de query
+ */
 export function buildUrl(path: string, params?: Record<string, string>): string {
     let url = `${API_CONFIG.BASE_URL}${path}`;
     if (params) {
-        const queryString = new URLSearchParams(params).toString();
-        url += `?${queryString}`;
+        const queryParams = new URLSearchParams(params);
+        url += `?${queryParams.toString()}`;
     }
     return url;
 }
 
-// Fonction utilitaire pour construire les URLs WebSocket
+/**
+ * Construit une URL WebSocket
+ * @param path - Chemin du endpoint WebSocket (optionnel)
+ */
 export function buildWsUrl(path: string = API_CONFIG.WS_ENDPOINT): string {
     return `${API_CONFIG.WS_URL}${path}`;
 }
+
+export { API_CONFIG };
