@@ -1,42 +1,29 @@
-# Build
-/dist
-/lib
-/lib-types
-/server
-
-# Development
+test-results
 node_modules
-.env
-*.local
 
-# Cache
-.cache
-.mf
-.rollup.cache
-tsconfig.tsbuildinfo
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Editor
-.vscode/*
-!.vscode/launch.json
-!.vscode/*.code-snippets
-
-.idea
+# OS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
 
-# Yarn
-.yarn/*
-!.yarn/releases
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Paraglide
+src/lib/paraglide
+
+*storybook.log

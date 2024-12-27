@@ -58,6 +58,7 @@ async def game_websocket_endpoint(
     - Connection management
     - Real-time state updates
     - Game events broadcasting
+    - Heartbeat (ping/pong)
     """
     logger.info("New WebSocket connection attempt")
     try:
@@ -86,6 +87,14 @@ async def game_websocket_endpoint(
             try:
                 data = await websocket.receive_json()
                 
+                # Gérer les pings
+                if data.get("type") == "ping":
+                    await websocket.send_json({
+                        "type": "pong",
+                        "timestamp": _json_serial(data.get("timestamp"))
+                    })
+                    continue
+                
                 # Traiter les messages du client
                 if data.get("type") == "get_state":
                     current_state = await agent_mgr.get_state()
@@ -99,7 +108,7 @@ async def game_websocket_endpoint(
                 logger.info("WebSocket disconnected")
                 break
             except Exception as e:
-                logger.error(f"Error processing WebSocket message: {e}")
+                logger.error(f"Error handling WebSocket message: {e}")
                 await websocket.send_json({
                     "error": str(e),
                     "status": "error"
@@ -107,6 +116,7 @@ async def game_websocket_endpoint(
                 
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-    finally:
-        logger.info("Cleaning up WebSocket connection")
         await ws_manager.handle_error(websocket)
+    finally:
+        ws_manager.disconnect(websocket)
+        logger.info("WebSocket connection closed")
