@@ -3,7 +3,7 @@ State Manager Module
 Manages game state persistence and validation.
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from pydantic import BaseModel, ValidationError
 import json
 import logging
@@ -23,8 +23,6 @@ def _json_serial(obj):
     if isinstance(obj, (datetime)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
-
-
 
 
 class StateManager(StateManagerProtocol):
@@ -118,6 +116,9 @@ class StateManager(StateManagerProtocol):
         """
         try:
             state_dict = state.model_dump()
+            # Préserver explicitement les IDs
+            state_dict["session_id"] = state.session_id
+            state_dict["game_id"] = self._game_id
             return json.dumps(state_dict, default=_json_serial)
         except Exception as e:
             logger.error(f"Error serializing state: {e}")
@@ -155,10 +156,21 @@ class StateManager(StateManagerProtocol):
             StateError: If persistence fails
         """
         try:
+            if not self._game_id:
+                raise StateError("No game ID set for persistence")
+
             json_data = self._serialize_state(state)
             
+            # Sauvegarder l'état courant
             await self.cache.save_cached_data(
-                key=f"section_{state.section_number}",
+                key=f"game_{self._game_id}_current",
+                namespace="state",
+                data=json_data
+            )
+            
+            # Sauvegarder aussi par section pour l'historique
+            await self.cache.save_cached_data(
+                key=f"game_{self._game_id}_section_{state.section_number}",
                 namespace="state",
                 data=json_data
             )
@@ -212,7 +224,7 @@ class StateManager(StateManagerProtocol):
                 raise StateError("State manager not initialized")
                 
             json_data = await self.cache.get_cached_data(
-                key=f"section_{section_number}",
+                key=f"game_{self._game_id}_section_{section_number}",
                 namespace="state"
             )
             
@@ -227,21 +239,50 @@ class StateManager(StateManagerProtocol):
             logger.error(f"Error loading state: {e}")
             raise StateError(f"Failed to load state: {str(e)}")
 
+    async def get_section_history(self) -> List[int]:
+        """Get list of available sections for current game."""
+        try:
+            if not self._game_id:
+                raise StateError("State manager not initialized")
+                
+            # Récupérer toutes les sections sauvegardées pour ce game_id
+            sections = []
+            pattern = f"game_{self._game_id}_section_*"
+            keys = await self.cache.list_keys(namespace="state", pattern=pattern)
+            
+            for key in keys:
+                # Extraire le numéro de section de la clé
+                section = int(key.split('_')[-1])
+                sections.append(section)
+                
+            return sorted(sections)
+            
+        except Exception as e:
+            logger.error(f"Error getting section history: {e}")
+            raise StateError(f"Failed to get section history: {str(e)}")
+
     async def get_current_state(self) -> Optional[GameState]:
         """Get current game state."""
         try:
             logger.debug("Getting current state")
-            # Try to get from cache first
-            state = await self.cache.get_cached_data(
-                key="current_state",
-                namespace="state"
-            )
-            if state:
-                logger.debug("Found state in cache")
-                return self._deserialize_state(state)
+            
+            # Si on a déjà un état en mémoire, on le retourne
+            if self._current_state:
+                logger.debug("Returning current state from memory")
+                return self._current_state
                 
-            # If not in cache, load from storage
-            # TODO: Implement storage loading
+            # Si on a un game_id, on essaie de récupérer l'état correspondant
+            if self._game_id:
+                state = await self.cache.get_cached_data(
+                    key=f"game_{self._game_id}_current",
+                    namespace="state"
+                )
+                if state:
+                    logger.debug("Found state in cache for game {}", self._game_id)
+                    deserialized_state = self._deserialize_state(state)
+                    self._current_state = deserialized_state
+                    return deserialized_state
+                
             logger.debug("No current state found")
             return None
             
@@ -250,8 +291,42 @@ class StateManager(StateManagerProtocol):
             raise StateError(f"Failed to get current state: {str(e)}")
 
     async def clear_state(self) -> None:
-        """Clear current state."""
-        self._current_state = None
+        """Clear current state and cache."""
+        try:
+            if self._game_id:
+                # Supprimer tous les états liés à cette partie
+                pattern = f"game_{self._game_id}_*"
+                await self.cache.clear_pattern(namespace="state", pattern=pattern)
+                
+            self._current_state = None
+            
+        except Exception as e:
+            logger.error(f"Error clearing state: {e}")
+            raise StateError(f"Failed to clear state: {str(e)}")
+
+    async def switch_game(self, new_game_id: str) -> None:
+        """Switch to a different game.
+        
+        Args:
+            new_game_id: ID of the game to switch to
+            
+        Raises:
+            StateError: If switch fails
+        """
+        try:
+            # Sauvegarder l'état actuel si nécessaire
+            if self._current_state:
+                await self._persist_state(self._current_state)
+                
+            # Changer de partie
+            old_game_id = self._game_id
+            await self.initialize(new_game_id)
+            
+            logger.info(f"Switched from game {old_game_id} to {new_game_id}")
+            
+        except Exception as e:
+            logger.error(f"Error switching game: {e}")
+            raise StateError(f"Failed to switch game: {str(e)}")
 
     async def create_initial_state(self, **init_params: Dict[str, Any]) -> GameState:
         """Create and return the initial game state.
@@ -288,6 +363,7 @@ class StateManager(StateManagerProtocol):
             params = {
                 'section_number': 1,
                 'session_id': session_id,
+                'game_id': self._game_id,  # Ajout du game_id
                 'last_update': self.get_current_timestamp(),
                 'character_id': "current",
                 **init_params  # Ajouter tout paramètre supplémentaire

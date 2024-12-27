@@ -2,7 +2,7 @@
 Cache Manager Protocol
 Defines the interface for caching operations.
 """
-from typing import Optional, Any, Dict, Protocol, runtime_checkable, Type, TypeVar
+from typing import Optional, Any, Dict, Protocol, runtime_checkable, Type, TypeVar, List
 from pydantic import BaseModel
 from abc import abstractmethod
 
@@ -101,6 +101,37 @@ class CacheManagerProtocol(Protocol):
         Args:
             key: Cache key
             namespace: Cache namespace
+            
+        Raises:
+            KeyError: If namespace is unknown
+        """
+        ...
+    
+    @abstractmethod
+    async def list_keys(self, namespace: str, pattern: str) -> List[str]:
+        """
+        List all keys in a namespace matching a pattern.
+        
+        Args:
+            namespace: Namespace to search in
+            pattern: Pattern to match (glob style)
+            
+        Returns:
+            List[str]: List of matching keys
+            
+        Raises:
+            KeyError: If namespace is unknown
+        """
+        ...
+        
+    @abstractmethod
+    async def clear_pattern(self, namespace: str, pattern: str) -> None:
+        """
+        Clear all cached data matching a pattern in a namespace.
+        
+        Args:
+            namespace: Namespace to clear in
+            pattern: Pattern to match (glob style)
             
         Raises:
             KeyError: If namespace is unknown

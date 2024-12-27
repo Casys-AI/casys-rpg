@@ -3,7 +3,7 @@ Cache Manager Module
 Handles caching and persistence of game data through a unified interface.
 """
 
-from typing import Dict, Optional, Any, Union, Type, TypeVar
+from typing import Dict, Optional, Any, Union, Type, TypeVar, List
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -365,3 +365,51 @@ class CacheManager(CacheManagerProtocol):
                 path = self.config.get_absolute_path(namespace)
                 logger.debug("Creating per-game directory for {}: {}", namespace, path)
                 path.mkdir(parents=True, exist_ok=True)
+
+    async def list_keys(self, namespace: str, pattern: str) -> List[str]:
+        """List all keys in a namespace matching a pattern."""
+        try:
+            if namespace not in self.config.namespaces:
+                logger.error("Unknown namespace: {}", namespace)
+                raise KeyError(f"Unknown namespace: {namespace}")
+                
+            # Obtenir le chemin du namespace
+            ns_path = self.config.get_absolute_path(namespace)
+            
+            # Utiliser glob pour trouver les fichiers correspondants
+            import glob
+            pattern_path = str(ns_path / pattern)
+            matching_files = glob.glob(pattern_path)
+            
+            # Extraire les noms de clés des chemins de fichiers
+            keys = []
+            for file_path in matching_files:
+                key = Path(file_path).stem  # Nom du fichier sans extension
+                keys.append(key)
+                
+            return keys
+            
+        except Exception as e:
+            logger.error("Error listing keys: {}", str(e))
+            raise
+            
+    async def clear_pattern(self, namespace: str, pattern: str) -> None:
+        """Clear all cached data matching a pattern in a namespace."""
+        try:
+            if namespace not in self.config.namespaces:
+                logger.error("Unknown namespace: {}", namespace)
+                raise KeyError(f"Unknown namespace: {namespace}")
+                
+            # Trouver toutes les clés correspondantes
+            keys = await self.list_keys(namespace, pattern)
+            
+            # Supprimer chaque clé
+            for key in keys:
+                await self.delete_cached_content(key, namespace)
+                
+            logger.debug("Cleared {} keys matching pattern {} in namespace {}", 
+                        len(keys), pattern, namespace)
+                
+        except Exception as e:
+            logger.error("Error clearing pattern: {}", str(e))
+            raise
