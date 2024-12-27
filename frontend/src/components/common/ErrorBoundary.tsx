@@ -17,32 +17,15 @@ export const ErrorBoundary = component$(() => {
         console.log('🏥 Checking API health...');
         
         // Vérifier l'état de l'API
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
+        const healthEndpoint = '/api/health';
+        const response = await fetch(`${API_CONFIG.BASE_URL}${healthEndpoint}`);
         
         if (!response.ok) {
           console.error('❌ API health check failed:', response.statusText);
           throw new Error(`API inaccessible: ${response.statusText}`);
         }
         
-        // Vérifier l'état de l'espace auteur
-        const authorResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}?check_type=author`);
-        
-        if (!authorResponse.ok) {
-          console.error('❌ Author health check failed:', authorResponse.statusText);
-          // Ne pas bloquer si l'espace auteur n'est pas accessible
-          console.warn('⚠️ Author space not accessible, continuing anyway');
-          return;
-        }
-        
-        const authorHealth = await authorResponse.json();
-        
-        if (authorHealth.status !== 'ok') {
-          console.warn('⚠️ Author space reported non-ok status:', authorHealth.message);
-          // Ne pas bloquer si l'espace auteur n'est pas en état optimal
-          return;
-        }
-        
-        console.log('✅ Health checks successful');
+        console.log('✅ Health check successful');
         
       } catch (error) {
         console.error('💥 Health check error:', error);
@@ -56,20 +39,20 @@ export const ErrorBoundary = component$(() => {
 
   if (errorState.value.hasError) {
     return (
-      <div class="min-h-screen flex items-center justify-center bg-red-50">
-        <div class="max-w-md p-8 bg-white rounded-lg shadow-lg">
-          <h2 class="text-2xl font-bold text-red-600 mb-4">
-            Une erreur est survenue
-          </h2>
-          <p class="text-gray-600 mb-4">{errorState.value.errorInfo}</p>
-          <p class="text-sm text-gray-500">
-            {errorState.value.error?.message}
+      <div class="min-h-screen flex items-center justify-center bg-gray-100">
+        <div class="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <h2 class="text-2xl font-bold text-red-600 mb-4">Une erreur est survenue</h2>
+          <p class="text-gray-600 mb-4">
+            {errorState.value.error?.message || "Une erreur inattendue s'est produite."}
           </p>
+          <pre class="bg-gray-100 p-4 rounded text-sm overflow-auto">
+            {errorState.value.errorInfo}
+          </pre>
           <button
-            class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             onClick$={() => window.location.reload()}
           >
-            Rafraîchir la page
+            Recharger la page
           </button>
         </div>
       </div>

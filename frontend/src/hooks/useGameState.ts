@@ -1,108 +1,104 @@
-import { $, useSignal, useTask$, useVisibleTask$ } from '@builder.io/qwik';
-import { gameStateWS, api } from '~/services/api';
-import type { GameState } from '~/types/game';
+import { $, useSignal, useVisibleTask$, noSerialize } from '@builder.io/qwik';
+import { API_CONFIG } from '~/config/api';
 
-export const useGameState = () => {
+export interface GameState {
+  session_id: string;
+  game_id: string;
+  section_number: number;
+}
+
+export function useGameState() {
   const gameState = useSignal<GameState | null>(null);
+  const socket = useSignal<any>(null);
   const error = useSignal<string | null>(null);
-  const isConnected = useSignal(false);
-  const isInitialized = useSignal(false);
+  const isConnecting = useSignal<boolean>(false);
 
-  // Initialiser l'état du jeu
-  useVisibleTask$(async ({ track }) => {
-    track(() => isConnected.value);
-    
-    if (!isInitialized.value) {
-      try {
-        // Initialiser le jeu d'abord
-        const initialState = await api.getGameState();
-        if (initialState) {
-          console.log('Initial state received:', initialState);
-          gameState.value = initialState;
-          isInitialized.value = true;
-        } else {
-          console.log('No initial state received, initializing game...');
-          // Si pas d'état initial, initialiser le jeu
-          const response = await fetch(`${api.API_BASE_URL}/api/game/initialize`, {
-            method: 'POST'
-          });
-          const initData = await response.json();
-          console.log('Game initialized:', initData);
-          
-          if (initData?.initial_state) {
-            gameState.value = initData.initial_state;
-            isInitialized.value = true;
-          }
-        }
-      } catch (err) {
-        console.error('Error initializing game state:', err);
-        error.value = err instanceof Error ? err.message : 'Error initializing game state';
-      }
+  // Fonction utilitaire pour gérer les messages WebSocket
+  const handleWebSocketMessage = $((event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data);
+      gameState.value = data;
+    } catch (err) {
+      console.error('WebSocket message error:', err);
     }
   });
 
-  // Gérer la connexion WebSocket
-  useTask$(({ track, cleanup }) => {
-    track(() => isConnected.value);
+  // Fonction utilitaire pour gérer les erreurs WebSocket
+  const handleWebSocketError = $((event: Event) => {
+    console.error('WebSocket error:', event);
+    error.value = 'WebSocket connection error';
+  });
+
+  // Configuration du WebSocket
+  const setupWebSocket = $(async () => {
+    if (socket.value?.readyState === WebSocket.OPEN || isConnecting.value) {
+      return;
+    }
+
+    try {
+      isConnecting.value = true;
+      const wsUrl = `${API_CONFIG.WS_URL}${API_CONFIG.WS_ENDPOINT}`;
+      console.log('Connecting to WebSocket:', wsUrl);
+      const ws = new WebSocket(wsUrl);
+      
+      ws.onmessage = (event) => handleWebSocketMessage(event);
+      ws.onerror = (event) => handleWebSocketError(event);
+      ws.onclose = () => {
+        console.log('WebSocket closed');
+        socket.value = null;
+        isConnecting.value = false;
+        // Tentative de reconnexion après 5 secondes
+        setTimeout(async () => {
+          await setupWebSocket();
+        }, 5000);
+      };
+      
+      // Utiliser noSerialize pour l'objet WebSocket
+      socket.value = noSerialize(ws);
+    } catch (err) {
+      console.error('WebSocket setup error:', err);
+      error.value = 'Failed to setup WebSocket';
+    } finally {
+      isConnecting.value = false;
+    }
+  });
+
+  // Initialiser une nouvelle partie
+  const initializeGame = $(async () => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/initialize`, {
+        method: 'POST',
+        headers: API_CONFIG.DEFAULT_HEADERS
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initialize game');
+      }
+
+      const data = await response.json();
+      gameState.value = data;
+      
+      // S'assurer que le WebSocket est connecté
+      await setupWebSocket();
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error';
+    }
+  });
+
+  // Établir la connexion WebSocket au chargement
+  useVisibleTask$(async () => {
+    await setupWebSocket();
     
-    const listener = {
-      onStateUpdate: (state: GameState | null) => {
-        if (state === null) {
-          // Signal de connexion réussie
-          error.value = null;
-          isConnected.value = true;
-          return;
-        }
-        
-        // Mise à jour de l'état avec validation
-        if (state.narrative && typeof state.narrative === 'object') {
-          console.log('Updating game state with:', state);
-          gameState.value = state;
-          error.value = null;
-          isConnected.value = true;
-        } else {
-          console.error('Invalid game state received:', state);
-        }
-      },
-      onError: (err: Error) => {
-        console.error('WebSocket error:', err);
-        error.value = err.message;
-        isConnected.value = false;
+    return () => {
+      if (socket.value) {
+        socket.value.close();
       }
     };
-
-    gameStateWS.addListener(listener);
-    
-    if (!isConnected.value) {
-      gameStateWS.connect();
-    }
-
-    cleanup(() => {
-      gameStateWS.removeListener(listener);
-      gameStateWS.disconnect();
-    });
-  });
-
-  // Fonction pour reconnecter manuellement
-  const reconnect = $(async () => {
-    try {
-      await gameStateWS.connect();
-      if (!gameState.value) {
-        const initialState = await api.getGameState();
-        if (initialState) {
-          gameState.value = initialState;
-        }
-      }
-    } catch (err) {
-      console.error('Error reconnecting:', err);
-      error.value = err instanceof Error ? err.message : 'Error reconnecting';
-    }
   });
 
   return {
     gameState,
     error,
-    isConnected,
-    reconnect
+    initializeGame,
   };
-};
+}
