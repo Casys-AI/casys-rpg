@@ -30,6 +30,7 @@
     "@builder.io/qwik": "^1.2.19",
     "@builder.io/qwik-city": "^1.2.19",
     "@tailwindcss/typography": "^0.5.15",
+    "@types/d3": "^7.4.3",
     "@types/eslint": "8.56.10",
     "@types/node": "20.14.11",
     "@typescript-eslint/eslint-plugin": "7.16.1",
@@ -40,8 +41,7 @@
     "typescript": "5.4.5",
     "undici": "*",
     "vite": "5.3.5",
-    "vite-tsconfig-paths": "^4.2.1",
-    "@types/d3": "^7.4.3"
+    "vite-tsconfig-paths": "^4.2.1"
   },
   "dependencies": {
     "d3": "^7.8.5",

@@ -1,4 +1,4 @@
-import { component$, useSignal, useStore, useVisibleTask$, $ } from '@builder.io/qwik';
+import { component$, useSignal, useStore, useTask$, $ } from '@builder.io/qwik';
 import type { GameState } from '~/types/game';
 
 interface DiceRollerProps {
@@ -41,26 +41,26 @@ export const DiceRoller = component$<DiceRollerProps>(({ diceType, gameState }) 
       
       diceState.result = result;
     } catch (error) {
-      diceState.error = 'Error rolling dice';
-      console.error('Dice rolling error:', error);
+      diceState.error = 'Erreur de lancement des dés';
+      console.error('Erreur de lancement des dés :', error);
     } finally {
       diceState.isRolling = false;
     }
   });
 
-  useVisibleTask$(({ cleanup }) => {
-    const cleanupAnimation = () => {
+  // Nettoyage de l'animation
+  useTask$(({ cleanup }) => {
+    cleanup(() => {
       if (animationFrame.value) {
         animationFrame.value = 0;
       }
-    };
-    cleanup(cleanupAnimation);
+    });
   });
 
   return (
     <div class="flex flex-col items-center p-4">
       <div class="text-lg mb-4 text-gray-700">
-        {diceType === 'combat' ? 'Combat Roll' : 'Chance Roll'}
+        {diceType === 'combat' ? 'Lancer de combat' : 'Lancer de chance'}
       </div>
 
       <button
@@ -89,7 +89,7 @@ export const DiceRoller = component$<DiceRollerProps>(({ diceType, gameState }) 
 
       {diceState.result && !diceState.isRolling && (
         <div class="mt-4 text-xl font-bold">
-          Result: {diceState.result}
+          Résultat : {diceState.result}
         </div>
       )}
     </div>
