@@ -1,4 +1,4 @@
-import { $, useSignal, useStore, useTask$ } from '@builder.io/qwik';
+import { useSignal, useStore, useTask$, $ } from '@builder.io/qwik';
 import { useLocation } from '@builder.io/qwik-city';
 import { gameService } from '../services/gameService';
 import { websocketService } from '../services/websocketService';
@@ -13,6 +13,13 @@ export interface GameStore {
   currentRoute: string;
 }
 
+interface WebSocketMessage {
+  type: string;
+  state?: GameState;
+  error?: string;
+  data?: any;
+}
+
 /**
  * Hook principal de gestion du jeu
  */
@@ -21,9 +28,12 @@ export const useGame = () => {
   
   const location = useLocation();
   
-  // Signaux WebSocket
+  // Signaux
   const wsConnected = useSignal(false);
   const wsError = useSignal<string | null>(null);
+  const isInitializing = useSignal(false);
+  const isNavigating = useSignal(false);
+  const isRollingDice = useSignal(false);
 
   // Store principal
   const store = useStore<GameStore>({
@@ -37,85 +47,125 @@ export const useGame = () => {
 
   console.log(' [useGame] Initial store state:', store);
 
-  // Actions du jeu
-  const actions = {
-    /**
-     * Initialise le jeu avec un état optionnel
-     */
-    initGame: $(async (initialState?: GameState) => {
-      console.log(' [useGame] Starting game initialization');
-      try {
-        // Si on a un état initial, on l'utilise
-        if (initialState) {
-          console.log(' [useGame] Using provided initial state');
-          store.state = initialState;
-        } else {
-          console.log(' [useGame] Fetching game state from server');
-          // Sinon on charge depuis le serveur
-          const newState = await gameService.getGameState();
-          console.log(' [useGame] Received state:', newState);
-          store.sessionId = newState.sessionId;
-          store.gameId = newState.gameId;
-          store.state = newState;
-        }
+  // Gestionnaires WebSocket
+  const handleMessage = $(async (data: unknown) => {
+    console.log(' [useGame] WebSocket message:', data);
+    if (data && typeof data === 'object' && 'type' in data) {
+      const message = data as WebSocketMessage;
+      if (message.type === 'state' && message.state) {
+        store.state = message.state;
+      }
+    }
+  });
 
-        console.log(' [useGame] Game initialized successfully');
-        return store.state;
+  const handleError = $(async (error: any) => {
+    console.error(' [useGame] WebSocket error:', error);
+    wsError.value = error instanceof Error ? error.message : 'Erreur de connexion';
+    wsConnected.value = false;
+  });
+
+  const handleClose = $(async () => {
+    console.log(' [useGame] WebSocket closed');
+    wsConnected.value = false;
+  });
+
+  // Fonction utilitaire pour assurer la connexion WebSocket
+  const ensureWebSocketConnection = $(async () => {
+    if (!websocketService.isConnected()) {
+      try {
+        await websocketService.connect({
+          onMessage$: handleMessage,
+          onError$: handleError,
+          onClose$: handleClose
+        });
+        wsConnected.value = true;
+        wsError.value = null;
       } catch (error) {
-        console.error(' [useGame] Initialization error:', error);
+        console.error(' [useGame] WebSocket connection error:', error);
+        wsError.value = error instanceof Error ? error.message : 'Erreur de connexion';
+        wsConnected.value = false;
         throw error;
       }
-    }),
+    }
+  });
 
-    /**
-     * Navigation entre les sections
-     */
-    navigate: $(async (section: number) => {
-      console.log(' [useGame] Navigating to section:', section);
-      try {
-        if (!websocketService.isConnected()) {
-          throw new Error('WebSocket non connecté');
-        }
-
-        const message = {
-          type: 'navigate',
-          data: { section }
-        };
-
-        websocketService.send(message);
-      } catch (error) {
-        console.error(' [useGame] Navigation error:', error);
-        store.error = error instanceof Error ? error.message : 'Erreur de navigation';
+  // Actions
+  const initGame = $(async (initialState?: GameState) => {
+    console.log(' [useGame] Starting game initialization');
+    isInitializing.value = true;
+    try {
+      if (initialState) {
+        console.log(' [useGame] Using provided initial state');
+        store.state = initialState;
+      } else {
+        console.log(' [useGame] Fetching game state from server');
+        const newState = await gameService.getGameState();
+        console.log(' [useGame] Received state:', newState);
+        store.sessionId = newState.sessionId;
+        store.gameId = newState.gameId;
+        store.state = newState;
       }
-    }),
 
-    /**
-     * Lance les dés
-     */
-    rollDice: $(async (diceType: string): Promise<number> => {
-      console.log(' [useGame] Rolling dice:', diceType);
-      try {
-        if (!store.sessionId || !store.gameId) {
-          throw new Error('Session invalide');
-        }
+      // Établir la connexion WebSocket après l'initialisation
+      await ensureWebSocketConnection();
 
-        return await gameService.rollDice(store.sessionId, store.gameId, diceType);
-      } catch (error) {
-        console.error(' [useGame] Dice roll error:', error);
-        store.error = error instanceof Error ? error.message : 'Erreur de lancer de dés';
-        return 0;
+      console.log(' [useGame] Game initialized successfully');
+      return store.state;
+    } catch (error) {
+      console.error(' [useGame] Initialization error:', error);
+      throw error;
+    } finally {
+      isInitializing.value = false;
+    }
+  });
+
+  const navigate = $(async (section: number) => {
+    console.log(' [useGame] Navigating to section:', section);
+    isNavigating.value = true;
+    try {
+      // S'assurer que la connexion WebSocket est établie
+      await ensureWebSocketConnection();
+
+      const message = {
+        type: 'navigate',
+        data: { section }
+      };
+
+      websocketService.send(message);
+    } catch (error) {
+      console.error(' [useGame] Navigation error:', error);
+      store.error = error instanceof Error ? error.message : 'Erreur de navigation';
+    } finally {
+      isNavigating.value = false;
+    }
+  });
+
+  const rollDice = $(async (diceType: string): Promise<number> => {
+    console.log(' [useGame] Rolling dice:', diceType);
+    isRollingDice.value = true;
+    try {
+      if (!store.sessionId || !store.gameId) {
+        throw new Error('Session invalide');
       }
-    }),
 
-    /**
-     * Efface les erreurs
-     */
-    clearError: $(() => {
-      console.log(' [useGame] Clearing errors');
-      store.error = null;
-      wsError.value = null;
-    })
-  };
+      // S'assurer que la connexion WebSocket est établie
+      await ensureWebSocketConnection();
+
+      return await gameService.rollDice(store.sessionId, store.gameId, diceType);
+    } catch (error) {
+      console.error(' [useGame] Dice roll error:', error);
+      store.error = error instanceof Error ? error.message : 'Erreur de lancer de dés';
+      return 0;
+    } finally {
+      isRollingDice.value = false;
+    }
+  });
+
+  const clearError = $(async () => {
+    console.log(' [useGame] Clearing errors');
+    store.error = null;
+    wsError.value = null;
+  });
 
   // Task pour la gestion WebSocket
   useTask$(({ track, cleanup }) => {
@@ -123,34 +173,16 @@ export const useGame = () => {
     track(() => store.sessionId);
     track(() => store.gameId);
     
-    if (store.sessionId && store.gameId && !websocketService.isConnected()) {
-      console.log(' [useGame] Connecting WebSocket');
-      websocketService.connect({
-        onMessage$: $((data: any) => {
-          console.log(' [useGame] WebSocket message:', data);
-          if (data.type === 'state') {
-            store.state = data.state;
-          }
-        }),
-        onError$: $((error: any) => {
-          console.error(' [useGame] WebSocket error:', error);
-          wsError.value = error instanceof Error ? error.message : 'Erreur de connexion';
-        }),
-        onClose$: $(() => {
-          console.log(' [useGame] WebSocket closed');
-          wsConnected.value = false;
-        })
+    if (store.sessionId && store.gameId) {
+      ensureWebSocketConnection().catch(error => {
+        console.error(' [useGame] WebSocket setup error:', error);
       });
-      wsConnected.value = true;
     }
 
     // Nettoyage
     cleanup(() => {
       console.log(' [useGame] Cleaning up WebSocket');
-      if (websocketService.isConnected()) {
-        websocketService.disconnect();
-        wsConnected.value = false;
-      }
+      websocketService.disconnect();
     });
   });
 
@@ -158,6 +190,14 @@ export const useGame = () => {
     store,
     wsConnected: wsConnected.value,
     wsError: wsError.value,
-    actions
+    isInitializing: isInitializing.value,
+    isNavigating: isNavigating.value,
+    isRollingDice: isRollingDice.value,
+    actions: {
+      initGame,
+      navigate,
+      rollDice,
+      clearError
+    }
   };
 };

@@ -18,8 +18,9 @@ export interface RulesState {
 }
 
 export interface GameState {
-  game_id: string;
   session_id: string;
+  game_id: string;
   narrative: NarrativeState;
-  rules?: RulesState;
+  rules: RulesState;
+  choices: Choice[];
 }
