@@ -16,18 +16,26 @@ import {
 } from "@builder.io/qwik/server";
 import { manifest } from "@qwik-client-manifest";
 import Root from "./root";
+import { isDev } from "@builder.io/qwik/build";
 
 export default function (opts: RenderToStreamOptions) {
   return renderToStream(<Root />, {
     manifest,
     ...opts,
-    // Use container attributes to set attributes on the html tag.
+    prefetchStrategy: {
+      implementation: {
+        linkInsert: null,
+        workerFetchInsert: null,
+        prefetchEvent: "always",
+      },
+    },
     containerAttributes: {
-      lang: "en-us",
+      lang: "fr",
       ...opts.containerAttributes,
     },
     serverData: {
       ...opts.serverData,
+      isDev,
     },
   });
 }

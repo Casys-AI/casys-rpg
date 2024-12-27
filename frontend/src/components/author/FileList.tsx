@@ -1,5 +1,4 @@
 import { component$, useSignal, useStore, useTask$, $ } from '@builder.io/qwik';
-import { api } from '~/services/api';
 
 interface Section {
   id: string;
@@ -19,9 +18,13 @@ export const FileList = component$(() => {
     
     loading.value = true;
     try {
-      const data = await api.getSections();
-      sections.length = 0; // Clear existing sections
-      sections.push(...data);
+      // TODO: Implement API call
+      const mockData: Section[] = [
+        { id: '1', title: 'Introduction', content: 'Introduction content' },
+        { id: '2', title: 'Chapter 1', content: 'Chapter 1 content' }
+      ];
+      sections.length = 0;
+      sections.push(...mockData);
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error fetching sections';
       console.error('Error fetching sections:', err);
@@ -51,17 +54,19 @@ export const FileList = component$(() => {
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       ) : error.value ? (
-        <div class="text-red-600 p-4">
-          {error.value}
-        </div>
+        <div class="text-red-500 p-4">{error.value}</div>
       ) : (
         <ul class="space-y-2">
           {sections.map((section) => (
             <li
               key={section.id}
-              class={`cursor-pointer p-2 rounded hover:bg-gray-200 ${
-                selectedSection.value === section.id ? 'bg-gray-200' : ''
-              }`}
+              class={`
+                cursor-pointer p-2 rounded
+                ${selectedSection.value === section.id
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'hover:bg-gray-100'
+                }
+              `}
               onClick$={() => handleSectionClick$(section)}
             >
               {section.title}

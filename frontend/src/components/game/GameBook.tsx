@@ -33,13 +33,13 @@ export const GameBook = component$<GameBookProps>(({ gameState, onNavigate$ }) =
           </div>
 
           {/* Choix */}
-          {gameState.rules?.choices && gameState.rules.choices.length > 0 && (
+          {gameState.choices && gameState.choices.length > 0 && (
             <div class="mt-12 space-y-6">
               <h2 class="text-2xl font-bold text-center text-black">
                 Que souhaitez-vous faire ?
               </h2>
               <div class="space-y-4">
-                {gameState.rules.choices.map((choice, index) => (
+                {gameState.choices.map((choice, index) => (
                   <button
                     key={index}
                     onClick$={() => onNavigate$?.(choice.target)}
@@ -52,17 +52,14 @@ export const GameBook = component$<GameBookProps>(({ gameState, onNavigate$ }) =
               </div>
             </div>
           )}
-        </div>
 
-        {/* Dés */}
-        {showDice.value && (
-          <div class="fixed bottom-4 right-4">
-            <DiceRoller
-              diceType={gameState.rules?.dice_type || 'chance'}
-              gameState={gameState}
-            />
-          </div>
-        )}
+          {/* Dés */}
+          {showDice.value && (
+            <div class="mt-12">
+              <DiceRoller type={gameState.rules.dice_type} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

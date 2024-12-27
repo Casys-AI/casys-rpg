@@ -7,34 +7,43 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [
     qwikCity(),
-    qwikVite(),
+    qwikVite({
+      devTools: {
+        clickToSource: false
+      }
+    }),
     tsconfigPaths()
   ],
-  resolve: {
-    alias: {
-      '~': resolve(__dirname, 'src')
-    }
+  preview: {
+    headers: {
+      'Cache-Control': 'public, max-age=600',
+    },
   },
   optimizeDeps: {
-    include: [
-      '@builder.io/qwik',
-      '@builder.io/qwik-city',
-      'tailwindcss'
-    ],
-    exclude: []
+    include: ['@builder.io/qwik', '@builder.io/qwik-city']
+  },
+  ssr: {
+    noExternal: ['@builder.io/qwik-city']
   },
   build: {
     target: 'es2020',
-    outDir: 'dist',
+    modulePreload: {
+      polyfill: false
+    },
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/entry.ssr.tsx')
+      input: ['@builder.io/qwik', '@builder.io/qwik-city'],
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
       }
     }
   },
   server: {
     port: 5173,
-    strictPort: false,
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
@@ -46,9 +55,5 @@ export default defineConfig({
         ws: true
       }
     }
-  },
-  preview: {
-    port: 5173,
-    strictPort: false
   }
 });

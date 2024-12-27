@@ -36,12 +36,12 @@ export const useInitGame = routeAction$(async (_, { cookie }) => {
   try {
     const gameState = await gameService.getGameState();
     
-    if (!gameState?.sessionId || !gameState?.gameId) {
+    if (!gameState?.session_id || !gameState?.game_id) {
       return { success: false };
     }
 
-    cookie.set('session_id', gameState.sessionId, { path: '/' });
-    cookie.set('game_id', gameState.gameId, { path: '/' });
+    cookie.set('session_id', gameState.session_id, { path: '/' });
+    cookie.set('game_id', gameState.game_id, { path: '/' });
     
     return { success: true };
   } catch (error) {
