@@ -15,45 +15,39 @@ export const ErrorBoundary = component$(() => {
     const checkHealth = async () => {
       try {
         console.log('🏥 Checking API health...');
-        console.log(`🔍 Health check URL: ${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
         
         // Vérifier l'état de l'API
         const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
-        console.log('📡 Health check response:', response);
         
         if (!response.ok) {
           console.error('❌ API health check failed:', response.statusText);
           throw new Error(`API inaccessible: ${response.statusText}`);
         }
         
-        console.log('✅ API health check successful');
-        
         // Vérifier l'état de l'espace auteur
-        console.log('🏥 Checking author space...');
-        const authorResponse = await fetch(`${API_CONFIG.BASE_URL}/api/author/health`);
-        console.log('📡 Author health check response:', authorResponse);
+        const authorResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}?check_type=author`);
         
         if (!authorResponse.ok) {
           console.error('❌ Author health check failed:', authorResponse.statusText);
-          throw new Error(`Espace auteur inaccessible: ${authorResponse.statusText}`);
+          // Ne pas bloquer si l'espace auteur n'est pas accessible
+          console.warn('⚠️ Author space not accessible, continuing anyway');
+          return;
         }
         
         const authorHealth = await authorResponse.json();
-        console.log('📊 Author health data:', authorHealth);
         
         if (authorHealth.status !== 'ok') {
-          console.error('❌ Author space reported error:', authorHealth.message);
-          throw new Error(authorHealth.message);
+          console.warn('⚠️ Author space reported non-ok status:', authorHealth.message);
+          // Ne pas bloquer si l'espace auteur n'est pas en état optimal
+          return;
         }
         
-        console.log('✅ Author health check successful');
+        console.log('✅ Health checks successful');
+        
       } catch (error) {
         console.error('💥 Health check error:', error);
-        errorState.value = {
-          hasError: true,
-          error: error as Error,
-          errorInfo: 'Erreur de connexion à l\'API'
-        };
+        // Ne pas bloquer l'application si le health check échoue
+        console.warn('⚠️ Health check failed, continuing anyway');
       }
     };
     

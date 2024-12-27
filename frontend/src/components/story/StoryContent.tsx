@@ -1,4 +1,4 @@
-import { component$, useStyles$, $, useSignal, useOnDocument, type QRL } from '@builder.io/qwik';
+import { component$, $, useSignal, useOnDocument, type QRL } from '@builder.io/qwik';
 import type { Choice } from '~/types/game';
 import { ActionDialog } from '../dialog/ActionDialog';
 
@@ -19,6 +19,7 @@ export const StoryContent = component$<StoryContentProps>(({
 }) => {
   const dialogOpen = useSignal(false);
   const dialogMessage = useSignal('');
+  const contentRef = useSignal<HTMLDivElement>();
 
   // Fonction pour afficher un message dans la boîte de dialogue
   const showDialog = $((message: string) => {
@@ -30,126 +31,6 @@ export const StoryContent = component$<StoryContentProps>(({
   const closeDialog = $(() => {
     dialogOpen.value = false;
   });
-
-  useStyles$(`
-    .story-content {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-lg);
-      max-width: 800px;
-      margin: 0 auto;
-      font-family: var(--font-primary);
-    }
-
-    .content-text {
-      padding: var(--spacing-xl);
-      line-height: 1.8;
-      color: var(--color-ink);
-      background: var(--color-paper);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-soft);
-    }
-
-    .content-text h1 {
-      font-family: var(--font-secondary);
-      font-size: 2rem;
-      margin-bottom: var(--spacing-lg);
-      text-align: center;
-      color: var(--color-ink-dark);
-    }
-
-    .content-text p {
-      margin-bottom: var(--spacing-md);
-      text-align: justify;
-      font-size: 1.1rem;
-    }
-
-    .content-text em {
-      color: var(--color-ink-dark);
-      font-style: italic;
-    }
-
-    .content-text a {
-      color: var(--color-primary);
-      text-decoration: none;
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-
-    .content-text a:hover {
-      color: var(--color-primary-dark);
-      text-decoration: underline;
-    }
-
-    .choices-container {
-      padding: var(--spacing-lg);
-    }
-
-    .choices-title {
-      font-family: var(--font-secondary);
-      font-size: 1.25rem;
-      color: var(--color-ink);
-      margin-bottom: var(--spacing-md);
-      text-align: center;
-    }
-
-    .choices-list {
-      list-style: none;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-md);
-    }
-
-    .choice-item {
-      width: 100%;
-    }
-
-    .choice-button {
-      width: 100%;
-      text-align: left;
-      padding: var(--spacing-md) var(--spacing-lg);
-      font-family: var(--font-primary);
-      font-size: 1rem;
-      transition: all 0.3s ease;
-    }
-
-    .choice-button:hover {
-      transform: translateY(-2px);
-    }
-
-    .choice-button:active {
-      transform: translateY(1px);
-    }
-
-    @media (max-width: 768px) {
-      .content-text {
-        padding: var(--spacing-lg);
-      }
-
-      .content-text h1 {
-        font-size: 1.5rem;
-      }
-
-      .content-text p {
-        font-size: 1rem;
-      }
-
-      .choices-container {
-        padding: var(--spacing-md);
-      }
-
-      .choices-title {
-        font-size: 1.1rem;
-      }
-
-      .choice-button {
-        padding: var(--spacing-sm) var(--spacing-md);
-      }
-    }
-  `);
-
-  const contentRef = useSignal<HTMLDivElement>();
 
   const handleClick$ = $((e: Event) => {
     const link = (e.target as HTMLElement).closest('a');
@@ -171,23 +52,80 @@ export const StoryContent = component$<StoryContentProps>(({
     }
   });
 
+  // Traitement du contenu narratif
+  const processContent = (rawContent: any): string => {
+    console.log('Raw content received:', rawContent);
+    console.log('Type of content:', typeof rawContent);
+    
+    if (!rawContent) {
+      console.log('Content is null or undefined');
+      return '';
+    }
+    
+    // Si c'est une chaîne de caractères
+    if (typeof rawContent === 'string') {
+      console.log('Content is string:', rawContent);
+      return rawContent;
+    }
+    
+    // Si c'est un objet
+    if (typeof rawContent === 'object') {
+      console.log('Content is object:', JSON.stringify(rawContent, null, 2));
+      
+      // Si c'est un NarratorModel ou un objet avec une propriété content
+      if (rawContent.content) {
+        const content = rawContent.content;
+        console.log('Extracted content:', content);
+        return content.toString();
+      }
+    }
+    
+    // Si aucun format valide n'est trouvé
+    console.log('No valid content found, returning empty string');
+    return '';
+  };
+
+  const processedContent = processContent(content);
+
   return (
-    <div class="story-content">
+    <div class="flex flex-col gap-6 max-w-3xl mx-auto font-primary">
       <div 
-        class="content-text"
-        dangerouslySetInnerHTML={content}
+        class="
+          p-8 leading-relaxed text-gray-800 bg-white 
+          rounded-lg shadow-lg prose prose-lg max-w-none
+          prose-headings:text-gray-900 prose-headings:font-secondary
+          prose-p:text-gray-700 prose-p:font-primary
+          prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+        "
+        dangerouslySetInnerHTML={{ __html: processedContent }}
+        ref={contentRef}
       />
+
       <ActionDialog 
         message={actionMessage || ''} 
         onSubmit$={handleAction$}
       />
+
       {choices && choices.length > 0 && (
-        <div class="choices-container">
-          <h3 class="choices-title">Que souhaitez-vous faire ?</h3>
-          <ul class="choices-list">
+        <div class="p-6">
+          <h3 class="text-xl text-center text-gray-800 mb-6 font-secondary">
+            Que souhaitez-vous faire ?
+          </h3>
+          <ul class="flex flex-col gap-4">
             {choices.map((choice, index) => (
-              <li key={index} class="choice-item">
-                <button class="choice-button" onClick$={choice.action}>
+              <li key={index} class="w-full">
+                <button 
+                  class="
+                    w-full text-left p-4 
+                    bg-white hover:bg-gray-50 
+                    text-gray-700 font-primary text-base
+                    rounded-lg shadow-md
+                    transition-all duration-200 ease-in-out
+                    hover:-translate-y-0.5 active:translate-y-0.5
+                    focus:outline-none focus:ring-2 focus:ring-blue-500
+                  "
+                  onClick$={choice.action}
+                >
                   {choice.text}
                 </button>
               </li>
