@@ -1,4 +1,4 @@
-import { component$, useStylesScoped$, useSignal, $ } from '@builder.io/qwik';
+import { component$, useSignal, $ } from '@builder.io/qwik';
 
 interface FeedbackPanelProps {
   sectionNumber: number;
@@ -9,70 +9,6 @@ export const FeedbackPanel = component$<FeedbackPanelProps>(({ sectionNumber, pr
   const feedback = useSignal('');
   const sending = useSignal(false);
   const success = useSignal(false);
-
-  useStylesScoped$(`
-    .feedback-panel {
-      padding: var(--spacing-lg);
-      background: var(--card-background);
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow-md);
-    }
-
-    .feedback-title {
-      color: var(--primary-color);
-      margin-bottom: var(--spacing-md);
-      font-family: var(--font-secondary);
-    }
-
-    .feedback-form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-md);
-    }
-
-    .feedback-textarea {
-      width: 100%;
-      min-height: 150px;
-      padding: var(--spacing-sm);
-      border: 2px solid var(--border-color);
-      border-radius: var(--border-radius);
-      font-family: var(--font-primary);
-      resize: vertical;
-      transition: border-color var(--transition-fast);
-    }
-
-    .feedback-textarea:focus {
-      outline: none;
-      border-color: var(--primary-color);
-    }
-
-    .submit-button {
-      padding: var(--spacing-sm) var(--spacing-md);
-      background: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: var(--border-radius);
-      font-family: var(--font-secondary);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-    }
-
-    .submit-button:hover:not(:disabled) {
-      background: var(--secondary-color);
-    }
-
-    .submit-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .success-message {
-      color: var(--health-color);
-      padding: var(--spacing-sm);
-      text-align: center;
-      font-family: var(--font-secondary);
-    }
-  `);
 
   const submitFeedback = $(async () => {
     if (sending.value || !feedback.value.trim()) return;
@@ -105,12 +41,25 @@ export const FeedbackPanel = component$<FeedbackPanelProps>(({ sectionNumber, pr
   });
 
   return (
-    <div class="feedback-panel">
-      <h3 class="feedback-title">Votre avis compte !</h3>
+    <div class="p-6 bg-white rounded-lg shadow-lg">
+      <h3 class="text-blue-600 mb-4 font-secondary text-xl">
+        Votre avis compte !
+      </h3>
       
-      <form class="feedback-form" preventdefault:submit onSubmit$={submitFeedback}>
+      <form 
+        class="flex flex-col gap-4" 
+        preventdefault:submit 
+        onSubmit$={submitFeedback}
+      >
         <textarea
-          class="feedback-textarea"
+          class="
+            w-full min-h-[150px] p-3
+            border-2 border-gray-200 rounded-lg
+            font-primary resize-y
+            transition-colors duration-200
+            focus:outline-none focus:border-blue-500
+            disabled:opacity-50 disabled:cursor-not-allowed
+          "
           value={feedback.value}
           onChange$={(e) => feedback.value = (e.target as HTMLTextAreaElement).value}
           placeholder="Partagez vos impressions sur cette section..."
@@ -119,7 +68,15 @@ export const FeedbackPanel = component$<FeedbackPanelProps>(({ sectionNumber, pr
         
         <button
           type="submit"
-          class="submit-button"
+          class="
+            px-4 py-2 bg-blue-500 text-white
+            rounded-lg font-secondary
+            transition-colors duration-200
+            hover:bg-blue-600
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
+            disabled:opacity-50 disabled:cursor-not-allowed
+            disabled:hover:bg-blue-500
+          "
           disabled={sending.value || !feedback.value.trim()}
         >
           {sending.value ? 'Envoi...' : 'Envoyer'}
@@ -127,7 +84,10 @@ export const FeedbackPanel = component$<FeedbackPanelProps>(({ sectionNumber, pr
       </form>
 
       {success.value && (
-        <div class="success-message">
+        <div class="
+          mt-4 p-2 text-center text-green-600 
+          font-secondary animate-fade-in
+        ">
           Merci pour votre retour !
         </div>
       )}

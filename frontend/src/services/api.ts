@@ -1,4 +1,4 @@
-import { API_CONFIG } from '~/config/api';
+import { API_CONFIG, updateApiConfig } from '~/config/api';
 
 const API_BASE_URL = API_CONFIG.BASE_URL;
 const WS_BASE_URL = API_CONFIG.WS_URL;
@@ -29,92 +29,71 @@ export class GameStateWebSocket {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private isConnecting = false;
 
-  connect() {
+  async connect() {
+    if (this.isConnecting) {
+      console.log('🔄 Already attempting to connect...');
+      return;
+    }
+
     if (this.ws?.readyState === WebSocket.OPEN) {
       console.log('📡 WebSocket already connected');
       return;
     }
 
-    const wsUrl = `${WS_BASE_URL}${API_CONFIG.GAME_WS_ENDPOINT}`;
-    console.log('🔌 Connecting to WebSocket...');
-    console.log(`🔍 WebSocket URL: ${wsUrl}`);
-    
+    this.isConnecting = true;
+
     try {
+      // Mise à jour de la configuration pour obtenir le bon port
+      const config = await updateApiConfig();
+      const wsUrl = `${config.WS_URL}${config.GAME_WS_ENDPOINT}`;
+      console.log('🔌 Connecting to WebSocket...', wsUrl);
+
       this.ws = new WebSocket(wsUrl);
-    } catch (error) {
-      console.error('❌ Failed to create WebSocket:', error);
-      this.notifyListeners('onError', new Error('Failed to create WebSocket connection'));
-      return;
-    }
 
-    this.ws.onmessage = (event) => {
-      try {
-        console.log('📥 Received WebSocket message:', event.data);
-        const state = JSON.parse(event.data);
-        
-        // Vérifier si c'est une erreur
-        if (state.status === 'error') {
-          console.error('❌ Server error:', state.error);
-          this.notifyListeners('onError', new Error(state.error));
-          return;
-        }
-        
-        // Vérifier que l'état est valide
-        if (!state.section_number || !state.current_section) {
-          console.error('❌ Invalid game state:', state);
-          this.notifyListeners('onError', new Error('Invalid game state received'));
-          return;
-        }
-        
-        this.notifyListeners('onStateUpdate', state);
-      } catch (error) {
-        console.error('❌ Failed to parse WebSocket message:', error);
-        this.notifyListeners('onError', new Error('Failed to parse game state'));
-      }
-    };
+      this.ws.onopen = () => {
+        console.log('✅ WebSocket connected');
+        this.isConnecting = false;
+        this.reconnectAttempts = 0;
+        this.listeners.forEach(listener => listener.onStateUpdate(null));
+      };
 
-    this.ws.onclose = () => {
-      console.log('🔌 WebSocket connection closed');
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
-        console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})...`);
-        setTimeout(() => {
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.listeners.forEach(listener => listener.onStateUpdate(data));
+        } catch (err) {
+          console.error('❌ Error parsing WebSocket message:', err);
+          const error = new Error('Erreur de décodage des données du serveur');
+          this.listeners.forEach(listener => listener.onError(error));
+        }
+      };
+
+      this.ws.onerror = (event) => {
+        console.error('❌ WebSocket error:', event);
+        const error = new Error('Erreur de connexion au serveur de jeu');
+        this.listeners.forEach(listener => listener.onError(error));
+      };
+
+      this.ws.onclose = () => {
+        console.log('❌ WebSocket closed');
+        this.isConnecting = false;
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
-          this.connect();
-        }, delay);
-      } else {
-        console.error('❌ Max reconnection attempts reached');
-        this.notifyListeners('onError', new Error('WebSocket connection failed after max retries'));
-      }
-    };
+          console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+          setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
+        } else {
+          const error = new Error('La connexion au serveur a été perdue. Veuillez réessayer plus tard.');
+          this.listeners.forEach(listener => listener.onError(error));
+        }
+      };
 
-    this.ws.onerror = (error) => {
-      console.error('💥 WebSocket error:', error);
-      this.notifyListeners('onError', new Error('WebSocket connection error'));
-    };
-
-    this.ws.onopen = () => {
-      console.log('✅ WebSocket connected successfully');
-      this.reconnectAttempts = 0;
-      this.notifyListeners('onStateUpdate', null); // Signal successful connection
-    };
-  }
-
-  private notifyListeners(event: keyof GameStateListener, data: any) {
-    this.listeners.forEach(listener => {
-      listener[event](data);
-    });
-  }
-
-  addListener(listener: GameStateListener) {
-    this.listeners.push(listener);
-  }
-
-  removeListener(listener: GameStateListener) {
-    const index = this.listeners.indexOf(listener);
-    if (index > -1) {
-      this.listeners.splice(index, 1);
+    } catch (err) {
+      console.error('❌ Error connecting to WebSocket:', err);
+      this.isConnecting = false;
+      const error = new Error('Impossible de se connecter au serveur de jeu. Veuillez vérifier votre connexion.');
+      this.listeners.forEach(listener => listener.onError(error));
     }
   }
 
@@ -123,8 +102,24 @@ export class GameStateWebSocket {
       this.ws.close();
       this.ws = null;
     }
-    this.listeners = [];
-    this.reconnectAttempts = 0;
+  }
+
+  addListener(listener: GameStateListener) {
+    this.listeners.push(listener);
+  }
+
+  removeListener(listener: GameStateListener) {
+    this.listeners = this.listeners.filter(l => l !== listener);
+  }
+
+  private notifyListeners(event: keyof GameStateListener, data: any) {
+    this.listeners.forEach(listener => {
+      try {
+        listener[event](data);
+      } catch (error) {
+        console.error(`Error in listener ${event}:`, error);
+      }
+    });
   }
 }
 
@@ -132,34 +127,32 @@ export const gameStateWS = new GameStateWebSocket();
 
 export const api = {
   async checkHealth() {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(`${API_BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}`);
     return handleResponse(response);
   },
 
   async checkAuthorHealth() {
-    const response = await fetch(`${API_BASE_URL}/author/health`);
+    const response = await fetch(`${API_BASE_URL}${API_CONFIG.HEALTH_CHECK_ENDPOINT}?check_type=author`);
     return handleResponse(response);
   },
 
-  // Note: Cette méthode est conservée pour la compatibilité, mais il est recommandé
-  // d'utiliser gameStateWS pour les mises à jour en temps réel
   async getGameState() {
-    const response = await fetch(`${API_BASE_URL}/game/state`);
+    const response = await fetch(`${API_BASE_URL}/api/game/state`);
     return handleResponse(response);
   },
 
   async getSections() {
-    const response = await fetch(`${API_BASE_URL}/sections`);
+    const response = await fetch(`${API_BASE_URL}/api/game/sections`);
     return handleResponse(response);
   },
 
   async getKnowledgeGraph() {
-    const response = await fetch(`${API_BASE_URL}/graph`);
+    const response = await fetch(`${API_BASE_URL}/api/game/knowledge-graph`);
     return handleResponse(response);
   },
 
   async processAction(action: { user_response: string; dice_result?: number }) {
-    const response = await fetch(`${API_BASE_URL}/game/action`, {
+    const response = await fetch(`${API_BASE_URL}/api/game/action`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -170,7 +163,7 @@ export const api = {
   },
 
   async rollDice(diceType: string) {
-    const response = await fetch(`${API_BASE_URL}/game/roll/${diceType}`);
+    const response = await fetch(`${API_BASE_URL}/api/game/roll/${diceType}`);
     return handleResponse(response);
   },
 
@@ -183,7 +176,7 @@ export const api = {
     session_id: string;
     user_id?: string;
   }) {
-    const response = await fetch(`${API_BASE_URL}/feedback`, {
+    const response = await fetch(`${API_BASE_URL}/api/feedback`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

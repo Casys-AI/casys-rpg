@@ -1,4 +1,4 @@
-import { component$, useStylesScoped$, $ } from '@builder.io/qwik';
+import { component$, $ } from '@builder.io/qwik';
 import type { GameState } from '~/types/game';
 import { API_CONFIG } from '~/config/api';
 
@@ -9,70 +9,6 @@ interface GameControlsProps {
 }
 
 export const GameControls = component$<GameControlsProps>(({ gameState }) => {
-  useStylesScoped$(`
-    .game-controls {
-      display: flex;
-      gap: var(--spacing-md);
-      margin-top: var(--spacing-lg);
-      padding: var(--spacing-md);
-      background: var(--card-background);
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .control-button {
-      padding: var(--spacing-sm) var(--spacing-md);
-      border: none;
-      border-radius: var(--border-radius);
-      font-family: var(--font-secondary);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-      flex: 1;
-    }
-
-    .save-button {
-      background: var(--primary-color);
-      color: white;
-    }
-
-    .save-button:hover {
-      background: var(--secondary-color);
-    }
-
-    .load-button {
-      background: var(--background-color);
-      border: 2px solid var(--primary-color);
-      color: var(--primary-color);
-    }
-
-    .load-button:hover {
-      background: var(--primary-color);
-      color: white;
-    }
-
-    .reset-button {
-      background: var(--accent-color);
-      color: white;
-    }
-
-    .reset-button:hover {
-      filter: brightness(1.1);
-    }
-
-    .debug-toggle {
-      background: var(--background-color);
-      border: 2px solid var(--border-color);
-      color: var(--text-color);
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-    }
-
-    .debug-toggle:hover {
-      border-color: var(--primary-color);
-    }
-  `);
-
   const resetGame = $(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/game/reset`, {
@@ -133,14 +69,38 @@ export const GameControls = component$<GameControlsProps>(({ gameState }) => {
   });
 
   return (
-    <div class="game-controls">
-      <button class="control-button reset-button" onClick$={resetGame}>
+    <div class="flex gap-4 mt-8 p-4 bg-white rounded-lg shadow-md">
+      <button 
+        class="
+          flex-1 px-4 py-2 rounded-md font-secondary
+          bg-red-500 text-white
+          hover:bg-red-600 transition-colors
+          focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50
+        " 
+        onClick$={resetGame}
+      >
         Recommencer
       </button>
-      <button class="control-button save-button" onClick$={saveGame}>
+      <button 
+        class="
+          flex-1 px-4 py-2 rounded-md font-secondary
+          bg-blue-500 text-white
+          hover:bg-blue-600 transition-colors
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
+        " 
+        onClick$={saveGame}
+      >
         Sauvegarder
       </button>
-      <button class="control-button load-button" onClick$={loadGame}>
+      <button 
+        class="
+          flex-1 px-4 py-2 rounded-md font-secondary
+          border-2 border-blue-500 text-blue-500
+          hover:bg-blue-500 hover:text-white transition-colors
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
+        " 
+        onClick$={loadGame}
+      >
         Charger
       </button>
     </div>
