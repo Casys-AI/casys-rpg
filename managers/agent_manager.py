@@ -190,11 +190,6 @@ class AgentManager:
         """Get current game state."""
         try:
             logger.debug("Fetching current game state")
-            # Vérifie si le game_id est défini avant d'accéder au state
-            if not await self.managers.state_manager.get_game_id():
-                logger.debug("No game ID set, returning None")
-                return None
-                
             state = await self.managers.state_manager.get_current_state()
             logger.debug("Current state: {}", state)
             return state
@@ -220,17 +215,24 @@ class AgentManager:
             # Create initial state
             initial_state = await self.managers.state_manager.create_initial_state()
             
-            # Create input data
+            # Create input data with preserved IDs
             input_data = GameState(
                 session_id=initial_state.session_id,
+                game_id=initial_state.game_id,
                 state=initial_state,
                 metadata={"node": "start"}
             )
             
-            # Execute workflow
-            result = await workflow.ainvoke(input_data.model_dump())
+            # Execute workflow with preserved IDs
+            state_dict = input_data.model_dump()
+            state_dict["session_id"] = initial_state.session_id  # Préserver le session_id
+            state_dict["game_id"] = initial_state.game_id  # Préserver le game_id
+            result = await workflow.ainvoke(state_dict)
             
             if isinstance(result, dict):
+                # Préserver les IDs du state initial
+                result["session_id"] = initial_state.session_id
+                result["game_id"] = initial_state.game_id
                 state = GameState(**result)
                 await self.managers.state_manager.save_state(state)
                 logger.info("Game initialization completed successfully")

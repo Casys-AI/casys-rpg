@@ -23,6 +23,7 @@ def take_last_value(a: Any, b: Any) -> Any:
 class GameStateBase(BaseModel):
     """Base state model with common fields."""
     session_id: Annotated[str, first_not_none]  # Le session_id doit être fourni explicitement
+    game_id: Annotated[str, first_not_none]  # Le game_id doit être fourni explicitement
     
     model_config = ConfigDict(
         json_encoders={
@@ -90,7 +91,7 @@ class GameState(GameStateInput, GameStateOutput):
     
     def __add__(self, other: 'GameState') -> 'GameState':
         """Merge two GameStates for LangGraph parallel results.
-        Takes the latest state while preserving session_id from the first state.
+        Takes the latest state while preserving session_id and game_id from the first state.
         
         Note: Unlike NarratorModel and RulesModel, GameState allows different section numbers
         and will take the section number from the latest state.
@@ -99,15 +100,16 @@ class GameState(GameStateInput, GameStateOutput):
             other: Another GameState to merge with
             
         Returns:
-            A new GameState with the latest state and original session_id
+            A new GameState with the latest state and original session_id and game_id
         """
         if not isinstance(other, GameState):
             return self
             
         # Créer une copie du nouvel état
         new_state = other.model_copy()
-        # Garder le session_id original
+        # Garder le session_id et game_id originaux
         new_state.session_id = self.session_id
+        new_state.game_id = self.game_id
         return new_state
         
     @field_validator('section_number', mode='before')
@@ -140,6 +142,7 @@ class GameState(GameStateInput, GameStateOutput):
             exclude_unset=True,    # Exclure les champs non définis
             exclude={              # Exclure les champs internes spécifiques
                 'session_id': False,  # Toujours inclure session_id
+                'game_id': False,     # Toujours inclure game_id
                 'error': False       # Toujours inclure error même si None
             }
         )
@@ -239,9 +242,29 @@ class GameState(GameStateInput, GameStateOutput):
         )
 
     def with_updates(self, **updates) -> "GameState":
-        """Create a new state with updates."""
+        """Create a new state with updates.
+        
+        This method preserves both session_id and game_id when creating a new state.
+        
+        Args:
+            **updates: Updates to apply to the state
+            
+        Returns:
+            GameState: New state with updates applied
+        """
         state_dict = self.model_dump()
+        # Préserver explicitement les IDs
+        session_id = state_dict.get('session_id')
+        game_id = state_dict.get('game_id')
+        
         state_dict.update(updates)
+        
+        # Réinjecter les IDs s'ils existent
+        if session_id:
+            state_dict['session_id'] = session_id
+        if game_id:
+            state_dict['game_id'] = game_id
+            
         return GameState(**state_dict)
         
     def model_dump_json(self, **kwargs):
@@ -271,12 +294,13 @@ class GameState(GameStateInput, GameStateOutput):
         )
         
     @classmethod
-    def create_error_state(cls, error_message: str, session_id: str, section_number: int = 1, current_state: Optional["GameState"] = None) -> "GameState":
+    def create_error_state(cls, error_message: str, session_id: str, game_id: str, section_number: int = 1, current_state: Optional["GameState"] = None) -> "GameState":
         """Create a game state with error, optionally preserving current state.
         
         Args:
             error_message: Error message to include
             session_id: Session ID for the error state
+            game_id: Game ID for the error state
             section_number: Section number to use if no current state
             current_state: Optional current state to preserve
             
@@ -288,13 +312,15 @@ class GameState(GameStateInput, GameStateOutput):
             state_dict.update({
                 "section_number": current_state.section_number,
                 "error": error_message,
-                "session_id": session_id
+                "session_id": session_id,
+                "game_id": game_id
             })
             return cls(**state_dict)
         
         # Pour un nouvel état, initialiser tous les champs obligatoires
         return cls(
             session_id=session_id,
+            game_id=game_id,
             section_number=section_number,
             source=RulesSourceType.RAW,
             error=error_message,

@@ -280,8 +280,7 @@ def custom_openapi():
     openapi_schema = get_openapi(
         title="Casys RPG API",
         version="1.0.0",
-        description="""
-        API pour le jeu de rôle interactif Casys.
+        description="""API pour le jeu de rôle interactif Casys.
         
         ## Fonctionnalités
         
@@ -618,11 +617,8 @@ async def initialize_game(agent_mgr=Depends(get_agent_manager)) -> Dict[str, Any
         # Appelle initialize_game sans arguments
         initial_state = await agent_mgr.initialize_game()
 
-        # Retourne l'état initial
-        return {
-            "session_id": initial_state.session_id,
-            "initial_state": initial_state.model_dump()  # Dump du modèle GameState en dict
-        }
+        # Retourne l'état initial directement
+        return initial_state.model_dump()
 
     except Exception as e:
         logger.error(f"Error initializing game: {e}")

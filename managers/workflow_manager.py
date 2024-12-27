@@ -83,11 +83,11 @@ class WorkflowManager(WorkflowManagerProtocol):
             else:
                 raise WorkflowError(f"Invalid input data type: {type(input_data)}. Expected GameState or dict.")
 
-            # Validation que le `session_id` est présent dans l'état
-            if not getattr(state, "session_id", None):
-                logger.debug("Creating initial state with session_id")
+            # Validation que le `session_id` et `game_id` sont présents dans l'état
+            if not getattr(state, "session_id", None) or not getattr(state, "game_id", None):
+                logger.debug("Creating initial state with session_id and game_id")
                 state = await self.state_manager.create_initial_state()
-            logger.debug("Validated state session_id: {}", state.session_id)
+            logger.debug("Validated state session_id: {} and game_id: {}", state.session_id, state.game_id)
 
             # Mise à jour du section_number si next_section est présent dans la décision
             section_number = state.section_number
@@ -98,6 +98,7 @@ class WorkflowManager(WorkflowManagerProtocol):
             # Création de la sortie avec métadonnées et nouveau section_number
             output = GameState(
                 session_id=state.session_id,
+                game_id=state.game_id,  # Ajout du game_id
                 section_number=section_number,
                 metadata={"node": "start"}
             )
