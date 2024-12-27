@@ -294,7 +294,7 @@ class GameState(GameStateInput, GameStateOutput):
         )
         
     @classmethod
-    def create_error_state(cls, error_message: str, session_id: str, game_id: str, section_number: int = 1, current_state: Optional["GameState"] = None) -> "GameState":
+    def create_error_state(cls, error_message: str, session_id: str, game_id: str, section_number: int, current_state: Optional["GameState"] = None) -> "GameState":
         """Create a game state with error, optionally preserving current state.
         
         Args:
