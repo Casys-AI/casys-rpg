@@ -1,5 +1,20 @@
 import { API_CONFIG } from '../config/api';
 import type { GameState } from '../types/game';
+import { websocketService } from './websocketService';
+
+/**
+ * Assure que la connexion WebSocket est établie
+ */
+const ensureWebSocketConnection = async () => {
+  if (!websocketService.isConnected()) {
+    try {
+      await websocketService.connect();
+    } catch (error) {
+      console.error('WebSocket connection error:', error);
+      throw error;
+    }
+  }
+};
 
 /**
  * Service de gestion du jeu
@@ -11,14 +26,21 @@ export const gameService = {
    * Soit on initialise une nouvelle partie
    */
   getGameState: async (sessionId?: string, gameId?: string): Promise<GameState | null> => {
+    // S'assurer que la connexion WebSocket est établie
+    await ensureWebSocketConnection();
+
     // Si on a les deux IDs, on récupère l'état existant
     if (sessionId && gameId) {
       console.log('Fetching game state with:', { sessionId, gameId });
+      
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/state`, {
-        headers: API_CONFIG.DEFAULT_HEADERS
+        headers: {
+          ...API_CONFIG.DEFAULT_HEADERS,
+          'X-Session-ID': sessionId,
+          'X-Game-ID': gameId
+        }
       });
 
-      // Si on a un 404, ça veut dire que l'état n'existe pas
       if (response.status === 404) {
         console.log('Game state not found');
         return null;
@@ -40,6 +62,7 @@ export const gameService = {
 
     // Sinon on initialise une nouvelle partie
     console.log('Initializing new game');
+    
     const initResponse = await fetch(`${API_CONFIG.BASE_URL}/api/game/initialize`, {
       method: 'POST',
       headers: API_CONFIG.DEFAULT_HEADERS
@@ -52,51 +75,57 @@ export const gameService = {
     }
 
     const initData = await initResponse.json();
-    if (!initData.state) {
-      console.error('No state in init response:', initData);
-      throw new Error('État initial invalide');
-    }
-    return initData.state;
+    return {
+      sessionId: initData.session_id,
+      gameId: initData.game_id,
+      ...initData.state
+    };
   },
 
   /**
    * Lance les dés
    */
   rollDice: async (sessionId: string, gameId: string, diceType: string): Promise<number> => {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/roll`, {
+    // S'assurer que la connexion WebSocket est établie
+    await ensureWebSocketConnection();
+
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/roll/${diceType}`, {
       method: 'POST',
       headers: {
         ...API_CONFIG.DEFAULT_HEADERS,
-        'X-Session-Id': sessionId,
-        'X-Game-Id': gameId
-      },
-      body: JSON.stringify({ diceType })
+        'X-Session-ID': sessionId,
+        'X-Game-ID': gameId
+      }
     });
 
     if (!response.ok) {
-      throw new Error('Erreur lors du lancer de dés');
+      const error = await response.text();
+      throw new Error(`Erreur ${response.status}: ${error}`);
     }
 
-    const result = await response.json();
-    return result.value;
+    const data = await response.json();
+    return data.result;
   },
 
   /**
    * Navigation vers une nouvelle section
    */
   navigate: async (sessionId: string, gameId: string, target: string): Promise<GameState> => {
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/navigate`, {
+    // S'assurer que la connexion WebSocket est établie
+    await ensureWebSocketConnection();
+
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/game/navigate/${target}`, {
       method: 'POST',
       headers: {
         ...API_CONFIG.DEFAULT_HEADERS,
-        'X-Session-Id': sessionId,
-        'X-Game-Id': gameId
-      },
-      body: JSON.stringify({ target })
+        'X-Session-ID': sessionId,
+        'X-Game-ID': gameId
+      }
     });
 
     if (!response.ok) {
-      throw new Error('Erreur lors de la navigation');
+      const error = await response.text();
+      throw new Error(`Erreur ${response.status}: ${error}`);
     }
 
     const data = await response.json();
