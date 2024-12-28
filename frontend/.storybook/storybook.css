@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Styles spécifiques pour Storybook uniquement */
+.sbdocs.sbdocs-wrapper {
+  background: #1a1a1a;
+  color: #e2e8f0;
+}
+
+.sbdocs.sbdocs-preview {
+  background: #1a1a1a;
+  border: 1px solid #2d2d2d;
+}
+
+/* Storybook Theme Styles */
+.light {
+  --sb-background: #ffffff;
+  --sb-text: #1a1a1a;
+}
+
+.dark {
+  --sb-background: #1a1a1a;
+  --sb-text: #e2e8f0;
+}
+
+/* Apply theme colors to Storybook UI */
+.docs-story {
+  background-color: var(--sb-background);
+  color: var(--sb-text);
+}
+
+/* Force light theme by default */
+:root {
+  color-scheme: light;
+}
+
+/* Transition for theme changes */
+.docs-story * {
+  transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+}

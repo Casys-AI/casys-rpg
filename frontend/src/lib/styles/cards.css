@@ -1,0 +1,62 @@
+/* Card Base */
+.card {
+  width: 190px;
+  height: 254px;
+  border-radius: 30px;
+  background: #212121;
+  box-shadow: 15px 15px 30px rgb(25, 25, 25),
+              -15px -15px 30px rgb(60, 60, 60);
+  transition: var(--transition-default);
+}
+
+/* Card Sizes */
+.card-sm {
+  width: 190px;
+  height: 254px;
+}
+
+.card-md {
+  width: 285px;
+  height: 381px;
+}
+
+.card-lg {
+  width: 380px;
+  height: 508px;
+}
+
+/* Card Content */
+.card-content {
+  padding: 2rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card Hover Effects */
+.card-hover:hover {
+  transform: scale(1.05);
+}
+
+/* Light Theme Card */
+.light .card {
+  background: var(--color-card-light);
+  box-shadow: 15px 15px 30px #bebebe,
+              -15px -15px 30px #ffffff;
+}
+
+/* Card Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-animated {
+  animation: slideIn 0.3s ease-out;
+}

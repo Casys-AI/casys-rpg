@@ -1,3 +1,56 @@
+/* Custom Styles */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Tailwind Directives */
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
+
+/* Base Styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-game-background-dark text-game-primary-dark;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cinzel', serif;
+  }
+}
+
+/* Component Styles */
+@layer components {
+  .btn-neu {
+    @apply px-8 py-4 text-lg font-bold text-white rounded-full cursor-pointer transition-all duration-200;
+    background: linear-gradient(to bottom, #171717, #242424);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 1), 0 10px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .input-neu {
+    @apply w-[200px] h-[45px] border-none outline-none px-2 rounded-md text-white text-[15px] bg-transparent transition-all duration-300;
+    box-shadow: 3px 3px 10px rgb(0 0 0), -1px -1px 6px rgb(255 255 255 / 0.4);
+  }
+
+  .input-neu:focus {
+    box-shadow: 3px 3px 10px rgb(0 0 0), -1px -1px 6px rgb(255 255 255 / 0.4),
+                inset 3px 3px 10px rgb(0 0 0), inset -1px -1px 6px rgb(255 255 255 / 0.4);
+  }
+
+  .card-neu {
+    @apply rounded-[30px] bg-game-card-dark transition-all duration-300;
+    box-shadow: 15px 15px 30px rgb(25 25 25), -15px -15px 30px rgb(60 60 60);
+  }
+}
+
+/* Custom Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
