@@ -1,0 +1,47 @@
+/* Theme Variables */
+:root {
+  /* Colors */
+  --color-background-light: #ffffff;
+  --color-background-dark: #1a1a1a;
+  --color-primary-light: #1a1a1a;
+  --color-primary-dark: #e2e8f0;
+  --color-secondary-light: #4b5563;
+  --color-secondary-dark: #94a3b8;
+  --color-accent: #4d7cff;
+  
+  /* Card Colors */
+  --color-card-light: #e0e0e0;
+  --color-card-dark: #212121;
+  
+  /* Shadows */
+  --shadow-dark-inner: rgba(0, 0, 0, 1);
+  --shadow-light-outer: rgba(255, 255, 255, 0.4);
+  
+  /* Transitions */
+  --transition-default: all 0.3s ease;
+  
+  /* Border Radius */
+  --radius-card: 50px;
+  --radius-button: 8px;
+  --radius-input: 6px;
+  
+  /* Font Families */
+  --font-serif: 'Cinzel', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+
+/* Dark Theme */
+.dark {
+  --color-background: var(--color-background-dark);
+  --color-text: var(--color-primary-dark);
+  --color-secondary: var(--color-secondary-dark);
+  --color-card: var(--color-card-dark);
+}
+
+/* Light Theme */
+:root:not(.dark) {
+  --color-background: var(--color-background-light);
+  --color-text: var(--color-primary-light);
+  --color-secondary: var(--color-secondary-light);
+  --color-card: var(--color-card-light);
+}
