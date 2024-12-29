@@ -2,6 +2,7 @@ import { gameService } from '$lib/services/gameService';
 import { gameSession } from '$lib/stores/gameStore';
 import type { PageLoad } from './$types';
 import { browser } from '$app/environment';
+import { get } from 'svelte/store';
 
 export const load: PageLoad = async ({ fetch }) => {
     console.log('🎮 Loading game page...');
@@ -18,13 +19,8 @@ export const load: PageLoad = async ({ fetch }) => {
     }
 
     // Vérifier si on a déjà une session
-    let hasSession = false;
-    let currentGameId: string | null = null;
-    
-    gameSession.subscribe(session => {
-        hasSession = !!session.gameId;
-        currentGameId = session.gameId;
-    })();
+    const currentSession = get(gameSession);
+    const hasSession = !!currentSession.gameId;
     
     try {
         if (!hasSession) {

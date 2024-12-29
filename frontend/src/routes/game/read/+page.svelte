@@ -30,21 +30,33 @@
     }
 
     onMount(async () => {
-        console.log("Initialisation de la page de lecture");
+        console.log("🎮 Initialisation de la page de lecture");
         
         try {
-            // On a déjà l'état initial du jeu depuis +page.ts
-            console.log('État initial du jeu:', gameState);
+            // Si pas d'état initial, initialiser le jeu
+            if (!gameState) {
+                console.log('🎲 Pas d\'état initial, initialisation du jeu...');
+                const initResponse = await gameService.initialize();
+                if (initResponse.success) {
+                    console.log('✅ Jeu initialisé avec succès');
+                    gameState = initResponse.state;
+                } else {
+                    throw new Error(initResponse.message || 'Échec de l\'initialisation');
+                }
+            }
+            
+            console.log('📋 État actuel du jeu:', gameState);
 
             // S'abonner aux mises à jour WebSocket
             unsubscribe = gameService.onMessage((data) => {
-                console.log('Mise à jour du jeu reçue:', data);
+                console.log('📥 Mise à jour du jeu reçue:', data);
                 if (data.state) {
+                    console.log('🔄 Mise à jour de l\'état du jeu');
                     gameState = data.state;
                 }
             });
         } catch (e) {
-            console.error('Erreur:', e);
+            console.error('❌ Erreur:', e);
             error = e instanceof Error ? e.message : 'Une erreur est survenue';
         }
 
@@ -63,6 +75,7 @@
     });
 
     onDestroy(() => {
+        console.log('👋 Nettoyage de la page de lecture');
         if (unsubscribe) {
             unsubscribe();
         }
@@ -85,14 +98,20 @@
     }
 
     async function resetGame() {
-        // Effacer les cookies côté serveur via l'API
-        const response = await fetch('/api/game/reset', {
-            method: 'POST',
-        });
-        
-        if (response.ok) {
-            // Rediriger vers la page d'accueil
+        try {
+            console.log('🔄 Réinitialisation du jeu...');
+            // Déconnecter le WebSocket actuel
+            gameService.disconnect();
+            
+            // Effacer la session et l'état
+            await gameService.clearSession();
+            
+            // Rediriger vers la page de jeu
+            console.log('➡️ Redirection vers /game...');
             await goto('/game');
+        } catch (error) {
+            console.error('❌ Erreur lors de la réinitialisation:', error);
+            error = error instanceof Error ? error.message : 'Une erreur est survenue lors de la réinitialisation';
         }
     }
 </script>
