@@ -10,7 +10,7 @@ from api.utils.serialization_utils import from_game_state
 from api.dto.request_dto import GameInitRequest
 from api.dto.response_dto import GameResponse
 
-game_router_rest = APIRouter()
+game_router_rest = APIRouter(prefix="/api/game", tags=["game"])
 
 
 @game_router_rest.post("/initialize")
@@ -22,11 +22,12 @@ async def initialize_game(
     Initialize a new game session.
     """
     try:
-        game_state = await agent_mgr.initialize_game(init_request.model_dump())
+        # Pour l'instant on n'utilise pas init_request
+        game_state = await agent_mgr.initialize_game()
         state_dict = from_game_state(game_state)
         return GameResponse(
             success=True,
-            game_id=state_dict["game_id"],  # game_id est toujours présent
+            game_id=state_dict["game_id"],
             state=state_dict,
             message="Game initialized successfully"
         )

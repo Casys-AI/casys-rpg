@@ -6,7 +6,7 @@ import { WebSocketService } from './websocketService';
 class GameService {
     private wsService: WebSocketService | null = null;
     private readonly API_BASE_URL = 'http://localhost:8000/api/game';
-    private readonly WS_URL = 'ws://localhost:8000/ws';
+    private readonly WS_URL = 'ws://localhost:8000/ws/game';  
     private customFetch: typeof fetch = fetch;
     
     setFetch(fetchFn: typeof fetch) {
@@ -26,14 +26,15 @@ class GameService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({})  // Envoyer un objet vide pour satisfaire FastAPI
             });
 
             const data = await response.json();
             console.log('🎲 Game initialized response:', data);
             
             if (!response.ok) {
-                throw new Error(data.message || 'Server error');
+                throw new Error(data.detail?.[0]?.msg || data.message || 'Server error');
             }
             
             if (data.success && browser) {
@@ -60,7 +61,25 @@ class GameService {
     async getGameState(): Promise<GameResponse> {
         console.log('🎲 Getting game state...');
         try {
-            const response = await this.customFetch(`${this.API_BASE_URL}/state`, {
+            // Récupérer le game_id du store
+            let currentGameId: string | null = null;
+            gameSession.subscribe(session => {
+                currentGameId = session.gameId;
+            })();
+
+            // Si pas de game_id, retourner une erreur
+            if (!currentGameId) {
+                console.log('❌ No game ID found');
+                return {
+                    success: false,
+                    message: 'No game ID found',
+                    session_id: null,
+                    game_id: null,
+                    state: {}
+                };
+            }
+
+            const response = await this.customFetch(`${this.API_BASE_URL}/state?game_id=${currentGameId}`, {
                 credentials: 'include'
             });
             
@@ -113,8 +132,8 @@ class GameService {
             return;
         }
 
-        console.log('🔌 Connecting to WebSocket...');
-        this.wsService = new WebSocketService(`${this.WS_URL}/game`);
+        console.log('🔌 Creating new WebSocket connection');
+        this.wsService = new WebSocketService(this.WS_URL);  // Plus besoin d'ajouter /game
         
         // Gérer les messages
         this.wsService.onMessage((data) => {

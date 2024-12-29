@@ -4,8 +4,13 @@ from pydantic import BaseModel
 
 
 class GameInitRequest(BaseModel):
-    """Game initialization request."""
-    game_id: str
+    """Game initialization request.
+    
+    Pour l'instant on n'a besoin de rien pour initialiser,
+    plus tard on ajoutera peut-être :
+    - player_id: pour identifier le joueur
+    - settings: pour des paramètres de jeu spécifiques
+    """
     player_id: Optional[str] = None
     settings: Optional[Dict[str, Any]] = None
 
