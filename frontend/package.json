@@ -24,6 +24,7 @@
 	"devDependencies": {
 		"@chromatic-com/storybook": "^3.2.3",
 		"@eslint/compat": "^1.2.3",
+		"@inlang/cli": "^2.18.1",
 		"@playwright/test": "^1.45.3",
 		"@storybook/addon-essentials": "^8.4.7",
 		"@storybook/addon-interactions": "^8.4.7",
@@ -54,7 +55,8 @@
 		"vitest": "^2.0.4"
 	},
 	"dependencies": {
-		"@inlang/paraglide-sveltekit": "^0.11.1",
+		"@inlang/paraglide-js": "^1.11.3",
+		"@inlang/paraglide-sveltekit": "^0.11.5",
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"@tailwindcss/container-queries": "^0.1.1",

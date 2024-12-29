@@ -1,25 +1,27 @@
 import type { GameState, GameResponse } from '$lib/types/game';
 import { browser } from '$app/environment';
 import { gameSession, gameState, gameChoices, type Choice } from '$lib/stores/gameStore';
-import { WebSocketService } from './websocketService';
+import { WebSocketService, type ConnectionStatus } from './websocketService';
+import { writable, type Writable } from 'svelte/store';
 
 class GameService {
     private wsService: WebSocketService | null = null;
-    private readonly API_BASE_URL = 'http://localhost:8000/api/game';
-    private readonly WS_URL = 'ws://localhost:8000/ws/game';  
+    private readonly API_BASE_URL = 'http://127.0.0.1:8000/api/game';
+    private readonly WS_URL = 'ws://127.0.0.1:8000/api/ws/game';  
     private customFetch: typeof fetch = fetch;
-    
+    private messageHandlers: ((data: GameResponse) => void)[] = [];
+
+    // Exposer le status de connexion du WebSocket
+    get connectionStatus(): Writable<ConnectionStatus> {
+        return this.wsService?.connectionStatus || writable<ConnectionStatus>('disconnected');
+    }
+
     setFetch(fetchFn: typeof fetch) {
         this.customFetch = fetchFn;
     }
     
     async initialize(): Promise<GameResponse> {
         console.log('🎮 Initializing game...');
-        
-        // D'abord effacer la session existante et les états
-        gameSession.clearSession();
-        gameState.reset();
-        gameChoices.reset();
         
         try {
             const response = await this.customFetch(`${this.API_BASE_URL}/initialize`, {
@@ -37,25 +39,58 @@ class GameService {
                 throw new Error(data.detail?.[0]?.msg || data.message || 'Server error');
             }
             
-            if (data.success && browser) {
-                // Stocker les nouveaux IDs
-                gameSession.setSession(data.state.session_id, data.state.game_id);
-                // Mettre à jour l'état du jeu
-                gameState.setState(data.state);
-                // Mettre à jour les choix si présents
-                if (data.state.choices) {
-                    gameChoices.setAvailableChoices(data.state.choices);
+            if (data.success) {
+                if (browser) {
+                    // D'abord effacer la session existante et les états
+                    gameSession.clearSession();
+                    gameState.reset();
+                    gameChoices.reset();
+                    
+                    // Stocker les nouveaux IDs
+                    gameSession.setSession(data.state.session_id, data.state.game_id);
+                    // Mettre à jour l'état du jeu
+                    gameState.setState(data.state);
+                    // Mettre à jour les choix si présents
+                    if (data.state.choices) {
+                        gameChoices.setAvailableChoices(data.state.choices);
+                    }
+                    await this.connectWebSocket();
                 }
-                await this.connectWebSocket();
-            } else {
-                throw new Error(data.message || 'Failed to initialize game');
-            }
+                return data;
+            } 
             
-            return data;
+            throw new Error(data.message || 'Failed to initialize game');
         } catch (error) {
             console.error('🎲 Game initialization error:', error);
             throw error;
         }
+    }
+
+    // Méthode publique pour se connecter au WebSocket
+    async connectWebSocket(): Promise<void> {
+        if (this.wsService) {
+            console.log('🔌 WebSocket already connected');
+            return;
+        }
+
+        console.log('🔌 Creating new WebSocket connection');
+        this.wsService = new WebSocketService(this.WS_URL);
+        
+        // Gérer les messages
+        this.wsService.onMessage(this.handleMessage.bind(this));
+    }
+
+    private handleMessage(data: GameResponse) {
+        console.log('📥 Received message:', data);
+        // Mettre à jour l'état du jeu si présent dans le message
+        if (data.state) {
+            gameState.setState(data.state);
+            // Mettre à jour les choix si présents
+            if (data.state.choices) {
+                gameChoices.setAvailableChoices(data.state.choices);
+            }
+        }
+        this.messageHandlers.forEach(handler => handler(data));
     }
 
     async getGameState(): Promise<GameResponse> {
@@ -126,30 +161,6 @@ class GameService {
         }
     }
 
-    private async connectWebSocket(): Promise<void> {
-        if (this.wsService) {
-            console.log('🔌 WebSocket already connected');
-            return;
-        }
-
-        console.log('🔌 Creating new WebSocket connection');
-        this.wsService = new WebSocketService(this.WS_URL);  // Plus besoin d'ajouter /game
-        
-        // Gérer les messages
-        this.wsService.onMessage((data) => {
-            console.log('📥 Received message:', data);
-            // Mettre à jour l'état du jeu si présent dans le message
-            if (data.state) {
-                gameState.setState(data.state);
-                // Mettre à jour les choix si présents
-                if (data.state.choices) {
-                    gameChoices.setAvailableChoices(data.state.choices);
-                }
-            }
-            this.messageHandlers.forEach(handler => handler(data));
-        });
-    }
-
     async sendAction(action: string, data: any = {}): Promise<void> {
         if (!this.wsService) {
             throw new Error('WebSocket not initialized');
@@ -210,8 +221,6 @@ class GameService {
             gameChoices.reset();
         }
     }
-
-    private messageHandlers: ((data: GameResponse) => void)[] = [];
 }
 
 export const gameService = new GameService();
