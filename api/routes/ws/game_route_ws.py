@@ -10,7 +10,7 @@ from api.utils.serialization_utils import from_game_state, _json_serial
 import json
 from loguru import logger
 
-game_router_ws = APIRouter()
+game_router_ws = APIRouter()  # Enlever le préfixe /api pour les WebSockets
 
 # WebSocket connection manager
 class GameWSConnectionManager:
