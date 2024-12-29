@@ -310,11 +310,6 @@ class AgentManager:
             if getattr(state, 'end_game', False):
                 logger.info("Game ended normally")
                 return False
-            
-            # Stop si on attend une réponse utilisateur
-            if state.rules and state.rules.needs_user_response:
-                logger.info("Waiting for user input")
-                return False
                 
             logger.debug("Game should continue")
             return True

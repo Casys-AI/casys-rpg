@@ -1,19 +1,27 @@
 """Response DTOs for the API."""
 from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from pydantic import BaseModel
 from datetime import datetime
 
 
-@dataclass
-class ActionResponse:
-    """Response to a player action."""
-    success: bool
-    message: str
+class GameResponse(BaseModel):
+    """Game response with state."""
+    success: bool = True
+    message: Optional[str] = None
+    game_id: Optional[str] = None
+    state: Dict[str, Any]
+
+
+class ActionResponse(BaseModel):
+    """Response to a game action."""
+    success: bool = True
+    message: Optional[str] = None
+    action_result: Optional[Dict[str, Any]] = None
     state: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 
-@dataclass
-class HealthResponse:
+class HealthResponse(BaseModel):
     """Health check response model.
     
     Attributes:
@@ -28,11 +36,3 @@ class HealthResponse:
     timestamp: str
     version: Optional[str] = None
     type: Optional[str] = None
-
-
-@dataclass
-class GameResponse:
-    """Game state response."""
-    game_id: str
-    state: Dict[str, Any]
-    message: Optional[str] = None
