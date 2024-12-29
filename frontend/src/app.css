@@ -43,6 +43,24 @@
     @apply rounded-[30px] bg-game-card-dark transition-all duration-300;
     box-shadow: 15px 15px 30px rgb(25 25 25), -15px -15px 30px rgb(60 60 60);
   }
+
+  /* Classe pour la barre de choix */
+  .choices-bar {
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Cache la barre quand on scroll vers le haut */
+  @media (hover: hover) {
+    .choices-bar {
+      @media (prefers-reduced-motion: no-preference) {
+        transform: translateY(0);
+      }
+    }
+
+    :root[scroll-up] .choices-bar {
+      transform: translateY(100%);
+    }
+  }
 }
 
 /* Custom Animations */

@@ -149,3 +149,30 @@ async def get_feedback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+@game_router_rest.post("/reset")
+async def reset_game(
+    agent_mgr: AgentManager = Depends(get_agent_manager)
+):
+    """
+    Reset the game state and clear cookies.
+    """
+    try:
+        # Arrêter le jeu en cours
+        await agent_mgr.stop_game()
+        
+        # Nettoyer l'état
+        if agent_mgr.managers.state_manager:
+            await agent_mgr.managers.state_manager.clear_state()
+            
+        return {
+            "status": "success",
+            "message": "Game reset successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to reset game: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

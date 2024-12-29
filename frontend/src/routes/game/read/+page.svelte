@@ -12,32 +12,41 @@
     let error = data.error;
     let unsubscribe: (() => void) | null = null;
     let showSettings = false;
-    let connectionStatus: ConnectionStatus;
-
-    // S'abonner au store de statut de connexion
-    gameService.connectionStatus.subscribe(status => {
+    let y: number;
+    let lastY = 0;
+    let showChoices = true;
+    
+    // S'abonner au store connectionStatus
+    let connectionStatus: ConnectionStatus = 'disconnected';
+    gameService.connectionStatus.subscribe((status) => {
         connectionStatus = status;
     });
 
-    onMount(async () => {
-        console.log(' Mounting game component...');
-        
-        // Initialiser le WebSocket
-        const gameResponse = await gameService.initialize();
-        console.log(' Game response:', gameResponse);
-
-        if (!gameResponse.success) {
-            error = gameResponse.message;
-            return;
+    $: {
+        if (y !== undefined) {
+            showChoices = y > lastY;
+            lastY = y;
         }
+    }
 
-        // S'abonner aux messages WebSocket
-        unsubscribe = gameService.onMessage((data) => {
-            console.log(' Received game update:', data);
-            if (data.state) {
-                gameState = data.state;
-            }
-        });
+    onMount(async () => {
+        console.log("Initialisation de la page de lecture");
+        
+        try {
+            // On a déjà l'état initial du jeu depuis +page.ts
+            console.log('État initial du jeu:', gameState);
+
+            // S'abonner aux mises à jour WebSocket
+            unsubscribe = gameService.onMessage((data) => {
+                console.log('Mise à jour du jeu reçue:', data);
+                if (data.state) {
+                    gameState = data.state;
+                }
+            });
+        } catch (e) {
+            console.error('Erreur:', e);
+            error = e instanceof Error ? e.message : 'Une erreur est survenue';
+        }
 
         // Fermer le menu quand on clique en dehors
         const handleClickOutside = (event: MouseEvent) => {
@@ -47,7 +56,7 @@
             }
         };
         document.addEventListener('click', handleClickOutside);
-
+        
         return () => {
             document.removeEventListener('click', handleClickOutside);
         };
@@ -60,8 +69,15 @@
         gameService.disconnect();
     });
 
-    function handleChoice(choice: any) {
-        gameService.sendAction('make_choice', { choice });
+    async function handleChoice(choice: any) {
+        try {
+            console.log('🎮 Choice clicked:', choice);
+            await gameService.sendChoice(choice.text || choice);
+        } catch (error) {
+            console.error('Error sending choice:', error);
+            // Afficher une erreur à l'utilisateur
+            error = error instanceof Error ? error.message : 'Une erreur est survenue lors de l\'envoi du choix';
+        }
     }
 
     function toggleSettings() {
@@ -80,6 +96,8 @@
         }
     }
 </script>
+
+<svelte:window bind:scrollY={y}/>
 
 {#if error}
     <div class="min-h-screen bg-game-background flex items-center justify-center">
@@ -169,8 +187,8 @@
         {/if}
 
         <!-- Contenu principal -->
-        <main class="flex-1">
-            <div class="max-w-4xl mx-auto p-4 pb-40">
+        <main class="flex-1 pb-40">
+            <div class="max-w-4xl mx-auto p-4">
                 <!-- Narrative Content -->
                 <div class="bg-game-surface/50 rounded-2xl p-4">
                     <div class="prose prose-lg prose-game max-w-none">
@@ -184,9 +202,12 @@
             </div>
         </main>
 
-        <!-- Choices -->
+        <!-- Barre de choix avec transition basée sur le scroll -->
         {#if gameState.rules?.choices}
-            <div class="fixed bottom-0 left-0 right-0 bg-game-surface/95 backdrop-blur-sm shadow-neu-up p-4 z-50">
+            <div 
+                class="fixed bottom-0 left-0 right-0 bg-game-surface/95 backdrop-blur-sm shadow-neu-up p-4 z-50 transition-transform duration-300"
+                class:translate-y-full={!showChoices}
+            >
                 <div class="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 justify-center">
                     {#each gameState.rules.choices as choice}
                         <button

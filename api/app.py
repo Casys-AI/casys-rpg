@@ -84,29 +84,12 @@ app = FastAPI(
 )
 
 # Configuration CORS
-origins = [
-    # IPv4
-    "http://127.0.0.1:5173",   # Vite dev server
-    "http://127.0.0.1:9000",   # Frontend Qwik
-    "http://127.0.0.1:3000",   # Autre frontend possible
-    "http://127.0.0.1:8000",   # API
-    "ws://127.0.0.1:8000",     # WebSocket
-    # Localhost
-    "http://localhost:5173",   # Vite dev server
-    "http://localhost:9000",   # Frontend Qwik
-    "http://localhost:3000",   # Autre frontend possible
-    "http://localhost:8000",   # API
-    "ws://localhost:8000",     # WebSocket
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://localhost:5173"],  # URL du frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
 )
 
 # Mount static files

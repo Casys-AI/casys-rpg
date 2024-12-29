@@ -280,60 +280,6 @@ class AgentManager:
             logger.error("Error getting story workflow: {}", str(e))
             raise GameError(f"Failed to get story workflow: {str(e)}")
 
-    async def stream_game_state(self) -> AsyncGenerator[Dict, None]:
-        """Stream game state updates.
-        
-        Yields:
-            Dict: Game state updates
-            
-        Raises:
-            GameError: If streaming fails
-        """
-        try:
-            logger.info("Starting game state streaming")
-            
-            # Get current state
-            current_state = await self.get_state()
-            if not current_state:
-                logger.error("No current state available")
-                raise GameError("No current state available")
-                
-            # Create input data
-            logger.debug("Creating input data")
-            input_data = GameState(
-                session_id=current_state.session_id,
-                state=current_state,
-                metadata={"node": "stream"}
-            )
-            
-            # Get workflow
-            logger.debug("Getting compiled workflow")
-            workflow = await self.get_story_workflow()
-            logger.debug("Starting workflow streaming")
-            
-            # Stream workflow results
-            async for result in workflow.astream(input_data.model_dump()):
-                if isinstance(result, dict):
-                    logger.debug("Processing workflow result")
-                    state = GameState(**result)
-                    
-                    # Check if game should continue
-                    if not await self.should_continue(state):
-                        logger.info("Game should not continue, stopping streaming")
-                        return
-                
-                    # Save state
-                    logger.debug("Saving updated state")
-                    await self.managers.state_manager.save_state(state)
-                    logger.debug("Yielding state update")
-                    yield state.model_dump()
-                else:
-                    logger.error("Invalid workflow result type: {}", type(result))
-                    raise GameError("Invalid workflow result")
-            
-        except Exception as e:
-            logger.error("Error streaming game state: {}", str(e))
-            raise GameError(f"Failed to stream game state: {str(e)}")
 
     async def get_feedback(self) -> str:
         """Get feedback about the current game state."""
