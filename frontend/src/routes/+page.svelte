@@ -51,12 +51,12 @@
 
         <!-- CTA Button -->
         <div class="mt-16">
-          <button
-            on:click={() => goto('/game')}
-            class="transform rounded-2xl bg-game-background px-12 py-6 text-xl font-serif font-semibold text-game-primary shadow-neu-flat hover:shadow-neu-pressed transition-all duration-300 focus:outline-none"
+          <a
+            href="/game"
+            class="inline-block transform rounded-2xl bg-game-background px-12 py-6 text-xl font-serif font-semibold text-game-primary shadow-neu-flat hover:shadow-neu-pressed transition-all duration-300 focus:outline-none"
           >
             Commencer l'aventure
-          </button>
+          </a>
         </div>
       </div>
     </div>

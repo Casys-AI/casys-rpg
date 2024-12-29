@@ -82,9 +82,11 @@ class GameService {
 
         console.log('🔌 Connecting to WebSocket...');
         this.connectionStatus.set('connecting');
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/game/ws`;
-
+        
+        // Utiliser l'URL du backend
+        const wsUrl = `ws://${window.location.hostname}:8000/api/ws/game`;
+        console.log('🔌 WebSocket URL:', wsUrl);
+        
         try {
             this.ws = new WebSocket(wsUrl);
 
@@ -98,36 +100,39 @@ class GameService {
                 this.messageHandlers.forEach(handler => handler(data));
             };
 
-            this.ws.onclose = () => {
-                console.log('🔌 WebSocket disconnected');
-                this.connectionStatus.set('disconnected');
-                this.clearHeartbeat();
-                this.handleReconnect();
-            };
-
-            this.ws.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
-                this.connectionStatus.set('error');
-                this.clearHeartbeat();
-                this.handleReconnect();
-            };
+            this.ws.onopen = this.onopen.bind(this);
+            this.ws.onclose = this.onclose.bind(this);
+            this.ws.onerror = this.onerror.bind(this);
 
             await new Promise((resolve, reject) => {
                 if (!this.ws) return reject(new Error('WebSocket not initialized'));
 
-                this.ws.onopen = () => {
-                    console.log('✅ WebSocket connected');
-                    this.connectionStatus.set('connected');
-                    this.reconnectAttempts = 0;
-                    this.startHeartbeat();
-                    resolve(true);
-                };
+                resolve(true);
             });
         } catch (error) {
             console.error('❌ Error connecting to WebSocket:', error);
             this.connectionStatus.set('error');
             this.handleReconnect();
         }
+    }
+
+    private onopen() {
+        console.log('🔌 WebSocket connected');
+        this.connectionStatus.set('connected');
+        this.reconnectAttempts = 0;
+        this.startHeartbeat();
+    }
+
+    private onclose() {
+        console.log('🔌 WebSocket disconnected');
+        this.connectionStatus.set('disconnected');
+        this.clearHeartbeat();
+        this.handleReconnect();
+    }
+
+    private onerror(error: Event) {
+        console.error('❌ WebSocket error:', error);
+        this.connectionStatus.set('error');
     }
 
     private startHeartbeat() {
@@ -180,6 +185,28 @@ class GameService {
 
         console.log('📤 Sending action:', { action, ...data });
         this.ws.send(JSON.stringify({ action, ...data }));
+    }
+
+    async sendChoice(choice: string) {
+        console.log('📤 Sending choice via WebSocket:', choice);
+        
+        // Attendre que la connexion soit établie
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.log('⏳ WebSocket not ready, connecting...');
+            await this.connectWebSocket();
+        }
+        
+        // Vérifier à nouveau l'état de la connexion
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            throw new Error('WebSocket connection failed');
+        }
+        
+        const message = { 
+            type: 'choice',
+            choice: choice 
+        };
+        console.log('📦 Sending message:', message);
+        this.ws.send(JSON.stringify(message));
     }
 
     disconnect() {

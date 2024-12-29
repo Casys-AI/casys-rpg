@@ -263,46 +263,25 @@ class StateManager(StateManagerProtocol):
 
     async def get_current_state(self) -> Optional[GameState]:
         """Get current game state."""
-        try:
-            logger.debug("Getting current state")
-            
-            # Si on a déjà un état en mémoire, on le retourne
-            if self._current_state:
-                logger.debug("Returning current state from memory")
-                return self._current_state
-                
-            # Si on a un game_id, on essaie de récupérer l'état correspondant
-            if self._game_id:
-                state = await self.cache.get_cached_data(
-                    key=f"game_{self._game_id}_current",
-                    namespace="state"
-                )
-                if state:
-                    logger.debug("Found state in cache for game {}", self._game_id)
-                    deserialized_state = self._deserialize_state(state)
-                    self._current_state = deserialized_state
-                    return deserialized_state
-                
-            logger.debug("No current state found")
-            return None
-            
-        except Exception as e:
-            logger.error("Error getting current state: %s", str(e))
-            raise StateError(f"Failed to get current state: {str(e)}")
+        return self._current_state
 
     async def clear_state(self) -> None:
-        """Clear current state and cache."""
+        """Clear current game state and cache."""
+        logger.info("Clearing game state")
         try:
-            if self._game_id:
-                # Supprimer tous les états liés à cette partie
-                pattern = f"game_{self._game_id}_*"
-                await self.cache.clear_pattern(namespace="state", pattern=pattern)
-                
+            # Nettoyer l'état en mémoire
             self._current_state = None
+            self._game_id = None
+            
+            # Nettoyer le cache
+            if self.cache:
+                await self.cache.clear()
+                
+            logger.info("Game state cleared successfully")
             
         except Exception as e:
-            logger.error(f"Error clearing state: {e}")
-            raise StateError(f"Failed to clear state: {str(e)}")
+            logger.error(f"Error clearing game state: {e}")
+            raise StateError(f"Failed to clear game state: {str(e)}")
 
     async def switch_game(self, new_game_id: str) -> None:
         """Switch to a different game.

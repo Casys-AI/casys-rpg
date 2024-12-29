@@ -104,6 +104,36 @@ async def game_websocket_endpoint(
                             json.dumps(state_dict, default=_json_serial)
                         )
                 
+                elif data.get("type") == "choice":
+                    logger.info("Processing user choice")
+                    try:
+                        choice = data.get("choice")
+                        logger.debug(f"Received choice data: {data}")
+                        if not choice:
+                            raise ValueError("No choice provided")
+                            
+                        # Process le choix avec process_game_state
+                        logger.info(f"Processing choice: {choice}")
+                        new_state = await agent_mgr.process_game_state(
+                            user_input=choice
+                        )
+                        
+                        if new_state:
+                            # Broadcast le nouvel état à tous les clients
+                            logger.info("Broadcasting new state after choice")
+                            state_dict = from_game_state(new_state)
+                            await ws_manager.broadcast(state_dict)
+                        else:
+                            raise ValueError("No state returned after processing choice")
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing choice: {e}")
+                        await websocket.send_json({
+                            "error": str(e),
+                            "status": "error",
+                            "type": "choice_error"
+                        })
+                
             except WebSocketDisconnect:
                 logger.info("WebSocket disconnected")
                 break
