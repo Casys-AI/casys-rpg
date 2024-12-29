@@ -23,3 +23,18 @@ class ActionRequest(BaseModel):
     game_id: str
     action_type: str
     data: Dict[str, Any]
+
+
+class ChoiceRequest(BaseModel):
+    """Player choice request."""
+    game_id: str
+    choice_id: str
+    choice_text: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ResponseRequest(BaseModel):
+    """Player response request."""
+    game_id: str
+    response: str
+    metadata: Optional[Dict[str, Any]] = None

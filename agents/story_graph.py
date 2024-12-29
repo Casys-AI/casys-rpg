@@ -189,7 +189,7 @@ class StoryGraph(StoryGraphProtocol):
                             logger.error("Decision error: {}", decision.message)
                             return GameState(
                                 session_id=state.session_id,
-                                game_id=input_data.game_id,
+                                game_id=state.game_id,
                                 section_number=state.section_number,
                                 error=decision.message
                             )
@@ -199,7 +199,7 @@ class StoryGraph(StoryGraphProtocol):
                             logger.error("Decision missing next_section")
                             return GameState(
                                 session_id=state.session_id,
-                                game_id=input_data.game_id,
+                                game_id=state.game_id,
                                 section_number=state.section_number,
                                 error="Decision missing next section number"
                             )
@@ -211,13 +211,15 @@ class StoryGraph(StoryGraphProtocol):
                 raise GameError("No valid decision result")
 
             logger.debug("No user input to process")
+            if state.rules and state.rules.needs_user_response:
+                logger.info(" En attente d'une réponse utilisateur pour la section {}", state.section_number)
             return state
 
         except Exception as e:
             logger.exception("Error in decision processing: {}", str(e))
             return GameState(
                 session_id=state.session_id,
-                game_id=input_data.game_id,
+                game_id=state.game_id,
                 section_number=state.section_number,
                 error=str(e)
             )
