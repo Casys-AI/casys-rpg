@@ -1,6 +1,6 @@
 /** @type { import('@storybook/sveltekit').StorybookConfig } */
 const config = {
-  stories: ['../src/**/*.stories.@(js|ts)'],
+  stories: ['../src/**/*.mdx', '../src/**/*.stories.@(js|jsx|ts|tsx|svelte)'],
   addons: [
     '@storybook/addon-links',
     '@storybook/addon-essentials',
@@ -9,6 +9,13 @@ const config = {
   framework: {
     name: '@storybook/sveltekit',
     options: {}
+  },
+  viteFinal: async (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      $lib: '/src/lib'
+    };
+    return config;
   }
 };
 

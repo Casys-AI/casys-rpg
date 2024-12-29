@@ -5,11 +5,14 @@
   let mounted = false;
 
   onMount(() => {
-    checked = document.documentElement.classList.contains('dark');
-    mounted = true;
+    if (typeof document !== 'undefined') {
+      checked = document.documentElement.classList.contains('dark');
+      mounted = true;
+    }
   });
 
   function toggleTheme() {
+    if (typeof document === 'undefined') return;
     checked = !checked;
     if (checked) {
       document.documentElement.classList.add('dark');
@@ -29,7 +32,7 @@
   />
   <label
     for="themeToggle"
-    class="button absolute w-full h-full rounded-full border-4 border-game-toggle-darker bg-transparent bg-toggle-gradient box-border shadow-toggle flex items-center justify-center {checked ? 'checked' : ''}"
+    class="button absolute w-full h-full rounded-full border-4 border-game-toggle-darker bg-transparent bg-toggle-gradient-new shadow-toggle flex items-center justify-center {checked ? 'checked' : ''}"
   >
     <span class="icon w-[60px] h-[60px] inline-block">
       {#if mounted}
@@ -53,7 +56,7 @@
 
 <style>
   .button::before {
-    @apply absolute content-[''] w-[116px] h-[116px] rounded-full bg-transparent bg-toggle-outer -z-10 shadow-toggle-outer;
+    @apply absolute content-[''] w-[116px] h-[116px] rounded-full bg-transparent bg-toggle-outer-new -z-10 shadow-toggle-outer;
   }
 
   .button.checked {
