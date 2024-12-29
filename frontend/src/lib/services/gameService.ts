@@ -2,7 +2,7 @@ import type { GameState, GameResponse } from '$lib/types/game';
 import { browser } from '$app/environment';
 import { gameSession, gameState, gameChoices, type Choice } from '$lib/stores/gameStore';
 import { WebSocketService, type ConnectionStatus } from './websocketService';
-import { writable, type Writable } from 'svelte/store';
+import { writable, type Writable, get } from 'svelte/store';
 
 class GameService {
     private wsService: WebSocketService | null = null;
@@ -42,16 +42,20 @@ class GameService {
             if (data.success) {
                 if (browser) {
                     // D'abord effacer la session existante et les états
+                    console.log('🔄 Resetting game session and state...');
                     gameSession.clearSession();
                     gameState.reset();
                     gameChoices.reset();
                     
                     // Stocker les nouveaux IDs
+                    console.log('💾 Storing new session:', data.state.session_id, data.state.game_id);
                     gameSession.setSession(data.state.session_id, data.state.game_id);
                     // Mettre à jour l'état du jeu
+                    console.log('🔄 Updating game state:', data.state);
                     gameState.setState(data.state);
                     // Mettre à jour les choix si présents
                     if (data.state.choices) {
+                        console.log('🎲 Setting choices:', data.state.choices);
                         gameChoices.setAvailableChoices(data.state.choices);
                     }
                     await this.connectWebSocket();
@@ -97,14 +101,12 @@ class GameService {
         console.log('🎲 Getting game state...');
         try {
             // Récupérer le game_id du store
-            let currentGameId: string | null = null;
-            gameSession.subscribe(session => {
-                currentGameId = session.gameId;
-            })();
+            let currentSession = get(gameSession);
+            let currentGameId = currentSession.gameId;
 
             // Si pas de game_id, retourner une erreur
             if (!currentGameId) {
-                console.log('❌ No game ID found');
+                console.log('❌ No game ID found in session:', currentSession);
                 return {
                     success: false,
                     message: 'No game ID found',
@@ -118,46 +120,24 @@ class GameService {
                 credentials: 'include'
             });
             
-            if (response.status === 401) {
-                console.log('❌ No session found');
-                gameState.reset();
-                gameChoices.reset();
-                return {
-                    success: false,
-                    message: 'No session found',
-                    session_id: null,
-                    game_id: null,
-                    state: {}
-                };
-            }
-
             const data = await response.json();
             console.log('📥 Got game state:', data);
             
-            // Mettre à jour le store avec le nouvel état
-            if (data.success) {
+            if (!response.ok) {
+                throw new Error(data.detail?.[0]?.msg || data.message || 'Server error');
+            }
+
+            if (data.success && browser) {
                 gameState.setState(data.state);
-                // Mettre à jour les choix si présents
                 if (data.state.choices) {
                     gameChoices.setAvailableChoices(data.state.choices);
                 }
             }
-            
-            return {
-                ...data,
-                success: true
-            };
+
+            return data;
         } catch (error) {
-            console.error('❌ Failed to get game state:', error);
-            gameState.reset();
-            gameChoices.reset();
-            return {
-                success: false,
-                message: error instanceof Error ? error.message : 'Failed to get game state',
-                session_id: null,
-                game_id: null,
-                state: {}
-            };
+            console.error('❌ Error getting game state:', error);
+            throw error;
         }
     }
 
@@ -216,6 +196,21 @@ class GameService {
             throw error;
         } finally {
             // Toujours effacer les cookies et l'état même si le reset échoue
+            gameSession.clearSession();
+            gameState.reset();
+            gameChoices.reset();
+        }
+    }
+
+    async clearSession(): Promise<void> {
+        console.log('🧹 Nettoyage de la session...');
+        
+        if (browser) {
+            // Déconnecter le WebSocket
+            this.disconnect();
+            
+            // Effacer la session et les états
+            console.log('🔄 Réinitialisation des stores...');
             gameSession.clearSession();
             gameState.reset();
             gameChoices.reset();

@@ -10,6 +10,7 @@ export class WebSocketService {
   private maxReconnectAttempts: number = 5;
   private reconnectAttempts: number = 0;
   private heartbeatInterval: number | null = null;
+  private maxReconnectDelay: number = 30000;
 
   // Store pour l'état de la connexion
   public connectionStatus: Writable<ConnectionStatus> = writable('disconnected');
@@ -21,18 +22,18 @@ export class WebSocketService {
   }
 
   private connect(): void {
-    console.log(' Connecting to WebSocket...', this.wsUrl);
+    console.log('🔌 Connecting to WebSocket...', this.wsUrl);
     this.connectionStatus.set('connecting');
 
     this.ws = new WebSocket(this.wsUrl);
-    this.ws.onopen = () => this.onopen();
-    this.ws.onmessage = (event) => this.onmessage(event);
-    this.ws.onclose = () => this.onclose();
-    this.ws.onerror = (error) => this.onerror(error);
+    this.ws.onopen = this.onopen.bind(this);
+    this.ws.onmessage = this.onmessage.bind(this);
+    this.ws.onclose = this.onclose.bind(this);
+    this.ws.onerror = this.onerror.bind(this);
   }
 
   private onopen(): void {
-    console.log(' WebSocket connected');
+    console.log('🔌 WebSocket connected');
     this.connectionStatus.set('connected');
     this.reconnectAttempts = 0;
     this.startHeartbeat();
@@ -44,11 +45,11 @@ export class WebSocketService {
       
       // Gérer le heartbeat
       if (data.type === 'pong') {
-        console.log(' Heartbeat received');
+        console.log('❤️ Heartbeat received');
         return;
       }
 
-      console.log(' Received message:', data);
+      console.log('📥 Received message:', data);
       this.messageHandlers.forEach(handler => handler(data));
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
@@ -56,26 +57,26 @@ export class WebSocketService {
   }
 
   private onclose(): void {
-    console.log(' WebSocket disconnected');
+    console.log('🔌 WebSocket disconnected');
     this.connectionStatus.set('disconnected');
     this.stopHeartbeat();
     this.handleReconnect();
   }
 
   private onerror(error: Event): void {
-    console.error(' WebSocket error:', error);
+    console.error('❌ WebSocket error:', error);
     this.connectionStatus.set('error');
   }
 
   private handleReconnect(): void {
     if (!browser) return; // Ne pas tenter de reconnexion côté serveur
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(' Max reconnection attempts reached');
+      console.error('🔌 Max reconnection attempts reached');
       return;
     }
 
-    const timeout = this.reconnectTimeout * Math.pow(2, this.reconnectAttempts);
-    console.log(` Attempting to reconnect in ${timeout}ms (attempt ${this.reconnectAttempts + 1})`);
+    const timeout = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay);
+    console.log(`🔄 Attempting to reconnect in ${timeout}ms (attempt ${this.reconnectAttempts + 1})`);
 
     setTimeout(() => {
       this.reconnectAttempts++;
@@ -85,12 +86,12 @@ export class WebSocketService {
 
   private startHeartbeat(): void {
     if (!browser) return; // Ne pas démarrer le heartbeat côté serveur
-    console.log(' Starting heartbeat');
+    console.log('❤️ Starting heartbeat');
     this.stopHeartbeat();
     
     this.heartbeatInterval = window.setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        console.log(' Sending heartbeat');
+        console.log('❤️ Sending heartbeat');
         this.send({ type: 'ping' });
       }
     }, 30000); // Ping toutes les 30 secondes
@@ -98,19 +99,19 @@ export class WebSocketService {
 
   private stopHeartbeat(): void {
     if (this.heartbeatInterval) {
-      console.log(' Stopping heartbeat');
+      console.log('❤️ Stopping heartbeat');
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
   }
 
-  async send(data: any): Promise<void> {
+  send(data: any): void {
     if (!browser) return; // Ne pas envoyer de messages côté serveur
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
     }
 
-    console.log(' Sending message:', data);
+    console.log('📤 Sending message:', data);
     this.ws.send(JSON.stringify(data));
   }
 
