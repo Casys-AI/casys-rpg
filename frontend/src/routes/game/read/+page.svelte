@@ -169,10 +169,10 @@
         {/if}
 
         <!-- Contenu principal -->
-        <div class="flex-1 p-2 sm:p-4">
-            <div class="max-w-4xl mx-auto">
+        <main class="flex-1">
+            <div class="max-w-4xl mx-auto p-4 pb-40">
                 <!-- Narrative Content -->
-                <div class="bg-game-surface/50 rounded-2xl p-2 sm:p-4">
+                <div class="bg-game-surface/50 rounded-2xl p-4">
                     <div class="prose prose-lg prose-game max-w-none">
                         {#if gameState.narrative}
                             <div class="font-serif text-game-text text-justify leading-relaxed whitespace-pre-wrap">
@@ -181,23 +181,23 @@
                         {/if}
                     </div>
                 </div>
-
-                <!-- Choices -->
-                {#if gameState.rules?.choices}
-                    <div class="fixed bottom-0 left-0 right-0 bg-game-surface/95 backdrop-blur-sm shadow-neu-up p-4">
-                        <div class="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 justify-center">
-                            {#each gameState.rules.choices as choice}
-                                <button
-                                    on:click={() => handleChoice(choice)}
-                                    class="transform rounded-xl bg-game-background px-6 py-3 text-lg font-serif font-medium text-game-primary shadow-neu-flat hover:bg-opacity-95 active:shadow-neu-pressed transition-all duration-300 focus:outline-none"
-                                >
-                                    {choice.text}
-                                </button>
-                            {/each}
-                        </div>
-                    </div>
-                {/if}
             </div>
-        </div>
+        </main>
+
+        <!-- Choices -->
+        {#if gameState.rules?.choices}
+            <div class="fixed bottom-0 left-0 right-0 bg-game-surface/95 backdrop-blur-sm shadow-neu-up p-4 z-50">
+                <div class="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 justify-center">
+                    {#each gameState.rules.choices as choice}
+                        <button
+                            on:click={() => handleChoice(choice)}
+                            class="transform rounded-xl bg-game-background px-6 py-3 text-lg font-serif font-medium text-game-primary shadow-neu-flat hover:bg-opacity-95 active:shadow-neu-pressed transition-all duration-300 focus:outline-none"
+                        >
+                            {choice.text}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        {/if}
     </div>
 {/if}

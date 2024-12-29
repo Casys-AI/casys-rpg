@@ -52,3 +52,4 @@ build/
 *.pdf
 .DS_Store
 Thumbs.db
+logs/debug.log
