@@ -9,6 +9,7 @@ from managers.dependencies import get_agent_manager
 from api.utils.serialization_utils import from_game_state, _json_serial
 import json
 from loguru import logger
+from api.dto.request_dto import ChoiceRequest
 
 game_router_ws = APIRouter()  # Enlever le préfixe /api pour les WebSockets
 
@@ -18,8 +19,14 @@ class GameWSConnectionManager:
         self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+        """Connect and initialize a WebSocket connection."""
+        try:
+            await websocket.accept()
+            self.active_connections.append(websocket)
+            return True
+        except Exception as e:
+            logger.error(f"Error accepting WebSocket connection: {e}")
+            return False
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -61,11 +68,16 @@ async def game_websocket_endpoint(
     - Heartbeat (ping/pong)
     """
     logger.info("New WebSocket connection attempt")
+    
+    # Étape 1: Accepter la connexion
+    if not await ws_manager.connect(websocket):
+        logger.error("Failed to establish WebSocket connection")
+        return
+    
     try:
-        await ws_manager.connect(websocket)
         logger.info("WebSocket connection established")
         
-        # Envoyer l'état initial
+        # Étape 2: Envoyer l'état initial
         try:
             initial_state = await agent_mgr.get_state()
             if initial_state:
@@ -107,15 +119,23 @@ async def game_websocket_endpoint(
                 elif data.get("type") == "choice":
                     logger.info("Processing user choice")
                     try:
-                        choice = data.get("choice")
+                        choice_data = data.get("choice")
                         logger.debug(f"Received choice data: {data}")
-                        if not choice:
+                        if not choice_data:
                             raise ValueError("No choice provided")
                             
+                        # Valider le choix avec le DTO
+                        choice_request = ChoiceRequest(
+                            game_id=choice_data.get("game_id", ""),
+                            choice_id=choice_data.get("choice_id", ""),
+                            choice_text=choice_data.get("choice_text", ""),
+                            metadata=choice_data.get("metadata", {})
+                        )
+                        
                         # Process le choix avec process_game_state
-                        logger.info(f"Processing choice: {choice}")
+                        logger.info(f"Processing choice: {choice_request}")
                         new_state = await agent_mgr.process_game_state(
-                            user_input=choice
+                            user_input=choice_request.choice_text
                         )
                         
                         if new_state:

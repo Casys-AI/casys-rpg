@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { writable, get, type Writable } from 'svelte/store';
 import type { Choice } from '$lib/types/game';
+import { gameState } from '$lib/stores/gameStore';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -135,13 +136,25 @@ export class WebSocketService {
       throw new Error('WebSocket not connected');
     }
 
+    const currentGameState = get(gameState);
+    if (!currentGameState?.game_id) {
+      throw new Error('No game ID available');
+    }
+
     console.log('📤 Sending choice:', choice);
     const message = {
       type: 'choice',
       choice: {
-        ...choice,
+        game_id: currentGameState.game_id,
         choice_id: String(choice.target_section),
-        choice_text: choice.text
+        choice_text: choice.text,
+        metadata: {
+          type: choice.type,
+          target_section: choice.target_section,
+          conditions: choice.conditions,
+          dice_type: choice.dice_type,
+          dice_results: choice.dice_results
+        }
       }
     };
 

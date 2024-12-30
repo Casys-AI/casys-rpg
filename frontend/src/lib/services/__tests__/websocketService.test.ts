@@ -1,14 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { WebSocketService } from '../websocketService';
-import { browser } from '$app/environment';
 import type { Choice } from '$lib/types/game';
 
-// Mock browser et window
+// Mock browser
 vi.mock('$app/environment', () => ({
-  browser: false
+  browser: true
 }));
 
-// Mock global window
+// Mock gameState with factory function
+vi.mock('$lib/stores/gameStore', () => {
+  const { writable } = require('svelte/store');
+  const store = writable({
+    game_id: null,
+    session_id: null,
+    state: null,
+    message: null
+  });
+  return { gameState: store };
+});
+
+// Import after mocks
+import { writable, get } from 'svelte/store';
+import { WebSocketService } from '../websocketService';
+import { gameState } from '$lib/stores/gameStore';
+
+// Mock window
 global.window = {
   setInterval: vi.fn(),
   clearInterval: vi.fn()
@@ -17,7 +32,7 @@ global.window = {
 describe('WebSocketService', () => {
   let wsService: WebSocketService;
   let mockWs: any;
-  
+
   beforeEach(() => {
     // Reset les mocks
     vi.clearAllMocks();
@@ -47,7 +62,7 @@ describe('WebSocketService', () => {
       
       // Simuler une connexion réussie
       mockWs.onopen();
-      expect(wsService.getConnectionStatus()).toBe('connected');
+      expect(get(wsService.connectionStatus)).toBe('connected');
     });
 
     it('should handle connection errors', async () => {
@@ -55,14 +70,24 @@ describe('WebSocketService', () => {
       
       // Simuler une erreur
       mockWs.onerror(new Error('Connection failed'));
-      expect(wsService.getConnectionStatus()).toBe('error');
+      expect(get(wsService.connectionStatus)).toBe('error');
     });
   });
 
   describe('sendChoice', () => {
     it('should format and send choice correctly', async () => {
+      // Connecter d'abord le WebSocket
       wsService.connect();
       mockWs.onopen();
+      expect(get(wsService.connectionStatus)).toBe('connected');
+
+      // Set game state
+      gameState.set({
+        game_id: 'test-game-id',
+        session_id: 'test-session',
+        state: null,
+        message: null
+      });
 
       const testChoice: Choice = {
         text: 'Test choice',
@@ -79,21 +104,24 @@ describe('WebSocketService', () => {
         JSON.stringify({
           type: 'choice',
           choice: {
-            ...testChoice,
+            game_id: 'test-game-id',
             choice_id: '1',
-            choice_text: 'Test choice'
+            choice_text: 'Test choice',
+            metadata: {
+              type: 'direct',
+              target_section: 1,
+              conditions: [],
+              dice_type: 'none',
+              dice_results: {}
+            }
           }
         })
       );
     });
 
     it('should handle disconnected state', async () => {
-      wsService.connect();
-      
-      // Simuler une déconnexion
-      mockWs.readyState = WebSocket.CLOSED;
       wsService.connectionStatus.set('disconnected');
-      
+
       const testChoice: Choice = {
         text: 'test',
         type: 'direct',
@@ -107,6 +135,34 @@ describe('WebSocketService', () => {
         .rejects
         .toThrow('WebSocket not connected');
     });
+
+    it('should handle missing game ID', async () => {
+      // Connecter d'abord le WebSocket
+      wsService.connect();
+      mockWs.onopen();
+      expect(get(wsService.connectionStatus)).toBe('connected');
+
+      // Set empty game state
+      gameState.set({
+        game_id: null,
+        session_id: null,
+        state: null,
+        message: null
+      });
+
+      const testChoice: Choice = {
+        text: 'test',
+        type: 'direct',
+        target_section: 1,
+        conditions: [],
+        dice_type: 'none',
+        dice_results: {}
+      };
+
+      await expect(wsService.sendChoice(testChoice))
+        .rejects
+        .toThrow('No game ID available');
+    });
   });
 
   describe('disconnect', () => {
@@ -116,7 +172,7 @@ describe('WebSocketService', () => {
       
       await wsService.disconnect();
       expect(mockWs.close).toHaveBeenCalled();
-      expect(wsService.getConnectionStatus()).toBe('disconnected');
+      expect(get(wsService.connectionStatus)).toBe('disconnected');
     });
   });
 
