@@ -4,6 +4,7 @@ from datetime import datetime
 from models.game_state import GameState, GameStateInput, GameStateOutput, first_not_none
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, SourceType as RulesSourceType
+from models.decision_model import DecisionModel
 
 def test_first_not_none_function():
     """Test the first_not_none function behavior."""
@@ -75,6 +76,56 @@ def test_section_number_sync():
     game_state.sync_section_numbers()
     assert game_state.narrative.section_number == 2
     assert game_state.rules.section_number == 2
+
+    # Test basic sync
+    game_state = GameState(
+        session_id="test_session",
+        game_id="test_game",
+        section_number=1,
+        narrative=NarratorModel(section_number=1),
+        rules=RulesModel(section_number=1),
+        source=RulesSourceType.RAW
+    )
+    assert game_state.narrative.section_number == 1
+    assert game_state.rules.section_number == 1
+    
+    # Test sync avec DecisionModel
+    decision = DecisionModel(
+        section_number=1,
+        next_section=2
+    )
+    updated_state = GameState(
+        session_id="test_session",
+        game_id="test_game",
+        section_number=1,
+        narrative=NarratorModel(section_number=1),
+        rules=RulesModel(section_number=1),
+        decision=decision,
+        source=RulesSourceType.RAW
+    )
+    
+    # Vérifier que next_section est devenu section_number
+    assert updated_state.section_number == 2
+    assert updated_state.narrative.section_number == 2
+    assert updated_state.rules.section_number == 2
+    assert updated_state.decision.section_number == 2
+
+    # Test sync avec dict
+    dict_state = GameState(
+        session_id="test_session",
+        game_id="test_game",
+        section_number=1,
+        narrative={"section_number": 1},
+        rules={"section_number": 1},
+        decision={"section_number": 1, "next_section": 3},
+        source=RulesSourceType.RAW
+    )
+    
+    # Vérifier que next_section est devenu section_number même avec un dict
+    assert dict_state.section_number == 3
+    assert dict_state.narrative.section_number == 3
+    assert dict_state.rules.section_number == 3
+    assert dict_state.decision.section_number == 3
 
 def test_state_conversion():
     """Test state conversion methods."""

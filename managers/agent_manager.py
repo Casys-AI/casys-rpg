@@ -165,13 +165,22 @@ class AgentManager:
             
             # Préparer les données d'entrée avec la mise à jour de l'utilisateur
             input_data = state.with_updates(player_input=user_input)
+            state_dict = input_data.model_dump()
             
             # Ajouter la configuration du thread
             thread_config = {"configurable": {"thread_id": str(state.session_id)}}
             
             # Exécuter le workflow
-            async for result in workflow.astream(input_data.model_dump(), thread_config):
+            async for result in workflow.astream(state_dict, thread_config):
                 if isinstance(result, dict):
+                    # Préserver les IDs
+                    result["session_id"] = state.session_id
+                    result["game_id"] = state.game_id
+                    
+                    # Utiliser next_section comme nouveau section_number si présent
+                    if "decision" in result and result["decision"] and "next_section" in result["decision"]:
+                        result["section_number"] = result["decision"]["next_section"]
+                    
                     new_state = GameState(**result)
                     await self.managers.state_manager.save_state(new_state)
                     logger.info("Game state processed successfully")
