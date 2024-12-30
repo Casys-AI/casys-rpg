@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WebSocketService } from '../websocketService';
 import { browser } from '$app/environment';
+import type { Choice } from '$lib/types/game';
 
 // Mock browser et window
 vi.mock('$app/environment', () => ({
@@ -63,18 +64,25 @@ describe('WebSocketService', () => {
       wsService.connect();
       mockWs.onopen();
 
-      const mockChoice = {
+      const testChoice: Choice = {
         text: 'Test choice',
         type: 'direct',
-        target_section: 1
+        target_section: 1,
+        conditions: [],
+        dice_type: 'none',
+        dice_results: {}
       };
 
-      await wsService.sendChoice(mockChoice);
+      await wsService.sendChoice(testChoice);
 
       expect(mockWs.send).toHaveBeenCalledWith(
         JSON.stringify({
           type: 'choice',
-          choice: mockChoice.text
+          choice: {
+            ...testChoice,
+            choice_id: '1',
+            choice_text: 'Test choice'
+          }
         })
       );
     });
@@ -86,7 +94,16 @@ describe('WebSocketService', () => {
       mockWs.readyState = WebSocket.CLOSED;
       wsService.connectionStatus.set('disconnected');
       
-      await expect(wsService.sendChoice({ text: 'test' }))
+      const testChoice: Choice = {
+        text: 'test',
+        type: 'direct',
+        target_section: 1,
+        conditions: [],
+        dice_type: 'none',
+        dice_results: {}
+      };
+
+      await expect(wsService.sendChoice(testChoice))
         .rejects
         .toThrow('WebSocket not connected');
     });
