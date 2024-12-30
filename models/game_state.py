@@ -36,7 +36,7 @@ class GameStateBase(BaseModel):
 class GameStateInput(GameStateBase):
     """Input state for the game workflow."""
     section_number: Annotated[int, take_last_value] = Field(default=1)  # Premier cycle par défaut
-    player_input: Optional[str] = None
+    player_input: Annotated[Optional[str], take_last_value] = None
     content: Optional[str] = None
 
     @field_validator('section_number')
