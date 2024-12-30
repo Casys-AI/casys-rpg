@@ -33,15 +33,23 @@
         console.log("🎮 Initialisation de la page de lecture");
         
         try {
-            // Si pas d'état initial, initialiser le jeu
+            // Si pas d'état, on essaie de le récupérer
             if (!gameState) {
-                console.log('🎲 Pas d\'état initial, initialisation du jeu...');
-                const initResponse = await gameService.initialize();
-                if (initResponse.success) {
-                    console.log('✅ Jeu initialisé avec succès');
-                    gameState = initResponse.state;
-                } else {
-                    throw new Error(initResponse.message || 'Échec de l\'initialisation');
+                console.log('🎲 Tentative de récupération de l\'état du jeu...');
+                try {
+                    const stateResponse = await gameService.getGameState();
+                    if (stateResponse.success) {
+                        console.log('✅ État du jeu récupéré avec succès');
+                        gameState = stateResponse.state;
+                    } else {
+                        throw new Error(stateResponse.message || 'État du jeu non trouvé');
+                    }
+                } catch (error) {
+                    console.error('❌ Erreur lors de la récupération de l\'état:', error);
+                    // Rediriger vers /game si l'état n'est pas trouvé
+                    await gameService.clearSession();
+                    await goto('/game');
+                    return;
                 }
             }
             
@@ -85,10 +93,9 @@
     async function handleChoice(choice: any) {
         try {
             console.log('🎮 Choice clicked:', choice);
-            await gameService.sendChoice(choice.text || choice);
+            await gameService.sendChoice(choice);
         } catch (error) {
             console.error('Error sending choice:', error);
-            // Afficher une erreur à l'utilisateur
             error = error instanceof Error ? error.message : 'Une erreur est survenue lors de l\'envoi du choix';
         }
     }

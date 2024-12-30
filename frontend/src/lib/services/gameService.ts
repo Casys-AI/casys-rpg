@@ -1,4 +1,4 @@
-import type { GameState, GameResponse } from '$lib/types/game';
+import type { GameState, GameResponse, GameStateResponse } from '$lib/types/game';
 import { browser } from '$app/environment';
 import { gameSession, gameState, gameChoices, type Choice } from '$lib/stores/gameStore';
 import { WebSocketService, type ConnectionStatus } from './websocketService';
@@ -97,47 +97,47 @@ class GameService {
         this.messageHandlers.forEach(handler => handler(data));
     }
 
-    async getGameState(): Promise<GameResponse> {
+    async getGameState(): Promise<GameStateResponse> {
         console.log('🎲 Getting game state...');
+
+        // Reset les stores
+        gameState.reset();
+        gameChoices.reset();
+
+        // Vérifier si on a un game_id
+        const session = get(gameSession);
+        if (!session.gameId) {
+          console.log('❌ No game ID found in session:', session);
+          return {
+            success: false,
+            message: 'No game ID found'
+          };
+        }
+
         try {
-            // Récupérer le game_id du store
-            let currentSession = get(gameSession);
-            let currentGameId = currentSession.gameId;
+          const response = await this.customFetch(`${this.API_BASE_URL}/state?game_id=${session.gameId}`, {
+            credentials: 'include'
+          });
+          const data = await response.json();
+          console.log('📥 Got game state:', data);
 
-            // Si pas de game_id, retourner une erreur
-            if (!currentGameId) {
-                console.log('❌ No game ID found in session:', currentSession);
-                return {
-                    success: false,
-                    message: 'No game ID found',
-                    session_id: null,
-                    game_id: null,
-                    state: {}
-                };
+          if (!response.ok) {
+            throw new Error(data.detail?.[0]?.msg || 'Failed to get game state');
+          }
+
+          // Mettre à jour les stores
+          if (data.state) {
+            console.log('🎲 Updating game state:', data.state);
+            gameState.setState(data.state);
+            if (data.state.choices) {
+              gameChoices.setAvailableChoices(data.state.choices);
             }
+          }
 
-            const response = await this.customFetch(`${this.API_BASE_URL}/state?game_id=${currentGameId}`, {
-                credentials: 'include'
-            });
-            
-            const data = await response.json();
-            console.log('📥 Got game state:', data);
-            
-            if (!response.ok) {
-                throw new Error(data.detail?.[0]?.msg || data.message || 'Server error');
-            }
-
-            if (data.success && browser) {
-                gameState.setState(data.state);
-                if (data.state.choices) {
-                    gameChoices.setAvailableChoices(data.state.choices);
-                }
-            }
-
-            return data;
+          return data;
         } catch (error) {
-            console.error('❌ Error getting game state:', error);
-            throw error;
+          console.error('❌ Error getting game state:', error);
+          throw error;
         }
     }
 
@@ -156,8 +156,8 @@ class GameService {
         // Mettre à jour le store avec le choix sélectionné
         gameChoices.selectChoice(choice);
         
-        // Envoyer le choix au serveur
-        await this.wsService.sendChoice(choice.text);
+        // Envoyer le choix complet au serveur
+        await this.wsService.sendChoice(choice);
     }
 
     onMessage(handler: (data: GameResponse) => void): () => void {
