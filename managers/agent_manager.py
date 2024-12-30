@@ -217,66 +217,72 @@ class AgentManager:
 
 
     async def process_game_state(self, state: Optional[GameState] = None, user_input: Optional[str] = None) -> GameState:
-        """Process game state through the workflow."""
         try:
             logger.info("Starting game state processing")
             
-            # Vérifier si le story graph est initialisé
             if not self.story_graph:
                 logger.error("Story graph not initialized")
                 raise GameError("Story graph not initialized")
-            
-            # Charger l'état actuel si aucun n'est fourni
+
+            # Charger l'état courant si nécessaire
             if not state:
-                logger.debug("No state provided, getting current state")
                 state = await self.get_state()
                 if not state:
-                    logger.error("No valid state available")
                     raise GameError("No valid state available")
-            
-            # Récupérer le workflow
+
             workflow = await self.get_story_workflow()
-            
-            # Préparer les données d'entrée avec la mise à jour de l'utilisateur
+
+            # Préparer les données
             input_data = state.with_updates(player_input=user_input)
             state_dict = input_data.model_dump()
-            
-            # Ajouter la configuration du thread
             thread_config = {"configurable": {"thread_id": str(state.session_id)}}
             
-            # Exécuter le workflow
-            async for result in workflow.astream(state_dict, thread_config):
-                if isinstance(result, dict):
-                    # Convertir next_section en section_number si présent
-                    if "decision" in result and result["decision"] and "next_section" in result["decision"]:
-                        logger.info("Updating section_number from {} to {}", 
-                                  state_dict["section_number"], 
-                                  result["decision"]["next_section"])
-                        state_dict["section_number"] = result["decision"]["next_section"]
-                        logger.info("Re-running workflow with new section_number")
-                        result = await workflow.ainvoke(state_dict, thread_config)
-                        logger.info("Workflow re-run completed with section {}", state_dict["section_number"])
-                    
-                    # Utiliser with_updates pour préserver l'état
+            # Appel unique avec `await` au lieu de `async for`
+            result = await workflow.ainvoke(state_dict, thread_config)
+
+            # Gérer le résultat
+            if isinstance(result, dict):
+                # Vérifier si on attend une action (dés ou input utilisateur)
+                if ("decision" in result and 
+                    result["decision"] and 
+                    "awaiting_action" in result["decision"]):
+                    logger.info("Waiting for action: {}", result["decision"]["awaiting_action"])
                     new_state = state.with_updates(**result)
                     await self.managers.state_manager.save_state(new_state)
-                    logger.info("Game state processed successfully")
+                    logger.info("Game state saved with awaiting_action")
                     return new_state
+
+                # Si on a next_section, on peut faire un second run
+                if ("decision" in result and 
+                    result["decision"] and 
+                    "next_section" in result["decision"] and
+                    result["decision"]["next_section"] is not None):
+                    next_section = result["decision"]["next_section"]
+                    logger.info("Decision found with next_section: {}", next_section)
+                    
+                    state_dict["section_number"] = next_section
+                    state_dict["decision"] = result["decision"]
+                    
+                    logger.info("Re-running workflow with section_number: {}", next_section)
+                    result = await workflow.ainvoke(state_dict, thread_config)
+                    logger.info("Workflow re-run completed")
+
+                new_state = state.with_updates(**result)
+                await self.managers.state_manager.save_state(new_state)
+                logger.info("Game state processed successfully")
+                return new_state
             
             logger.error("No valid result from workflow")
             raise GameError("No valid result")
-        
+
         except GraphInterrupt as gi:
             logger.info("Workflow interrupted: {}", gi)
-            # Gérer l'interruption si nécessaire
             raise gi
 
         except Exception as e:
             logger.error("Error processing game state: {}", str(e))
-            raise GameError(
-                f"Failed to process game state: {str(e)}",
-                original_exception=e
-            ) from e
+            raise GameError(f"Failed to process game state: {str(e)}") from e
+
 
     async def get_story_workflow(self) -> Any:
         """Get the compiled story workflow.

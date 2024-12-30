@@ -54,17 +54,7 @@ class WorkflowManager(WorkflowManagerProtocol):
             return await self.state_manager.create_error_state(str(e))
 
     async def start_workflow(self, input_data: Any) -> GameState:
-        """Start the workflow node.
-
-        Args:
-            input_data: Input state data (can be GameState or dict).
-
-        Returns:
-            GameState: Initial workflow state.
-
-        Raises:
-            WorkflowError: If input validation or state creation fails.
-        """
+        """Start the workflow node."""
         try:
             logger.info("Starting workflow node")
             logger.debug("Input data received: Type: {}, Value: {}", type(input_data), input_data)
@@ -83,24 +73,23 @@ class WorkflowManager(WorkflowManagerProtocol):
             else:
                 raise WorkflowError(f"Invalid input data type: {type(input_data)}. Expected GameState or dict.")
 
-            # Créer ou mettre à jour l'état avec with_updates
+            # Créer un nouvel état si nécessaire en utilisant l'opérateur +
             if not getattr(state, "session_id", None) or not getattr(state, "game_id", None):
                 logger.debug("Creating initial state with session_id and game_id")
                 initial_state = await self.state_manager.create_initial_state()
-                state = initial_state.with_updates(**state.model_dump())
-            logger.debug("Validated state session_id: {} and game_id: {}", state.session_id, state.game_id)
+                # Utiliser l'opérateur + pour fusionner les états
+                state = initial_state + state
+                logger.debug("State merged with initial state: session_id={}, game_id={}, section_number={}", 
+                           state.session_id, state.game_id, state.section_number)
 
-            # Mise à jour du section_number si next_section est présent dans la décision
-            if state.decision and state.decision.next_section is not None:
-                logger.debug("Found next_section in decision: {}", state.decision.next_section)
-                state = state.with_updates(section_number=state.decision.next_section)
-
-            # Sauvegarder l'état
+            # Ajouter les métadonnées du workflow
             state = state.with_updates(metadata={"node": "start"})
-            saved_state = await self.state_manager.save_state(state)
             
+            # Sauvegarder l'état
+            saved_state = await self.state_manager.save_state(state)
             logger.info("Successfully created and saved output with session_id: {} and section_number: {}", 
                        saved_state.session_id, saved_state.section_number)
+            
             return saved_state
 
         except Exception as e:

@@ -1,10 +1,16 @@
 """Models for the decision agent."""
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from models.rules_model import DiceType
 from models.trace_model import ActionType
+
+class NextActionType(str, Enum):
+    """Type of next action required."""
+    USER_FIRST = "user_first"
+    DICE_FIRST = "dice_first"
 
 class DiceResult(BaseModel):
     """Result of a dice roll."""
@@ -18,17 +24,30 @@ class DiceResult(BaseModel):
             raise ValueError("Dice value must be between 1 and 6")
         return v
 
+    class Config:
+        """Configuration for the model."""
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
 class AnalysisResult(BaseModel):
     """Result of decision analysis."""
     next_section: int
     conditions: List[str] = Field(default_factory=list)
     analysis: str = ""
+    error: Optional[str] = None
     
     @field_validator('next_section')
     def validate_next_section(cls, v):
         if v < 1:
             raise ValueError("Next section must be positive")
         return v
+
+    class Config:
+        """Configuration for the model."""
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 class DecisionModel(BaseModel):
     """A decision made in the game."""
@@ -38,6 +57,10 @@ class DecisionModel(BaseModel):
     awaiting_action: ActionType = ActionType.USER_INPUT
     conditions: List[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.now)
+    next_action: Optional[NextActionType] = Field(
+        default=None,
+        description="Order of actions ('user_first' or 'dice_first')"
+    )
     
     @field_validator('section_number')
     def validate_section_number(cls, v):
@@ -56,3 +79,9 @@ class DecisionModel(BaseModel):
         # Remove any duplicate conditions
         self.conditions = list(dict.fromkeys(self.conditions))
         return self
+
+    class Config:
+        """Configuration for the model."""
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
