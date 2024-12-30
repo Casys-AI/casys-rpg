@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { writable, get, type Writable } from 'svelte/store';
+import type { Choice } from '$lib/types/game';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -129,27 +130,27 @@ export class WebSocketService {
     await this.send({ action, ...data });
   }
 
-  public async sendChoice(choice: any): Promise<void> {
+  public async sendChoice(choice: Choice): Promise<void> {
+    if (!this.ws || get(this.connectionStatus) !== 'connected') {
+      throw new Error('WebSocket not connected');
+    }
+
     console.log('📤 Sending choice:', choice);
-    
-    return new Promise<void>((resolve, reject) => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        reject(new Error('WebSocket not connected'));
-        return;
+    const message = {
+      type: 'choice',
+      choice: {
+        ...choice,
+        choice_id: String(choice.target_section),
+        choice_text: choice.text
       }
-      
-      const message = {
-        type: 'choice',
-        choice: choice.text
-      };
-      
-      try {
-        this.ws.send(JSON.stringify(message));
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    });
+    };
+
+    try {
+      await this.ws.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('Error sending choice:', error);
+      throw error;
+    }
   }
 
   onMessage(handler: (data: any) => void): () => void {
