@@ -26,7 +26,9 @@ from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from langgraph.graph import StateGraph, END, START
 from langgraph.prebuilt import ToolExecutor
-from langgraph.types import interrupt
+from langgraph.types import Command, interrupt
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.errors import GraphInterrupt
 
 
 class StoryGraph(StoryGraphProtocol):
@@ -62,6 +64,7 @@ class StoryGraph(StoryGraphProtocol):
         
         self._graph = None
         self._current_section = 1
+        self._memory = None
 
     async def _setup_workflow(self) -> None:
         try:
@@ -172,7 +175,6 @@ class StoryGraph(StoryGraphProtocol):
 
 
 
-
     async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""
         try:
@@ -183,8 +185,9 @@ class StoryGraph(StoryGraphProtocol):
             # Si on a besoin d'une réponse utilisateur et qu'on n'en a pas
             if input_data.rules and input_data.rules.needs_user_response and not input_data.player_input:
                 logger.info("Waiting for user input in section {}", input_data.section_number)
-                return interrupt("Waiting for user input")
+                raise interrupt("Waiting for user input")
 
+            # Processus de décision
             if input_data.player_input:
                 logger.debug("Processing user input: {}", input_data.player_input)
                 async for result in self.decision_agent.ainvoke({"state": input_data}):
@@ -198,26 +201,22 @@ class StoryGraph(StoryGraphProtocol):
                                 section_number=input_data.section_number,
                                 error=decision.message
                             )
-                        
-                        # Vérifier que next_section est présent dans la décision
-                        # sauf si on attend une action (dés ou input utilisateur)
+
+                        # Validation de la décision
                         if (not hasattr(decision, 'next_section') or decision.next_section is None) and not hasattr(decision, 'awaiting_action'):
                             logger.error("Decision missing next_section")
-                            return GameState(
-                                session_id=input_data.session_id,
-                                game_id=input_data.game_id,
-                                section_number=input_data.section_number,
-                                error="Decision missing next section number"
-                            )
-                        
+                            raise DecisionError("Decision missing next_section or awaiting_action")
+
                         output = input_data.with_updates(decision=decision)
                         logger.debug("Decision processed: next_section={}", decision.next_section)
                         return output
 
-                raise GameError("No valid decision result")
-
             logger.debug("No user input to process")
             return input_data
+
+        except GraphInterrupt as gi:
+            logger.info("Workflow interrupted for user input: {}", gi)
+            raise gi  # Propager l'interruption
 
         except Exception as e:
             logger.exception("Error in decision processing: {}", str(e))
@@ -227,6 +226,8 @@ class StoryGraph(StoryGraphProtocol):
                 section_number=input_data.section_number,
                 error=str(e)
             )
+
+
 
 
     async def _process_trace(self, input_data: GameState) -> GameState:
@@ -267,6 +268,7 @@ class StoryGraph(StoryGraphProtocol):
         Returns:
             Any: Compiled workflow graph ready for execution
         """
+        self._memory = MemorySaver()
         if not self._graph:
             await self._setup_workflow()
-        return self._graph.compile()
+        return self._graph.compile(checkpointer=self._memory)
