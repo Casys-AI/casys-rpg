@@ -178,6 +178,11 @@ class StoryGraph(StoryGraphProtocol):
     async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""
         try:
+            logger.info("Processing decision for section {}", input_data.section_number)
+            
+            if not input_data:
+                raise GameError("No input data available for decision processing")
+
             if not self.decision_agent:
                 logger.debug("No decision agent available, returning input state")
                 return input_data
@@ -207,8 +212,10 @@ class StoryGraph(StoryGraphProtocol):
                             logger.error("Decision missing next_section")
                             raise DecisionError("Decision missing next_section or awaiting_action")
 
+                        logger.info("Decision processed: current_section={}, next_section={}", 
+                                  input_data.section_number, decision.next_section)
+                        
                         output = input_data.with_updates(decision=decision)
-                        logger.debug("Decision processed: next_section={}", decision.next_section)
                         return output
 
             logger.debug("No user input to process")
@@ -219,7 +226,7 @@ class StoryGraph(StoryGraphProtocol):
             raise gi  # Propager l'interruption
 
         except Exception as e:
-            logger.exception("Error in decision processing: {}", str(e))
+            logger.exception("Error processing decision: {}", str(e))
             return GameState(
                 session_id=input_data.session_id,
                 game_id=input_data.game_id,

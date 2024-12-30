@@ -342,10 +342,10 @@ class StateManager(StateManagerProtocol):
             params = {
                 'section_number': 1,
                 'session_id': session_id,
-                'game_id': self._game_id,  # Ajout du game_id
+                'game_id': self._game_id, 
                 'last_update': self.get_current_timestamp(),
                 'character_id': "current",
-                **init_params  # Ajouter tout paramètre supplémentaire
+                **init_params  #useful?
             }
 
             # Créer l'état initial

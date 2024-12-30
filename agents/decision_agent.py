@@ -98,18 +98,12 @@ class DecisionAgent(BaseAgent):
         rules: RulesModel,
         section_number: int
     ) -> Union[DecisionModel, DecisionError]:
-        """Process a player decision.
-        
-        Args:
-            player_input: Input from the player
-            rules: Current rules model
-            section_number: Current section number
-            
-        Returns:
-            Union[DecisionModel, DecisionError]: Processed decision or error
-        """
+        """Process a player decision."""
         try:
+            self._logger.info("Processing decision for section {} with input: {}", section_number, player_input)
+            
             if not rules:
+                self._logger.error("No rules found for section {}", section_number)
                 return DecisionModel(
                     section_number=section_number,
                     error=f"Règles non trouvées pour la section {section_number}"
@@ -117,10 +111,12 @@ class DecisionAgent(BaseAgent):
 
             # Vérifier si on a besoin d'un jet de dés
             needs_dice = rules.needs_dice
-            next_action = rules.next_action  # Optionnel: force l'ordre ("user_first", "dice_first")
+            next_action = rules.next_action
+            self._logger.debug("Rules state: needs_dice={}, next_action={}", needs_dice, next_action)
 
             # Si un ordre est spécifié
             if next_action == "user_first" and not player_input:
+                self._logger.info("Waiting for user input first")
                 return DecisionModel(
                     section_number=section_number,
                     awaiting_action="user_response",
@@ -128,6 +124,7 @@ class DecisionAgent(BaseAgent):
                     analysis="En attente de la réponse de l'utilisateur"
                 )
             elif next_action == "dice_first":
+                self._logger.info("Waiting for dice roll first")
                 return DecisionModel(
                     section_number=section_number,
                     awaiting_action="dice_roll",
@@ -136,8 +133,8 @@ class DecisionAgent(BaseAgent):
                 )
 
             # Sinon vérifier ce qui manque
-            # Vérifier d'abord les dés car c'est plus prioritaire
             if needs_dice:
+                self._logger.info("Dice roll needed")
                 return DecisionModel(
                     section_number=section_number,
                     awaiting_action="dice_roll",
@@ -146,11 +143,15 @@ class DecisionAgent(BaseAgent):
                 )
 
             # Analyser la réponse utilisateur
+            self._logger.info("Analyzing user response")
             analysis_result = await self.analyze_response(
                 section_number,
                 player_input,
                 rules.model_dump()
             )
+
+            self._logger.info("Analysis complete: current_section={}, next_section={}", 
+                          section_number, analysis_result.next_section)
 
             return DecisionModel(
                 section_number=section_number,
@@ -160,15 +161,15 @@ class DecisionAgent(BaseAgent):
             )
 
         except Exception as e:
-            self._logger.exception("Error analyzing decision: {}", str(e))
+            self._logger.exception("Error in decision processing: {}", str(e))
             return DecisionError(str(e))
 
     async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict[str, Any], None]:
         """Async invocation for decision processing."""
         try:
             state = GameState.model_validate(input_data.get("state", {}))
-            self._logger.debug("Processing decision for state: session={}, section={}", 
-                        state.session_id, state.section_number)
+            self._logger.info("Starting decision processing: session={}, section={}, input={}", 
+                         state.session_id, state.section_number, state.player_input)
             
             # Process decision
             decision = await self._process_decision(
@@ -178,7 +179,7 @@ class DecisionAgent(BaseAgent):
             )
             
             if isinstance(decision, DecisionError):
-                self._logger.error("Error processing decision: {}", decision.message)
+                self._logger.error("Decision processing error: {}", decision.message)
                 error_decision = DecisionModel(
                     section_number=state.section_number,
                     next_section=state.section_number,  
@@ -187,7 +188,8 @@ class DecisionAgent(BaseAgent):
                 )
                 yield {"decision": error_decision}
             else:
-                self._logger.debug("Decision processed successfully")
+                self._logger.info("Decision processed successfully: next_section={}", 
+                             getattr(decision, 'next_section', None))
                 yield {"decision": decision}
                 
         except Exception as e:
