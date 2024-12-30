@@ -83,36 +83,29 @@ class WorkflowManager(WorkflowManagerProtocol):
             else:
                 raise WorkflowError(f"Invalid input data type: {type(input_data)}. Expected GameState or dict.")
 
-            # Validation que le `session_id` et `game_id` sont présents dans l'état
+            # Créer ou mettre à jour l'état avec with_updates
             if not getattr(state, "session_id", None) or not getattr(state, "game_id", None):
                 logger.debug("Creating initial state with session_id and game_id")
-                state = await self.state_manager.create_initial_state()
+                initial_state = await self.state_manager.create_initial_state()
+                state = initial_state.with_updates(**state.model_dump())
             logger.debug("Validated state session_id: {} and game_id: {}", state.session_id, state.game_id)
 
             # Mise à jour du section_number si next_section est présent dans la décision
-            section_number = state.section_number
             if state.decision and state.decision.next_section is not None:
                 logger.debug("Found next_section in decision: {}", state.decision.next_section)
-                section_number = state.decision.next_section
+                state = state.with_updates(section_number=state.decision.next_section)
 
-            # Création de la sortie avec métadonnées et nouveau section_number
-            output = GameState(
-                session_id=state.session_id,
-                game_id=state.game_id,  # Ajout du game_id
-                section_number=section_number,
-                metadata={"node": "start"}
-            )
-
-            # Sauvegarder l'état ici
-            saved_state = await self.state_manager.save_state(output)
+            # Sauvegarder l'état
+            state = state.with_updates(metadata={"node": "start"})
+            saved_state = await self.state_manager.save_state(state)
             
             logger.info("Successfully created and saved output with session_id: {} and section_number: {}", 
                        saved_state.session_id, saved_state.section_number)
             return saved_state
 
         except Exception as e:
-            logger.error("Error during start_workflow: {}", str(e), exc_info=True)
-            raise WorkflowError(f"Failed to start workflow: {str(e)}")
+            logger.error("Error starting workflow. Input data: {}, Error: {}", input_data, str(e))
+            raise WorkflowError(str(e)) from e
 
     async def end_workflow(self, output_data: GameState) -> GameState:
         """End workflow node.
