@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { writable, type Writable } from 'svelte/store';
+import { writable, get, type Writable } from 'svelte/store';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -15,13 +15,13 @@ export class WebSocketService {
   // Store pour l'état de la connexion
   public connectionStatus: Writable<ConnectionStatus> = writable('disconnected');
 
-  constructor(private wsUrl: string) {
-    if (browser) {
+  constructor(private wsUrl: string, autoConnect: boolean = true) {
+    if (browser && autoConnect) {
       this.connect();
     }
   }
 
-  private connect(): void {
+  public connect(): void {
     console.log('🔌 Connecting to WebSocket...', this.wsUrl);
     this.connectionStatus.set('connecting');
 
@@ -85,56 +85,71 @@ export class WebSocketService {
   }
 
   private startHeartbeat(): void {
-    if (!browser) return; // Ne pas démarrer le heartbeat côté serveur
     console.log('❤️ Starting heartbeat');
     this.stopHeartbeat();
     
-    this.heartbeatInterval = window.setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        console.log('❤️ Sending heartbeat');
-        this.send({ type: 'ping' });
-      }
-    }, 30000); // Ping toutes les 30 secondes
+    // Vérifier si on est dans un environnement browser
+    if (browser) {
+      this.heartbeatInterval = window.setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          console.log('❤️ Sending heartbeat');
+          this.send({ type: 'ping' });
+        }
+      }, 30000); // 30 secondes
+    }
   }
 
   private stopHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      console.log('❤️ Stopping heartbeat');
-      clearInterval(this.heartbeatInterval);
+    if (browser && this.heartbeatInterval) {
+      window.clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
   }
 
-  send(data: any): void {
-    if (!browser) return; // Ne pas envoyer de messages côté serveur
+  public async disconnect(): Promise<void> {
+    if (this.ws) {
+      this.ws.close();
+      this.connectionStatus.set('disconnected');
+      
+      if (browser && this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+      }
+    }
+  }
+
+  private async send(message: any): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
     }
-
-    console.log('📤 Sending message:', data);
-    this.ws.send(JSON.stringify(data));
+    this.ws.send(JSON.stringify(message));
   }
 
-  async sendAction(action: string, data: any = {}): Promise<void> {
-    console.log(' Sending action:', { action, ...data });
+  public async sendAction(action: string, data: any = {}): Promise<void> {
     await this.send({ action, ...data });
   }
 
-  async sendChoice(choice: string): Promise<void> {
-    console.log(' Sending choice:', choice);
+  public async sendChoice(choice: any): Promise<void> {
+    console.log('📤 Sending choice:', choice);
     
-    // Attendre que la connexion soit établie
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log(' WebSocket not ready, connecting...');
-      this.connect();
-    }
-    
-    // Vérifier à nouveau l'état de la connexion
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket connection failed');
-    }
-    
-    await this.send({ type: 'choice', choice });
+    return new Promise<void>((resolve, reject) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        reject(new Error('WebSocket not connected'));
+        return;
+      }
+      
+      const message = {
+        type: 'choice',
+        choice: choice.text
+      };
+      
+      try {
+        this.ws.send(JSON.stringify(message));
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   onMessage(handler: (data: any) => void): () => void {
@@ -144,14 +159,7 @@ export class WebSocketService {
     };
   }
 
-  disconnect(): void {
-    if (!browser) return; // Ne pas déconnecter côté serveur
-    console.log(' Disconnecting WebSocket...');
-    this.stopHeartbeat();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.connectionStatus.set('disconnected');
+  public getConnectionStatus(): ConnectionStatus {
+    return get(this.connectionStatus);
   }
 }
