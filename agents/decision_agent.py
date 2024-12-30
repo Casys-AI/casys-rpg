@@ -181,7 +181,7 @@ class DecisionAgent(BaseAgent):
                 self._logger.error("Error processing decision: {}", decision.message)
                 error_decision = DecisionModel(
                     section_number=state.section_number,
-                    content="",
+                    next_section=state.section_number,  
                     error=decision.message,
                     timestamp=datetime.now()
                 )
@@ -194,7 +194,7 @@ class DecisionAgent(BaseAgent):
             self._logger.exception("Error in ainvoke: {}", str(e))
             error_decision = DecisionModel(
                 section_number=state.section_number,
-                content="",
+                next_section=state.section_number,  
                 error=str(e),
                 timestamp=datetime.now()
             )
