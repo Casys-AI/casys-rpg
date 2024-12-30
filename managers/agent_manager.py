@@ -57,6 +57,9 @@ from config.storage_config import StorageConfig
 
 import asyncio
 
+from langgraph.types import Command
+from langgraph.errors import GraphInterrupt
+
 _agent_manager = None
 
 def get_game_factory() -> GameFactory:
@@ -223,14 +226,25 @@ class AgentManager:
                 metadata={"node": "start"}
             )
             
-            # Execute workflow with preserved IDs
+            # Prepare state dict
             state_dict = input_data.model_dump()
-            state_dict["session_id"] = initial_state.session_id  # Préserver le session_id
-            state_dict["game_id"] = initial_state.game_id  # Préserver le game_id
-            result = await workflow.ainvoke(state_dict)
+            state_dict["session_id"] = initial_state.session_id
+            state_dict["game_id"] = initial_state.game_id
             
-            if isinstance(result, dict):
-                # Préserver les IDs du state initial
+            # Add thread_config for LangGraph
+            thread_config = {"configurable": {"thread_id": str(initial_state.session_id)}}
+
+            try:
+                # Execute workflow
+                result = await workflow.ainvoke(state_dict, thread_config)
+            except GraphInterrupt as gi:
+                logger.info("Workflow interrupted: {}", gi)
+                # Example of resuming workflow with user input
+                user_input = "Proceed to the next chapter"  # Replace with actual user input
+                result = await workflow.ainvoke(Command(resume=user_input), thread_config)
+            
+            # Validate and save result
+            if isinstance(result, dict) and "session_id" in result and "game_id" in result:
                 result["session_id"] = initial_state.session_id
                 result["game_id"] = initial_state.game_id
                 state = GameState(**result)
@@ -242,8 +256,9 @@ class AgentManager:
             raise GameError("Invalid workflow result")
             
         except Exception as e:
-            logger.error("Error initializing game: {}", str(e))
+            logger.error("Error initializing game. Input data: {}, Error: {}", state_dict, str(e))
             raise GameError(f"Failed to initialize game: {str(e)}")
+
 
     async def get_story_workflow(self) -> Any:
         """Get the compiled story workflow.
@@ -297,7 +312,17 @@ class AgentManager:
             raise
 
     async def should_continue(self, state: GameState) -> bool:
-        """Check if the game should continue."""
+        """Check if the game should continue.
+        
+        This method only checks for error conditions and end game.
+        The user input flow is handled by the StoryGraph workflow.
+        
+        Args:
+            state: Current game state
+            
+        Returns:
+            bool: True if game should continue, False if game should stop
+        """
         try:
             logger.debug("Checking game continuation for state: {}", state)
             
