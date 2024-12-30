@@ -26,6 +26,7 @@ from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from langgraph.graph import StateGraph, END, START
 from langgraph.prebuilt import ToolExecutor
+from langgraph.types import interrupt
 
 
 class StoryGraph(StoryGraphProtocol):
@@ -170,57 +171,60 @@ class StoryGraph(StoryGraphProtocol):
             )
 
 
-    async def _process_decision(
-        self,
-        state: GameState
-    ) -> GameState:
+
+
+    async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""
         try:
             if not self.decision_agent:
                 logger.debug("No decision agent available, returning input state")
-                return state
+                return input_data
 
-            if state.player_input:
-                logger.debug("Processing user input: {}", state.player_input)
-                async for result in self.decision_agent.ainvoke({"state": state}):
+            # Si on a besoin d'une réponse utilisateur et qu'on n'en a pas
+            if input_data.rules and input_data.rules.needs_user_response and not input_data.player_input:
+                logger.info("Waiting for user input in section {}", input_data.section_number)
+                return interrupt("Waiting for user input")
+
+            if input_data.player_input:
+                logger.debug("Processing user input: {}", input_data.player_input)
+                async for result in self.decision_agent.ainvoke({"state": input_data}):
                     if "decision" in result:
                         decision = result["decision"]
                         if isinstance(decision, DecisionError):
                             logger.error("Decision error: {}", decision.message)
                             return GameState(
-                                session_id=state.session_id,
-                                game_id=state.game_id,
-                                section_number=state.section_number,
+                                session_id=input_data.session_id,
+                                game_id=input_data.game_id,
+                                section_number=input_data.section_number,
                                 error=decision.message
                             )
                         
                         # Vérifier que next_section est présent dans la décision
-                        if not hasattr(decision, 'next_section') or decision.next_section is None:
+                        # sauf si on attend une action (dés ou input utilisateur)
+                        if (not hasattr(decision, 'next_section') or decision.next_section is None) and not hasattr(decision, 'awaiting_action'):
                             logger.error("Decision missing next_section")
                             return GameState(
-                                session_id=state.session_id,
-                                game_id=state.game_id,
-                                section_number=state.section_number,
+                                session_id=input_data.session_id,
+                                game_id=input_data.game_id,
+                                section_number=input_data.section_number,
                                 error="Decision missing next section number"
                             )
                         
-                        output = state.with_updates(decision=decision)
+                        output = input_data.with_updates(decision=decision)
                         logger.debug("Decision processed: next_section={}", decision.next_section)
                         return output
 
                 raise GameError("No valid decision result")
 
             logger.debug("No user input to process")
-            if state.rules and state.rules.needs_user_response:
-                logger.info(" En attente d'une réponse utilisateur pour la section {}", state.section_number)
-            return state
+            return input_data
 
         except Exception as e:
             logger.exception("Error in decision processing: {}", str(e))
             return GameState(
-                session_id=state.session_id,
-                game_id=state.game_id,
-                section_number=state.section_number,
+                session_id=input_data.session_id,
+                game_id=input_data.game_id,
+                section_number=input_data.section_number,
                 error=str(e)
             )
 
