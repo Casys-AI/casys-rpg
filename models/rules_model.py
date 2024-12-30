@@ -35,11 +35,25 @@ class Choice(BaseModel):
         description="Mapping of dice roll results to target sections"
     )
     
+    @field_validator('dice_type')
+    def validate_dice_type(cls, v: Optional[DiceType]) -> Optional[DiceType]:
+        """Convert dice_type to lowercase and validate."""
+        if isinstance(v, str):
+            return DiceType(v.lower())
+        return v
+    
     @model_validator(mode='after')
     def validate_choice_type(self) -> 'Choice':
         """Validate that the choice has the correct fields for its type."""
-        if self.type == ChoiceType.DIRECT and self.target_section is None:
-            raise ValueError("Direct choices must have a target section")
+        if self.type == ChoiceType.DIRECT:
+            if self.target_section is None:
+                raise ValueError("Direct choices must have a target section")
+            if self.dice_type not in (None, DiceType.NONE):
+                raise ValueError("Direct choices cannot have dice type other than none")
+            if self.conditions:
+                raise ValueError("Direct choices cannot have conditions")
+            if self.dice_results:
+                raise ValueError("Direct choices cannot have dice results")
         
         if self.type == ChoiceType.CONDITIONAL and not self.conditions:
             raise ValueError("Conditional choices must have conditions")
@@ -49,6 +63,8 @@ class Choice(BaseModel):
                 raise ValueError("Dice choices must have a dice type")
             if not self.dice_results:
                 raise ValueError("Dice choices must have dice results")
+            if self.dice_type == DiceType.NONE:
+                raise ValueError("Dice choices cannot have dice_type none")
                 
         if self.type == ChoiceType.MIXED:
             if not self.conditions:
@@ -57,6 +73,8 @@ class Choice(BaseModel):
                 raise ValueError("Mixed choices must have a dice type")
             if not self.dice_results:
                 raise ValueError("Mixed choices must have dice results")
+            if self.dice_type == DiceType.NONE:
+                raise ValueError("Mixed choices cannot have dice_type none")
                 
         return self
 
@@ -102,29 +120,42 @@ class RulesModel(BaseModel):
     @model_validator(mode='after')
     def validate_rules(self) -> 'RulesModel':
         """Validate the rules model for consistency."""
-        # Vérifier la cohérence des dés
+        # Vérifier si on a des choix qui nécessitent des dés
         has_dice_choice = any(
-            choice.dice_type is not None
+            choice.type in (ChoiceType.DICE, ChoiceType.MIXED)
             for choice in self.choices
         )
         
+        # Si on a des choix avec dés, on doit avoir needs_dice et un dice_type
         if has_dice_choice:
             self.needs_dice = True
-            
-        # Si on a besoin de dés, on doit avoir un type de dé
+            if self.dice_type == DiceType.NONE:
+                # Prendre le type de dé du premier choix qui en a un
+                self.dice_type = next(
+                    (choice.dice_type for choice in self.choices if choice.dice_type),
+                    DiceType.CHANCE  # Default to chance if no specific type
+                )
+        
+        # Si dice_type est none, needs_dice doit être false
+        if self.dice_type == DiceType.NONE:
+            self.needs_dice = False
+        
+        # Si on a besoin de dés, on doit avoir un type de dé non-none
         if self.needs_dice and self.dice_type == DiceType.NONE:
-            self.dice_type = next(
-                (choice.dice_type for choice in self.choices if choice.dice_type),
-                DiceType.CHANCE  # Default to chance if no specific type
-            )
+            raise ValueError("needs_dice cannot be True when dice_type is none")
             
         # Si on a des choix, on a besoin d'une réponse utilisateur
         if self.choices:
             self.needs_user_response = True
             
         # Vérifier la cohérence de next_action
-        if self.next_action and not self.needs_dice and not self.needs_user_response:
-            raise ValueError("next_action can only be set if needs_dice or needs_user_response is True")
+        if self.next_action:
+            if not self.needs_dice and not self.needs_user_response:
+                raise ValueError("next_action can only be set if needs_dice or needs_user_response is True")
+            if self.next_action == "dice_first" and not self.needs_dice:
+                raise ValueError("next_action cannot be dice_first when needs_dice is False")
+            if self.next_action == "user_first" and not self.needs_user_response:
+                raise ValueError("next_action cannot be user_first when needs_user_response is False")
             
         return self
         
@@ -169,4 +200,7 @@ class RulesModel(BaseModel):
                 ],
                 "rules_summary": "Player must have a sword and health above 0 to proceed"
             }
+        }
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
         }

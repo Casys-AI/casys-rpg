@@ -5,7 +5,7 @@ from typing import Dict, Optional, Any, List, AsyncGenerator, Union
 from langchain.schema.runnable import RunnableSerializable
 from pydantic import Field
 from models.game_state import GameState
-from models.decision_model import DecisionModel, AnalysisResult
+from models.decision_model import DecisionModel, AnalysisResult, NextActionType, ActionType
 from models.rules_model import RulesModel
 from models.errors_model import DecisionError
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -115,19 +115,19 @@ class DecisionAgent(BaseAgent):
             self._logger.debug("Rules state: needs_dice={}, next_action={}", needs_dice, next_action)
 
             # Si un ordre est spécifié
-            if next_action == "user_first" and not player_input:
+            if next_action == NextActionType.USER_FIRST and not player_input:
                 self._logger.info("Waiting for user input first")
                 return DecisionModel(
                     section_number=section_number,
-                    awaiting_action="user_response",
+                    awaiting_action=ActionType.USER_INPUT,
                     choices=rules.choices,
                     analysis="En attente de la réponse de l'utilisateur"
                 )
-            elif next_action == "dice_first":
+            elif next_action == NextActionType.DICE_FIRST:
                 self._logger.info("Waiting for dice roll first")
                 return DecisionModel(
                     section_number=section_number,
-                    awaiting_action="dice_roll",
+                    awaiting_action=ActionType.DICE_ROLL,
                     dice_type=rules.dice_type,
                     analysis="En attente du jet de dés"
                 )
@@ -137,7 +137,7 @@ class DecisionAgent(BaseAgent):
                 self._logger.info("Dice roll needed")
                 return DecisionModel(
                     section_number=section_number,
-                    awaiting_action="dice_roll",
+                    awaiting_action=ActionType.DICE_ROLL,
                     dice_type=rules.dice_type,
                     analysis="En attente du jet de dés"
                 )
@@ -147,7 +147,7 @@ class DecisionAgent(BaseAgent):
             analysis_result = await self.analyze_response(
                 section_number,
                 player_input,
-                rules.model_dump()
+                rules.model_dump(mode='json')
             )
 
             self._logger.info("Analysis complete: current_section={}, next_section={}", 

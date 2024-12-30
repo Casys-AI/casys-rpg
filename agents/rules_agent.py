@@ -5,6 +5,8 @@ Handles game rules analysis and validation using LLM.
 from typing import Dict, Optional, Any, List, AsyncGenerator, Union
 from datetime import datetime
 import json
+
+
 from pydantic import Field
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -145,6 +147,11 @@ class RulesAgent(BaseAgent):
                         rules_data[field] = defaults[field]
                         self.logger.warning(f"Using default value for missing field: {field}")
                 
+                # Force needs_dice à False si dice_type est none
+                if rules_data['dice_type'].lower() == 'none':
+                    rules_data['needs_dice'] = False
+                    self.logger.debug("Forced needs_dice to False because dice_type is none")
+                
                 # Ajouter les champs supplémentaires
                 rules_data["section_number"] = section_number
                 rules_data["source"] = "llm_analysis"
@@ -196,7 +203,7 @@ class RulesAgent(BaseAgent):
                 return RulesModel(
                     section_number=section_number,
                     needs_dice=False,
-                    dice_type="none",
+                    dice_type=DiceType.NONE,
                     needs_user_response=True,
                     next_action="user_first",
                     conditions=[],
@@ -215,7 +222,7 @@ class RulesAgent(BaseAgent):
             return RulesModel(
                 section_number=section_number,
                 needs_dice=False,
-                dice_type="none",
+                dice_type=DiceType.NONE,
                 needs_user_response=True,
                 next_action="user_first",
                 conditions=[],

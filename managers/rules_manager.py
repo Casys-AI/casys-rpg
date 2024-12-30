@@ -149,9 +149,9 @@ class RulesManager(RulesManagerProtocol):
 - Source_Type: {rules.source_type.value}
 
 ## Analysis
-- Needs_Dice: {rules.needs_dice}
+- Needs_Dice: {str(rules.needs_dice).lower()}
 - Dice_Type: {rules.dice_type.value}
-- Needs_User_Response: {rules.needs_user_response}
+- Needs_User_Response: {str(rules.needs_user_response).lower()}
 - Next_Action: {rules.next_action or 'None'}
 - Conditions: {', '.join(rules.conditions) if rules.conditions else 'None'}
 - Target_Sections: {', '.join(target_sections) if target_sections else 'None'}
@@ -368,7 +368,7 @@ class RulesManager(RulesManagerProtocol):
                 "source_type": SourceType((metadata.get('source_type') or 'raw').lower()),
                 "last_update": datetime.fromisoformat(metadata.get('last_update', datetime.now().isoformat()))
             }
-            
+
             logger.debug("Creating RulesModel with data: {}", {
                 "section_number": section_number,
                 "dice_type": model_data["dice_type"],
