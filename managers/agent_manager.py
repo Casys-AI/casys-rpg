@@ -137,57 +137,62 @@ class AgentManager:
             
         except Exception as e:
             logger.error("Error initializing AgentManager: {}", str(e))
-            raise GameError(f"Failed to initialize AgentManager: {str(e)}")
+            raise GameError(
+                f"Failed to process game state: {str(e)}",
+                original_exception=e
+            ) from e
 
     async def process_game_state(self, state: Optional[GameState] = None, user_input: Optional[str] = None) -> GameState:
-        """Process game state through the workflow.
-        
-        Args:
-            state: Optional game state to use
-            user_input: Optional user input
-            
-        Returns:
-            GameState: Updated game state
-            
-        Raises:
-            GameError: If processing fails
-        """
+        """Process game state through the workflow."""
         try:
             logger.info("Starting game state processing")
-            logger.debug("Input state: {}, User input: {}", state, user_input)
             
+            # Vérifier si le story graph est initialisé
             if not self.story_graph:
                 logger.error("Story graph not initialized")
                 raise GameError("Story graph not initialized")
-                
-            # Get current state if none provided
+            
+            # Charger l'état actuel si aucun n'est fourni
             if not state:
                 logger.debug("No state provided, getting current state")
                 state = await self.get_state()
-                
-                if not state and self.managers.state_manager:
-                    logger.debug("Creating initial state")
-                    state = await self.managers.state_manager.create_initial_state()
-                    
-            if not state:
-                logger.error("No valid state available")
-                raise GameError("No valid state available")
-                
-            # Compile workflow
+                if not state:
+                    logger.error("No valid state available")
+                    raise GameError("No valid state available")
+            
+            # Récupérer le workflow
             workflow = await self.get_story_workflow()
             
-            # Create input and execute
+            # Préparer les données d'entrée avec la mise à jour de l'utilisateur
             input_data = state.with_updates(player_input=user_input)
-            async for result in workflow.astream(input_data):
-                if isinstance(result, GameState):
-                    return result
-                    
+            
+            # Ajouter la configuration du thread
+            thread_config = {"configurable": {"thread_id": str(state.session_id)}}
+            
+            # Exécuter le workflow
+            async for result in workflow.astream(input_data.model_dump(), thread_config):
+                if isinstance(result, dict):
+                    new_state = GameState(**result)
+                    await self.managers.state_manager.save_state(new_state)
+                    logger.info("Game state processed successfully")
+                    return new_state
+            
             logger.error("No valid result from workflow")
             raise GameError("No valid result")
-            
+        
+        except GraphInterrupt as gi:
+            logger.info("Workflow interrupted: {}", gi)
+            # Gérer l'interruption si nécessaire
+            raise gi
+
         except Exception as e:
             logger.error("Error processing game state: {}", str(e))
-            raise GameError(str(e))
+            raise GameError(
+                f"Failed to process game state: {str(e)}",
+                original_exception=e
+            ) from e
+
+
 
     async def get_state(self) -> Optional[GameState]:
         """Get current game state."""
@@ -257,7 +262,11 @@ class AgentManager:
             
         except Exception as e:
             logger.error("Error initializing game. Input data: {}, Error: {}", state_dict, str(e))
-            raise GameError(f"Failed to initialize game: {str(e)}")
+            raise GameError(
+                f"Failed to process game state: {str(e)}",
+                original_exception=e
+            ) from e
+
 
 
     async def get_story_workflow(self) -> Any:
