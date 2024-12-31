@@ -1,7 +1,7 @@
 """
 Story Graph Agent
 """
-from typing import Dict, Any, Optional, AsyncGenerator, List, Annotated
+from typing import Dict, Any, Optional, AsyncGenerator, List, Union
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -17,19 +17,29 @@ from models.narrator_model import NarratorModel
 from models.decision_model import DecisionModel
 from models.rules_model import RulesModel
 from models.trace_model import TraceModel
-from models.types.agent_types import GameAgents
-from models.types.manager_types import GameManagers
+
 from config.agents.agent_config_base import AgentConfigBase
 
 from agents.protocols.story_graph_protocol import StoryGraphProtocol
+from agents.protocols.rules_agent_protocol import RulesAgentProtocol
+from agents.protocols.narrator_agent_protocol import NarratorAgentProtocol
+from agents.protocols.decision_agent_protocol import DecisionAgentProtocol
+from agents.protocols.trace_agent_protocol import TraceAgentProtocol
+
 from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
+
 from langgraph.graph import StateGraph, END, START
 from langgraph.prebuilt import ToolExecutor
 from langgraph.types import Command, interrupt
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.errors import GraphInterrupt
 
+# Type alias for manager protocols
+ManagerProtocols = Union[
+    WorkflowManagerProtocol,
+    StateManagerProtocol
+]
 
 class StoryGraph(StoryGraphProtocol):
     """Story Graph implementation for managing game workflow using LangGraph."""
@@ -37,8 +47,13 @@ class StoryGraph(StoryGraphProtocol):
     def __init__(
         self,
         config: AgentConfigBase,
-        managers: GameManagers,
-        agents: Optional[GameAgents] = None
+        managers: Dict[str, ManagerProtocols],
+        agents: Optional[Dict[str, Union[
+            NarratorAgentProtocol,
+            RulesAgentProtocol,
+            DecisionAgentProtocol,
+            TraceAgentProtocol
+        ]]] = None
     ):
         """Initialize StoryGraph.
         
@@ -48,22 +63,18 @@ class StoryGraph(StoryGraphProtocol):
             agents: Optional container with all game agents
         """
         # Initialize managers
-        self.state_manager = managers.state_manager
-        self.workflow_manager = managers.workflow_manager
-        self.rules_manager = managers.rules_manager
-        self.narrator_manager = managers.narrator_manager
-        self.decision_manager = managers.decision_manager
-        self.trace_manager = managers.trace_manager
+        self.state_manager: StateManagerProtocol = managers["state_manager"]
+        self.workflow_manager: WorkflowManagerProtocol = managers["workflow_manager"]
         
-        # Initialize agents if provided
+        # Initialize agents
         if agents:
-            self.rules_agent = agents.rules_agent
-            self.narrator_agent = agents.narrator_agent
-            self.decision_agent = agents.decision_agent
-            self.trace_agent = agents.trace_agent
+            self.rules_agent: RulesAgentProtocol = agents["rules_agent"]
+            self.narrator_agent: NarratorAgentProtocol = agents["narrator_agent"]
+            self.decision_agent: DecisionAgentProtocol = agents["decision_agent"]
+            self.trace_agent: TraceAgentProtocol = agents["trace_agent"]
         
         self._graph = None
-        self._current_section = 1
+        self._current_section = 1  #doublon avec section_number ?
         self._memory = None
 
     async def _setup_workflow(self) -> None:
@@ -77,6 +88,7 @@ class StoryGraph(StoryGraphProtocol):
             self._graph.add_node("node_rules", self._process_rules)
             self._graph.add_node("node_narrator", self._process_narrative)
             self._graph.add_node("node_decision", self._process_decision)
+            self._graph.add_node("node_trace", self._process_trace)  # Ajouté pour la traçabilité
             self._graph.add_node("node_end", self.workflow_manager.end_workflow)
 
             # Ajouter les connexions
@@ -87,8 +99,9 @@ class StoryGraph(StoryGraphProtocol):
             # Fan-in : fusion des résultats de `rules` et `narrator` dans `decision`
             self._graph.add_edge(["node_rules", "node_narrator"], "node_decision")
 
-            # Fin du workflow
-            self._graph.add_edge("node_decision", "node_end")
+            # Ajout du nœud de trace avant de terminer
+            self._graph.add_edge("node_decision", "node_trace")
+            self._graph.add_edge("node_trace", "node_end")
             self._graph.add_edge("node_end", END)
 
             # Compiler le graphe
@@ -97,9 +110,6 @@ class StoryGraph(StoryGraphProtocol):
         except Exception as e:
             logger.exception("Error setting up workflow: {}", str(e))
             raise
-
-
-
 
     async def _process_rules(self, input_data: GameState) -> GameState:
         """Process game rules for the current state."""
@@ -128,12 +138,7 @@ class StoryGraph(StoryGraphProtocol):
             
         except Exception as e:
             logger.exception("Error processing rules: {}", str(e))
-            return GameState(
-                session_id=input_data.session_id,
-                game_id=input_data.game_id,
-                section_number=input_data.section_number,
-                error=str(e)
-            )
+            return input_data.with_updates(error=str(e))
 
     async def _process_narrative(self, input_data: GameState) -> GameState:
         """Process narrative for the current state."""
@@ -166,14 +171,7 @@ class StoryGraph(StoryGraphProtocol):
 
         except Exception as e:
             logger.exception("Error processing narrative: {}", str(e))
-            return GameState(
-                session_id=input_data.session_id,
-                game_id=input_data.game_id,
-                section_number=input_data.section_number,
-                error=str(e)
-            )
-
-
+            return input_data.with_updates(error=str(e))
 
     async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""
@@ -200,23 +198,25 @@ class StoryGraph(StoryGraphProtocol):
                         decision = result["decision"]
                         if isinstance(decision, DecisionError):
                             logger.error("Decision error: {}", decision.message)
-                            return GameState(
-                                session_id=input_data.session_id,
-                                game_id=input_data.game_id,
-                                section_number=input_data.section_number,
-                                error=decision.message
+                            # Utiliser with_updates pour préserver l'état
+                            return input_data.with_updates(
+                                error=decision.message,
+                                decision=None  # Reset decision en cas d'erreur
                             )
 
                         # Validation de la décision
                         if (not hasattr(decision, 'next_section') or decision.next_section is None) and not hasattr(decision, 'awaiting_action'):
                             logger.error("Decision missing next_section")
-                            raise DecisionError("Decision missing next_section or awaiting_action")
+                            return input_data.with_updates(
+                                error="Decision missing next_section or awaiting_action",
+                                decision=None
+                            )
 
                         logger.info("Decision processed: current_section={}, next_section={}", 
                                   input_data.section_number, decision.next_section)
                         
-                        output = input_data.with_updates(decision=decision)
-                        return output
+                        # Utiliser with_updates pour préserver l'état
+                        return input_data.with_updates(decision=decision)
 
             logger.debug("No user input to process")
             return input_data
@@ -227,15 +227,11 @@ class StoryGraph(StoryGraphProtocol):
 
         except Exception as e:
             logger.exception("Error processing decision: {}", str(e))
-            return GameState(
-                session_id=input_data.session_id,
-                game_id=input_data.game_id,
-                section_number=input_data.section_number,
-                error=str(e)
+            # Utiliser with_updates pour préserver l'état
+            return input_data.with_updates(
+                error=str(e),
+                decision=None
             )
-
-
-
 
     async def _process_trace(self, input_data: GameState) -> GameState:
         """Process trace for the current state."""
@@ -259,15 +255,12 @@ class StoryGraph(StoryGraphProtocol):
                         
                 raise GameError("No valid trace result")
 
-            logger.debug("No trace agent available, returning empty output")
-            return GameState(session_id=input_data.session_id)
-            
+            logger.debug("No trace agent available, returning input state")
+            return input_data
+
         except Exception as e:
             logger.exception("Error processing trace: {}", str(e))
-            return GameState(
-                session_id=input_data.session_id,
-                error=str(e)
-            )
+            return input_data.with_updates(error=str(e))
 
     async def get_compiled_workflow(self) -> Any:
         """Get the compiled workflow graph.
@@ -279,3 +272,6 @@ class StoryGraph(StoryGraphProtocol):
         if not self._graph:
             await self._setup_workflow()
         return self._graph.compile(checkpointer=self._memory)
+
+# Register protocol implementation
+StoryGraphProtocol.register(StoryGraph)

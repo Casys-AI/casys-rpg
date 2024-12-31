@@ -1,10 +1,7 @@
-"""Models for game state management."""
 from typing import Dict, Optional, Any, Annotated
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict, validator
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 import uuid
-import operator
-from typing import Annotated
 
 from models.character_model import CharacterModel
 from models.decision_model import DecisionModel
@@ -22,8 +19,10 @@ def take_last_value(a: Any, b: Any) -> Any:
 
 class GameStateBase(BaseModel):
     """Base state model with common fields."""
-    session_id: Annotated[str, first_not_none]  # Le session_id doit être fourni explicitement
-    game_id: Annotated[str, first_not_none]  # Le game_id doit être fourni explicitement
+    session_id: Annotated[str, first_not_none]  # Le session_id doit être préservé
+    game_id: Annotated[str, first_not_none]    # Le game_id doit être préservé
+    metadata: Annotated[Optional[Dict[str, Any]], take_last_value] = None
+
     
     model_config = ConfigDict(
         json_encoders={
@@ -55,7 +54,7 @@ class GameStateOutput(GameStateBase):
     # Game state
     trace: Optional[TraceModel] = None
     character: Optional[CharacterModel] = None
-    decision: Optional[DecisionModel] = None
+    decision: Annotated[Optional[DecisionModel], take_last_value] = None
     
     # Global error state
     error: Annotated[Optional[str], first_not_none] = None  # Erreurs générales du workflow
@@ -110,6 +109,18 @@ class GameState(GameStateInput, GameStateOutput):
         # Garder le session_id et game_id originaux
         new_state.session_id = self.session_id
         new_state.game_id = self.game_id
+
+        # Fusionner les métadonnées
+        if self.metadata and other.metadata:
+            # Si les deux ont des métadonnées, les fusionner
+            merged_metadata = {**self.metadata, **other.metadata}
+        elif self.metadata:
+            merged_metadata = self.metadata
+        else:
+            merged_metadata = other.metadata
+        
+        new_state.metadata = merged_metadata
+        
         return new_state
         
     @field_validator('section_number', mode='before')
@@ -155,7 +166,8 @@ class GameState(GameStateInput, GameStateOutput):
         return self
 
     @model_validator(mode='before')
-    def sync_section_numbers(cls, values: Dict[str, Any]) -> Dict[str, Any]:  # pylint: disable=no-self-argument
+    @classmethod
+    def sync_section_numbers(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Synchronize section numbers between models."""
         if 'section_number' in values:
             section_number = values['section_number']
@@ -206,8 +218,6 @@ class GameState(GameStateInput, GameStateOutput):
             )
         return self
 
-
-        
     def update_from_input(self, input_state: GameStateInput) -> None:
         """Update state from input."""
         for field in input_state.model_fields:
@@ -253,17 +263,15 @@ class GameState(GameStateInput, GameStateOutput):
             GameState: New state with updates applied
         """
         state_dict = self.model_dump()
-        # Préserver explicitement les IDs
-        session_id = state_dict.get('session_id')
-        game_id = state_dict.get('game_id')
+        # Préserver explicitement les IDs depuis l'instance
+        session_id = self.session_id
+        game_id = self.game_id
         
         state_dict.update(updates)
         
-        # Réinjecter les IDs s'ils existent
-        if session_id:
-            state_dict['session_id'] = session_id
-        if game_id:
-            state_dict['game_id'] = game_id
+        # Toujours réinjecter les IDs
+        state_dict['session_id'] = session_id
+        state_dict['game_id'] = game_id
             
         return GameState(**state_dict)
         
@@ -275,17 +283,7 @@ class GameState(GameStateInput, GameStateOutput):
 
     @classmethod
     def create_from_section(cls, section_number: int) -> 'GameState':
-        """Create game state for a specific section.
-        
-        Args:
-            section_number: Section number to create state for
-            
-        Returns:
-            GameState: New game state instance
-            
-        Raises:
-            ValueError: If section number is invalid
-        """
+        """Create game state for a specific section."""
         return cls(
             section_number=section_number,
             source=RulesSourceType.RAW, 
@@ -295,18 +293,7 @@ class GameState(GameStateInput, GameStateOutput):
         
     @classmethod
     def create_error_state(cls, error_message: str, session_id: str, game_id: str, section_number: int, current_state: Optional["GameState"] = None) -> "GameState":
-        """Create a game state with error, optionally preserving current state.
-        
-        Args:
-            error_message: Error message to include
-            session_id: Session ID for the error state
-            game_id: Game ID for the error state
-            section_number: Section number to use if no current state
-            current_state: Optional current state to preserve
-            
-        Returns:
-            GameState: New game state with error
-        """
+        """Create a game state with error, optionally preserving current state."""
         if current_state:
             state_dict = current_state.model_dump()
             state_dict.update({
