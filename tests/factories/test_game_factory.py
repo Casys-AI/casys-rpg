@@ -2,23 +2,27 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime
+from pathlib import Path
 
-from agents.factories.game_factory import GameFactory
-from config.game_config import GameConfig
+from config.game_config import GameConfig, ManagerConfigs
+from config.game_constants import GameMode
 from models.game_state import GameState
 from models.character_model import CharacterModel, CharacterStats
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel
 from models.decision_model import DecisionModel
 from models.trace_model import TraceModel
+from config.storage_config import StorageConfig
 
 @pytest.fixture
 def mock_game_config() -> GameConfig:
     """Create a mock game config."""
-    config = GameConfig()
-    config.game_id = "test_game"
-    config.session_id = "test_session"
-    return config
+    storage_config = StorageConfig(base_path=Path("./test_data"))
+    manager_configs = ManagerConfigs(storage_config=storage_config)
+    return GameConfig(
+        mode=GameMode.NORMAL,
+        manager_configs=manager_configs
+    )
 
 @pytest.fixture
 def mock_character_model() -> CharacterModel:
@@ -50,7 +54,8 @@ def mock_decision_model() -> DecisionModel:
     """Create a mock decision model."""
     return DecisionModel(
         section_number=1,
-        choices={"1": "Test choice"}
+        choices=["choice1", "choice2"],
+        conditions=["condition1"]
     )
 
 @pytest.fixture
@@ -58,40 +63,86 @@ def mock_trace_model() -> TraceModel:
     """Create a mock trace model."""
     return TraceModel(
         section_number=1,
-        history=["Test action"]
+        actions=["action1", "action2"]
     )
 
-@pytest.mark.asyncio
-async def test_game_factory_create_state():
-    """Test creating a game state."""
-    # Arrange
-    config = GameConfig()
-    game_factory = GameFactory()
-    
-    # Act
-    game_state = await game_factory.create_state(config)
-    
-    # Assert
-    assert isinstance(game_state, GameState)
-    assert game_state.game_id == config.game_id
-    assert game_state.session_id == config.session_id
+@pytest.fixture
+def mock_cache_manager():
+    """Create a mock cache manager."""
+    return AsyncMock()
 
-@pytest.mark.asyncio
-async def test_game_factory_create_state_with_models(
+@pytest.fixture
+def mock_state_manager():
+    """Create a mock state manager."""
+    return AsyncMock()
+
+@patch('agents.factories.game_factory.CacheManager')
+@patch('agents.factories.game_factory.StateManager')
+@patch('agents.factories.game_factory.CharacterManager')
+@patch('agents.factories.game_factory.TraceManager')
+@patch('agents.factories.game_factory.RulesManager')
+@patch('agents.factories.game_factory.DecisionManager')
+@patch('agents.factories.game_factory.NarratorManager')
+@patch('agents.factories.game_factory.WorkflowManager')
+def test_game_factory_create_state(
+    mock_workflow_manager,
+    mock_narrator_manager,
+    mock_decision_manager,
+    mock_rules_manager,
+    mock_trace_manager,
+    mock_character_manager,
+    mock_state_manager,
+    mock_cache_manager,
+    mock_game_config
+):
+    """Test creating a game state."""
+    from agents.factories.game_factory import GameFactory
+    
+    # Setup
+    factory = GameFactory(mock_game_config)
+    
+    # Test
+    components = factory.create_game_components()
+    
+    # Verify
+    assert components is not None
+    assert len(components) == 2  # agents and managers
+    agents, managers = components
+    assert isinstance(agents, dict)
+    assert isinstance(managers, dict)
+
+@patch('agents.factories.game_factory.CacheManager')
+@patch('agents.factories.game_factory.StateManager')
+@patch('agents.factories.game_factory.CharacterManager')
+@patch('agents.factories.game_factory.TraceManager')
+@patch('agents.factories.game_factory.RulesManager')
+@patch('agents.factories.game_factory.DecisionManager')
+@patch('agents.factories.game_factory.NarratorManager')
+@patch('agents.factories.game_factory.WorkflowManager')
+def test_game_factory_create_state_with_models(
+    mock_workflow_manager,
+    mock_narrator_manager,
+    mock_decision_manager,
+    mock_rules_manager,
+    mock_trace_manager,
+    mock_character_manager,
+    mock_state_manager,
+    mock_cache_manager,
     mock_character_model,
     mock_narrator_model,
     mock_rules_model,
     mock_decision_model,
-    mock_trace_model
+    mock_trace_model,
+    mock_game_config
 ):
     """Test creating a game state with all models."""
-    # Arrange
-    config = GameConfig()
-    game_factory = GameFactory()
+    from agents.factories.game_factory import GameFactory
     
-    # Act
-    game_state = await game_factory.create_state(
-        config,
+    # Setup
+    factory = GameFactory(mock_game_config)
+    
+    # Configure mocks
+    mock_state_manager.return_value.get_current_state.return_value = GameState(
         character=mock_character_model,
         narrator=mock_narrator_model,
         rules=mock_rules_model,
@@ -99,21 +150,34 @@ async def test_game_factory_create_state_with_models(
         trace=mock_trace_model
     )
     
-    # Assert
-    assert game_state.character == mock_character_model
-    assert game_state.narrative == mock_narrator_model
-    assert game_state.rules == mock_rules_model
-    assert game_state.decision == mock_decision_model
-    assert game_state.trace == mock_trace_model
-
-@pytest.mark.asyncio
-async def test_game_factory_error_handling():
-    """Test error handling in game factory."""
-    # Arrange
-    config = GameConfig()
-    config.game_id = ""  # Invalid game_id
-    game_factory = GameFactory()
+    # Test
+    components = factory.create_game_components()
     
-    # Act & Assert
-    with pytest.raises(ValueError):
-        await game_factory.create_state(config)
+    # Verify
+    agents, managers = components
+    assert isinstance(agents, dict)
+    assert isinstance(managers, dict)
+    
+    # Verify managers were created with correct config
+    mock_cache_manager.assert_called_once()
+    mock_state_manager.assert_called_once()
+    mock_character_manager.assert_called_once()
+    mock_trace_manager.assert_called_once()
+    mock_rules_manager.assert_called_once()
+    mock_decision_manager.assert_called_once()
+    mock_narrator_manager.assert_called_once()
+    mock_workflow_manager.assert_called_once()
+
+@patch('agents.factories.game_factory.CacheManager')
+def test_game_factory_error_handling(mock_cache_manager, mock_game_config):
+    """Test error handling in game factory."""
+    from agents.factories.game_factory import GameFactory
+    
+    # Setup error condition
+    mock_cache_manager.side_effect = Exception("Test error")
+    
+    # Test
+    with pytest.raises(Exception) as exc_info:
+        factory = GameFactory(mock_game_config)
+        
+    assert str(exc_info.value) == "Test error"

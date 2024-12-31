@@ -7,6 +7,8 @@ from managers.protocols.trace_manager_protocol import TraceManagerProtocol
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
 from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
 from managers.protocols.narrator_manager_protocol import NarratorManagerProtocol
+from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
+from managers.workflow_manager import WorkflowManager
 
 __all__ = [
     # Protocols
@@ -18,6 +20,9 @@ __all__ = [
     'RulesManagerProtocol',
     'DecisionManagerProtocol',
     'NarratorManagerProtocol',
+    'WorkflowManagerProtocol',
+    # Implementations
+    'WorkflowManager',
 ]
 
 def get_manager(manager_type: str):

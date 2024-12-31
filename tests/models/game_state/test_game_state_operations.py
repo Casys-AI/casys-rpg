@@ -29,9 +29,7 @@ def test_game_state_addition(model_factory):
         section_number=1,
         narrative=model_factory.create_test_narrator_model(
             section_number=1,
-            content=model_factory.create_narrative_content(
-                raw_text="Initial content"
-            )
+            content="Initial content"
         )
     )
     
@@ -40,9 +38,7 @@ def test_game_state_addition(model_factory):
         section_number=2,
         narrative=model_factory.create_test_narrator_model(
             section_number=2,
-            content=model_factory.create_narrative_content(
-                raw_text="Updated content"
-            )
+            content="Updated content"
         )
     )
     
@@ -53,7 +49,7 @@ def test_game_state_addition(model_factory):
     assert combined.game_id == state1.game_id
     assert combined.session_id == state1.session_id
     assert combined.section_number == 2
-    assert combined.narrative.content.raw_text == "Updated content"
+    assert combined.narrative.content == "Updated content"
 
 def test_game_state_model_update(model_factory):
     """Test updating internal models."""
@@ -64,9 +60,7 @@ def test_game_state_model_update(model_factory):
         section_number=1,
         narrative=model_factory.create_test_narrator_model(
             section_number=1,
-            content=model_factory.create_narrative_content(
-                raw_text="Initial narrative"
-            )
+            content="Initial narrative"
         ),
         rules=model_factory.create_rules_model(
             section_number=1,
@@ -86,9 +80,7 @@ def test_game_state_model_update(model_factory):
         section_number=2,
         narrative=model_factory.create_test_narrator_model(
             section_number=2,
-            content=model_factory.create_narrative_content(
-                raw_text="Updated narrative"
-            )
+            content="Updated narrative"
         ),
         rules=model_factory.create_rules_model(
             section_number=2,
@@ -102,7 +94,7 @@ def test_game_state_model_update(model_factory):
     
     # Combine and verify
     result = initial + update
-    assert result.narrative.content.raw_text == "Updated narrative"
+    assert result.narrative.content == "Updated narrative"
     assert result.rules.dice_type == DiceType.D6
     assert result.decisions.decision_type == ChoiceType.DICE
     assert result.section_number == 2

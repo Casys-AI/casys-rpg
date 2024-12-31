@@ -110,6 +110,53 @@ The system follows several key principles:
 - Optimized rule retrieval
 - Content caching
 
+## Factory Architecture
+
+The system uses a dual-factory pattern for component and model creation:
+
+### 1. GameFactory
+- Creates and configures game components
+- Manages dependencies between components
+- Validates system configuration
+- Ensures singleton instances
+- Coordinates component lifecycle
+
+Components created:
+- Agent instances
+- Manager instances
+- System configurations
+
+### 2. ModelFactory
+Hybrid approach for model creation:
+- **Direct Model Creation**: Simple models use Pydantic constructors
+- **Complex Creation**: Factory handles:
+  - Multi-model dependencies (GameState)
+  - Inter-model validation
+  - Complex initialization logic
+  - State coordination
+
+This separation provides:
+- Clear responsibility boundaries
+- Better testing isolation
+- Simplified model creation
+- Centralized validation
+- Flexible extension points
+
+### Dependencies Management
+
+The system uses a centralized dependency injection system:
+- **dependencies.py**: Central configuration
+- Type definitions for all components
+- Singleton management
+- FastAPI integration
+- Clear component lifecycle
+
+This architecture ensures:
+- SOLID principles compliance
+- Clean separation of concerns
+- Efficient testing
+- Clear dependency flow
+
 ## Configuration
 
 The system is highly configurable through:

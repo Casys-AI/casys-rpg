@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Architecture documentation
+- Migration guides
+- Validation rules documentation
+- Test coverage for edge cases
 - Initial project setup
 - Basic game engine structure
 - Four specialized LLM agents:
@@ -23,49 +27,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nouvelles bonnes pratiques pour Qwik
 
 ### Changed
-- None
+- **StoryGraph**
+  - Refactored to use dictionary-based dependency injection
+  - Managers and agents now passed as collections
+  - Improved configuration handling
+  - Better separation of concerns
+
+- **Models**
+  - Moved Choice model and validation to RulesModel
+  - Simplified DecisionModel by removing choice handling
+  - Added comprehensive validation for all choice types
+  - Updated model relationships for better clarity
+  - Simplified DecisionModel state management
+  - Removed immutability constraints from individual models
+  - Fixed Pydantic configuration to use model_config
+  - Improved validation for conditions in DecisionModel
+  - Better alignment with GameState architecture
+
+- **Dependency Injection**
+  - Standardized configuration-based injection
+  - Removed direct manager arguments from constructors
+  - Improved testability and flexibility
+
 - Refactoring des services pour utiliser des objets simples au lieu de classes
 - Optimisation de la gestion d'état avec useResource$ et useTask$
 - Amélioration de la gestion WebSocket
 - Simplification de la configuration API
 
-### Deprecated
-- None
-
-### Removed
-- None
-- Pattern Singleton des services
-- useVisibleTask$ remplacé par useTask$
-- Classes GameService et WebSocketService
-
 ### Fixed
-- None
+- **GameConfig**
+  - Fixed import paths and module organization
+  - Improved configuration validation
+  - Better error messages for invalid configs
+
+- **Factory Methods**
+  - Removed redundant model factory methods
+  - Using direct constructors for simple models
+  - Factory methods reserved for complex objects
+
 - Problèmes de sérialisation Qwik
 - Gestion des erreurs WebSocket
 - Navigation entre les sections
+- Removed incompatible model_post_init usage
+- Corrected Pydantic configuration format
+- Fixed model validation workflow
 
-### Security
-- None
+### Architecture
+- Improved dependency injection patterns
+- Better separation of concerns in models
+- More consistent configuration handling
+- Cleaner model relationships
+- Better alignment with GameState immutability pattern
+- Clearer separation of responsibilities:
+  - GameState handles immutability
+  - Models focus on validation
+- Improved model update workflow
 
-## [0.1.0] - 2024-12-22
+### Documentation
+- Updated architecture documentation
+- Added migration guides
+- Improved code comments
+- Added validation rules documentation
 
-### Added
-- Initial release
-- Basic game functionality
-- Agent system architecture
-- Documentation structure
-
-## [0.1.0] - 2024-12-27
-
-### Added
-- Structure initiale du projet
-- Système d'agents LangChain
-- Interface utilisateur Qwik
-- Documentation de base
-
-### Changed
-- Première implémentation des composants
-- Configuration initiale
+### Testing
+- Added comprehensive Choice validation tests
+- Updated fixtures for new model structure
+- Improved test organization
+- Better test coverage for edge cases
+- Updated model tests to reflect mutable state
+- Added tests for model updates and validation
+- Improved test coverage for edge cases
 
 ### Removed
+- Pattern Singleton des services
+- useVisibleTask$ remplacé par useTask$
+- Classes GameService et WebSocketService
 - Code legacy non utilisé
+
+## [0.1.0] - 2024-12-31
+### Added
+- Initial release with core functionality:
+  - Multi-agent system architecture
+  - Core models and validation
+  - Basic game engine
+  - Test suite foundation
+  - Configuration system
+  - Model factories
+  - Manager protocols

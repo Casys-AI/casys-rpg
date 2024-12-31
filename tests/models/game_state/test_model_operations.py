@@ -54,8 +54,8 @@ async def test_model_merge():
         )
     )
     
-    # Fusion
-    merged_state = state1.model_copy(update=state2.model_dump())
+    # Fusion en utilisant l'opérateur +
+    merged_state = state1 + state2
     
     # Vérifications
     assert merged_state.section_number == 2

@@ -1,10 +1,9 @@
 """
 Dependencies for FastAPI.
 """
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, TYPE_CHECKING
 from loguru import logger
 
-from agents.factories.game_factory import GameFactory
 from managers.protocols.agent_manager_protocol import AgentManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
@@ -21,6 +20,9 @@ from agents.protocols.rules_agent_protocol import RulesAgentProtocol
 from agents.protocols.decision_agent_protocol import DecisionAgentProtocol
 from agents.protocols.trace_agent_protocol import TraceAgentProtocol
 from agents.protocols.base_agent_protocol import BaseAgentProtocol
+
+if TYPE_CHECKING:
+    from agents.factories.game_factory import GameFactory
 
 # Type alias for manager protocols
 ManagerProtocols = Union[
@@ -43,7 +45,7 @@ AgentProtocols = Union[
 ]
 
 # Composants du jeu
-_game_factory: Optional[GameFactory] = None
+_game_factory: Optional["GameFactory"] = None
 _agent_manager: Optional[AgentManagerProtocol] = None
 _game_components: Optional[tuple[Dict[str, AgentProtocols], Dict[str, ManagerProtocols]]] = None
 
@@ -55,6 +57,7 @@ def get_agent_manager() -> AgentManagerProtocol:
         logger.info("Creating new AgentManager instance")
         if not _game_factory:
             logger.debug("Creating new GameFactory instance")
+            from agents.factories.game_factory import GameFactory
             _game_factory = GameFactory()
         
         if not _game_components:

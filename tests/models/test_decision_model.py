@@ -1,34 +1,46 @@
 """Tests for decision model."""
 import pytest
 from datetime import datetime
-from models.decision_model import DecisionModel, DiceResult, AnalysisResult
-from models.rules_model import DiceType
+from models.decision_model import (
+    DecisionModel,
+    DiceResult,
+    AnalysisResult,
+    DiceType
+)
 from models.trace_model import ActionType
+from models.types.common_types import NextActionType
 
 @pytest.fixture
 def sample_decision_model():
+    """Create a sample decision model for testing."""
     return DecisionModel(
         section_number=1,
-        choices={"1": "Choice 1", "2": "Choice 2"}
+        next_section=2,
+        awaiting_action=ActionType.USER_INPUT,
+        next_action=NextActionType.USER_FIRST,
+        conditions=["initial_condition"]
     )
 
 def test_decision_model_creation(sample_decision_model):
     """Test creation and validation of decision models."""
     assert sample_decision_model.section_number == 1
-    assert "Choice 1" in sample_decision_model.choices.values()
-    assert "Choice 2" in sample_decision_model.choices.values()
-    assert sample_decision_model.selected_choice is None
+    assert sample_decision_model.next_section == 2
+    assert sample_decision_model.awaiting_action == ActionType.USER_INPUT
+    assert sample_decision_model.next_action == NextActionType.USER_FIRST
+    assert sample_decision_model.conditions == ["initial_condition"]
+    assert sample_decision_model.error is None
     assert isinstance(sample_decision_model.timestamp, datetime)
 
 def test_decision_model_empty_creation():
     """Test basic creation of decision model."""
     decision = DecisionModel(section_number=1)
     assert decision.section_number == 1
-    assert decision.choices == {}
-    assert decision.selected_choice is None
+    assert decision.next_section is None
+    assert decision.conditions == []
+    assert decision.error is None
     assert isinstance(decision.timestamp, datetime)
 
-def test_dice_result_creation():
+def test_dice_result_validation():
     """Test creation and validation of dice results."""
     # Test valid dice result
     dice = DiceResult(value=6, type=DiceType.COMBAT)
@@ -56,8 +68,9 @@ def test_analysis_result_validation():
         analysis="Player chose to fight"
     )
     assert analysis.next_section == 1
-    assert len(analysis.conditions) == 2
+    assert analysis.conditions == ["has_sword", "is_brave"]
     assert analysis.analysis == "Player chose to fight"
+    assert analysis.error is None
     
     # Test invalid next section
     with pytest.raises(ValueError):
@@ -76,57 +89,55 @@ def test_decision_model_validation():
     with pytest.raises(ValueError):
         DecisionModel(section_number=-1)
     
-    # Test invalid choice key
+    # Test invalid next_section
     with pytest.raises(ValueError):
         DecisionModel(
             section_number=1,
-            choices={"": "Empty key not allowed"}
+            next_section=0
         )
     
-    # Test invalid choice value
     with pytest.raises(ValueError):
         DecisionModel(
             section_number=1,
-            choices={"1": ""}
+            next_section=-1
         )
-
-def test_decision_model_choice_selection(sample_decision_model):
-    """Test choice selection in decision model."""
-    # Test valid choice selection
-    updated_model = sample_decision_model.model_copy(update={"selected_choice": "1"})
-    assert updated_model.selected_choice == "1"
     
-    # Test invalid choice selection
-    with pytest.raises(ValueError):
-        sample_decision_model.model_copy(update={"selected_choice": "invalid_choice"})
+    # Test valid model with optional fields
+    model = DecisionModel(
+        section_number=1,
+        next_section=2,
+        conditions=["test_condition"]
+    )
+    assert model.section_number == 1
+    assert model.next_section == 2
+    assert model.conditions == ["test_condition"]
+    assert model.error is None
 
-def test_decision_model_choice_validation():
-    """Test choice validation in decision model."""
-    # Test duplicate choice keys
-    choices = {
-        "1": "Choice 1",
-        "2": "Choice 2",
-        "1": "Duplicate key"  # This should be ignored by Python dict
-    }
-    decision = DecisionModel(section_number=1, choices=choices)
-    assert len(decision.choices) == 2
-    assert decision.choices["1"] == "Choice 1"
-
-def test_decision_model_immutability(sample_decision_model):
-    """Test immutability of decision model."""
-    # Attempt to modify choices
-    with pytest.raises(TypeError):
-        sample_decision_model.choices["3"] = "New choice"
+def test_decision_model_update(sample_decision_model):
+    """Test updating decision model fields."""
+    # Test direct update
+    sample_decision_model.next_section = 3
+    assert sample_decision_model.next_section == 3
     
-    # Verify original choices are unchanged
-    assert len(sample_decision_model.choices) == 2
-    assert "3" not in sample_decision_model.choices
+    # Test conditions update
+    sample_decision_model.conditions.append("new_condition")
+    assert "new_condition" in sample_decision_model.conditions
+    
+    # Test model_copy update
+    updated = sample_decision_model.model_copy(
+        update={"conditions": ["different_condition"]}
+    )
+    assert "different_condition" in updated.conditions
+    assert "new_condition" in sample_decision_model.conditions
+    assert isinstance(updated.conditions, list)
+    assert isinstance(sample_decision_model.conditions, list)
 
 def test_decision_model_serialization(sample_decision_model):
     """Test serialization of decision model."""
-    model_dict = sample_decision_model.model_dump()
+    json_data = sample_decision_model.model_dump_json()
+    loaded = DecisionModel.model_validate_json(json_data)
     
-    assert model_dict["section_number"] == 1
-    assert model_dict["choices"] == {"1": "Choice 1", "2": "Choice 2"}
-    assert model_dict["selected_choice"] is None
-    assert isinstance(model_dict["timestamp"], datetime)
+    assert loaded.section_number == sample_decision_model.section_number
+    assert loaded.next_section == sample_decision_model.next_section
+    assert loaded.awaiting_action == sample_decision_model.awaiting_action
+    assert loaded.next_action == sample_decision_model.next_action
