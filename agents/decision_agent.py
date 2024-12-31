@@ -167,9 +167,16 @@ class DecisionAgent(BaseAgent):
     async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict[str, Any], None]:
         """Async invocation for decision processing."""
         try:
-            state = GameState.model_validate(input_data.get("state", {}))
-            self._logger.info("Starting decision processing: session={}, section={}, input={}", 
-                         state.session_id, state.section_number, state.player_input)
+            # Récupérer le state complet avec session_id et game_id
+            if isinstance(input_data.get("state"), GameState):
+                state = input_data["state"]
+            else:
+                state = GameState.model_validate(input_data.get("state", {}))
+
+            # Log plus détaillé
+            self._logger.debug("Full state in decision: {}", state.model_dump())
+            self._logger.info("Starting decision processing: session={}, game={}, section={}, input={}", 
+                     state.session_id, state.game_id, state.section_number, state.player_input)
             
             # Process decision
             decision = await self._process_decision(
@@ -183,8 +190,7 @@ class DecisionAgent(BaseAgent):
                 error_decision = DecisionModel(
                     section_number=state.section_number,
                     next_section=state.section_number,  
-                    error=decision.message,
-                    timestamp=datetime.now()
+                    error=decision.message
                 )
                 yield {"decision": error_decision}
             else:
@@ -197,8 +203,7 @@ class DecisionAgent(BaseAgent):
             error_decision = DecisionModel(
                 section_number=state.section_number,
                 next_section=state.section_number,  
-                error=str(e),
-                timestamp=datetime.now()
+                error=str(e)
             )
             yield {"decision": error_decision}
 

@@ -144,6 +144,7 @@ def test_no_section_addition():
     # Create initial state with section 2
     state_dict = {
         'session_id': 'test',
+        'game_id': 'test_game_1',  # Ajout du game_id requis
         'section_number': 2,
         'narrative': narrator,  # section 1
         'rules': rules  # section 1
@@ -159,6 +160,7 @@ def test_no_section_addition():
     # Create another state with section 3
     new_state_dict = {
         'session_id': 'test',
+        'game_id': 'test_game_1',  # Ajout du game_id requis
         'section_number': 3,
         'narrative': game_state.narrative,  # section 2
         'rules': game_state.rules  # section 2

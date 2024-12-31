@@ -6,7 +6,6 @@ from datetime import datetime
 from models.game_state import GameState
 from models.trace_model import TraceModel, TraceAction, ActionType
 from models.errors_model import TraceError
-from models.types.manager_types import GameManagers
 from config.agents.trace_agent_config import TraceAgentConfig
 from agents.trace_agent import TraceAgent
 
@@ -29,6 +28,8 @@ def trace_agent(mock_trace_manager):
 def sample_game_state():
     """Create a sample game state."""
     return GameState(
+        session_id="test_session",
+        game_id="test_game",
         section_number=1,
         player_input="test input",
         last_update=datetime.now()
