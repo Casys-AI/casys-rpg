@@ -8,7 +8,7 @@ from models.game_state import GameState
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, DiceType, SourceType
 from models.errors_model import StateError
-from tests.test_model_factory import TestModelFactory
+from tests.models.conftest import ModelFactory
 from config.storage_config import StorageConfig
 from managers.cache_manager import CacheManager
 from managers.state_manager import StateManager
@@ -26,7 +26,7 @@ async def test_workflow_state_initialization():
     rules_manager = RulesManager(config, cache_manager)
     workflow_manager = WorkflowManager(state_manager, rules_manager)
     
-    initial_state = TestModelFactory.create_test_game_state(
+    initial_state = ModelFactory.create_test_game_state(
         game_id="test_game_id",
         session_id="test_session_id"
     )
@@ -47,11 +47,11 @@ async def test_workflow_state_update():
     workflow_manager = WorkflowManager(state_manager, rules_manager)
     
     # État initial
-    initial_state = TestModelFactory.create_test_game_state(
+    initial_state = ModelFactory.create_test_game_state(
         game_id="test_game_id",
         session_id="test_session_id",
         section_number=1,
-        narrative=TestModelFactory.create_test_narrator_model(
+        narrative=ModelFactory.create_test_narrator_model(
             content="Initial section"
         )
     )
@@ -60,9 +60,9 @@ async def test_workflow_state_update():
     workflow_state = await workflow_manager.start_workflow(initial_state)
     
     # Mise à jour
-    update_state = TestModelFactory.create_test_game_state(
+    update_state = ModelFactory.create_test_game_state(
         section_number=2,
-        narrative=TestModelFactory.create_test_narrator_model(
+        narrative=ModelFactory.create_test_narrator_model(
             section_number=2,
             content="Updated section"
         )
