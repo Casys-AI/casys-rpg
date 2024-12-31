@@ -8,6 +8,8 @@ from managers.protocols.rules_manager_protocol import RulesManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from managers.protocols.trace_manager_protocol import TraceManagerProtocol
 from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
+from managers.protocols.narrator_manager_protocol import NarratorManagerProtocol
+from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 
 __all__ = [
     'AgentManagerProtocol',
@@ -18,4 +20,6 @@ __all__ = [
     'StateManagerProtocol',
     'TraceManagerProtocol',
     'DecisionManagerProtocol',
+    'NarratorManagerProtocol',
+    'WorkflowManagerProtocol'
 ]

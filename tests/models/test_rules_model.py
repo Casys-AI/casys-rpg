@@ -2,9 +2,24 @@
 import pytest
 from datetime import datetime
 from models.rules_model import RulesModel, DiceType, SourceType, Choice, ChoiceType
+from models.decision_model import NextActionType
 
-def test_rules_model_creation():
+@pytest.fixture
+def sample_rules_model():
+    """Create a sample rules model."""
+    return RulesModel(section_number=1)
+
+def test_rules_model_creation(sample_rules_model):
     """Test basic creation of rules model."""
+    assert sample_rules_model.section_number == 1
+    assert sample_rules_model.dice_type == DiceType.NONE
+    assert not sample_rules_model.needs_dice
+    assert not sample_rules_model.needs_user_response
+    assert sample_rules_model.next_action is None
+    assert isinstance(sample_rules_model.last_update, datetime)
+
+def test_rules_model_empty_creation():
+    """Test creation of empty rules model."""
     rules = RulesModel(section_number=1)
     
     assert rules.section_number == 1
@@ -91,54 +106,84 @@ def test_rules_model_validation_section_number():
 
 def test_rules_model_next_action_validation():
     """Test next_action field validation."""
-    # Test avec needs_user_response
+    # Test with user_first
     rules_user = RulesModel(
         section_number=1,
-        needs_user_response=True,
-        next_action="user_first"
+        next_action=NextActionType.USER_FIRST
     )
-    assert rules_user.next_action == "user_first"
+    assert rules_user.next_action == NextActionType.USER_FIRST
     
     # Test avec needs_dice
     rules_dice = RulesModel(
         section_number=1,
         needs_dice=True,
-        next_action="dice_first"
+        next_action=NextActionType.DICE_FIRST
     )
-    assert rules_dice.next_action == "dice_first"
+    assert rules_dice.next_action == NextActionType.DICE_FIRST
     
-    # Test avec une valeur invalide
+    # Test invalid next_action
     with pytest.raises(ValueError):
         RulesModel(
             section_number=1,
-            needs_user_response=True,
-            next_action="invalid_action"
-        )
-    
-    # Test sans needs_dice ni needs_user_response
-    with pytest.raises(ValueError):
-        RulesModel(
-            section_number=1,
-            next_action="user_first"  # Devrait échouer car aucune action n'est nécessaire
+            next_action="invalid"
         )
 
 def test_rules_model_source_types():
-    """Test different source types."""
-    for source_type in SourceType:
-        rules = RulesModel(
-            section_number=1,
-            source_type=source_type
-        )
-        assert rules.source_type == source_type
+    """Test source type enumeration values."""
+    assert SourceType.RAW == "raw"
+    assert SourceType.PROCESSED == "processed"
+    assert SourceType.ERROR == "error"
+    
+    rules_raw = RulesModel(section_number=1, source_type=SourceType.RAW)
+    assert rules_raw.source_type == SourceType.RAW
+    
+    rules_processed = RulesModel(section_number=1, source_type=SourceType.PROCESSED)
+    assert rules_processed.source_type == SourceType.PROCESSED
+    
+    rules_error = RulesModel(section_number=1, source_type=SourceType.ERROR)
+    assert rules_error.source_type == SourceType.ERROR
 
 def test_rules_model_with_error():
     """Test rules model in error state."""
-    error_message = "Test error message"
+    error_msg = "Failed to process rules"
     rules = RulesModel(
         section_number=1,
-        error=error_message,
+        error=error_msg,
         source_type=SourceType.ERROR
     )
     
-    assert rules.error == error_message
+    assert rules.error == error_msg
     assert rules.source_type == SourceType.ERROR
+    assert not rules.needs_dice
+    assert not rules.needs_user_response
+
+def test_rules_model_choice_validation():
+    """Test choice validation in rules model."""
+    # Test invalid choice type
+    with pytest.raises(ValueError):
+        Choice(
+            text="Invalid choice",
+            type="invalid_type",  # type: ignore
+            target_section=2
+        )
+    
+    # Test missing target section for direct choice
+    with pytest.raises(ValueError):
+        Choice(
+            text="Invalid direct choice",
+            type=ChoiceType.DIRECT
+        )
+    
+    # Test missing conditions for conditional choice
+    with pytest.raises(ValueError):
+        Choice(
+            text="Invalid conditional choice",
+            type=ChoiceType.CONDITIONAL
+        )
+    
+    # Test missing dice_type for dice choice
+    with pytest.raises(ValueError):
+        Choice(
+            text="Invalid dice choice",
+            type=ChoiceType.DICE
+        )

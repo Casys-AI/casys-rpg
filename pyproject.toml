@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "casys-rpg"
+version = "0.1.0"
+description = "Un système de jeu de rôle basé sur des agents IA"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+pydantic = "^2.5.3"
+pytest = "^7.4.3"
+pytest-asyncio = "^0.23.2"
+langchain = "^0.1.0"
+langgraph = "^0.0.17"
+fastapi = "^0.108.0"
+uvicorn = "^0.25.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -74,3 +74,8 @@ class AuthorError(GameError):
     """Error related to author operations."""
     def __init__(self, message: str = "", **kwargs):
         super().__init__(message, **kwargs)
+
+class StoryGraphError(GameError):
+    """Error related to story graph operations."""
+    def __init__(self, message: str = "", **kwargs):
+        super().__init__(message, **kwargs)

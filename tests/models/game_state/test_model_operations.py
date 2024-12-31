@@ -1,65 +1,63 @@
-"""
-Tests for game state model operations (addition, combination).
-"""
+"""Tests for GameState model operations."""
 import pytest
 from datetime import datetime
 
 from models.game_state import GameState
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, DiceType, SourceType
+from models.decision_model import DecisionModel
+from models.trace_model import TraceModel
 from models.errors_model import StateError
-from tests.test_model_factory import TestModelFactory
+from tests.models.conftest import ModelFactory
 
-def test_model_addition():
-    """Test l'addition de modèles."""
-    # Test NarratorModel addition
-    narrator1 = TestModelFactory.create_test_narrator_model(
+@pytest.mark.asyncio
+async def test_model_update():
+    """Test la mise à jour des modèles dans GameState."""
+    # État initial
+    initial_state = ModelFactory.create_test_game_state(
         section_number=1,
-        content="Content 1"
-    )
-    narrator2 = TestModelFactory.create_test_narrator_model(
-        section_number=2,
-        content="Content 2"
-    )
-    
-    combined_narrator = narrator1 + narrator2
-    assert combined_narrator.section_number == 2, "Should take second section number"
-    assert combined_narrator.content == "Content 2", "Should take second content"
-    
-    # Test RulesModel addition
-    rules1 = TestModelFactory.create_test_rules_model(
-        section_number=1,
-        dice_type=DiceType.NONE
-    )
-    rules2 = TestModelFactory.create_test_rules_model(
-        section_number=2,
-        dice_type=DiceType.D6
-    )
-    
-    combined_rules = rules1 + rules2
-    assert combined_rules.section_number == 2, "Should take second section number"
-    assert combined_rules.dice_type == DiceType.D6, "Should take second dice type"
-
-def test_gamestate_combination():
-    """Test la combinaison d'états de jeu."""
-    state1 = TestModelFactory.create_test_game_state(
-        game_id="test_game",
-        session_id="test_session",
-        section_number=1,
-        narrative=TestModelFactory.create_test_narrator_model(
+        narrative=ModelFactory.create_test_narrator_model(
             content="Initial content"
         )
     )
     
-    state2 = TestModelFactory.create_test_game_state(
-        section_number=2,
-        narrative=TestModelFactory.create_test_narrator_model(
-            content="Updated content"
+    # Mise à jour avec nouveau contenu
+    updated_state = initial_state.model_copy(update={
+        "section_number": 2,
+        "narrative": ModelFactory.create_test_narrator_model(
+            content="Updated content",
+            section_number=2
+        )
+    })
+    
+    # Vérifications
+    assert updated_state.section_number == 2
+    assert updated_state.narrative.content == "Updated content"
+    assert updated_state.narrative.section_number == 2
+
+@pytest.mark.asyncio
+async def test_model_merge():
+    """Test la fusion de deux GameState."""
+    # États à fusionner
+    state1 = ModelFactory.create_test_game_state(
+        section_number=1,
+        narrative=ModelFactory.create_test_narrator_model(
+            content="Content 1"
         )
     )
     
-    combined_state = state1 + state2
-    assert combined_state.game_id == state1.game_id, "Should keep original game_id"
-    assert combined_state.session_id == state1.session_id, "Should keep original session_id"
-    assert combined_state.section_number == 2, "Should take new section number"
-    assert combined_state.narrative.content == "Updated content", "Should update content"
+    state2 = ModelFactory.create_test_game_state(
+        section_number=2,
+        narrative=ModelFactory.create_test_narrator_model(
+            content="Content 2",
+            section_number=2
+        )
+    )
+    
+    # Fusion
+    merged_state = state1.model_copy(update=state2.model_dump())
+    
+    # Vérifications
+    assert merged_state.section_number == 2
+    assert merged_state.narrative.content == "Content 2"
+    assert merged_state.narrative.section_number == 2

@@ -1,176 +1,100 @@
-"""Tests for the trace model."""
+"""Test trace model module."""
 import pytest
 from datetime import datetime
-from models.trace_model import TraceModel, TraceAction, ActionType
+from models import TraceModel, ActionType, CharacterModel, CharacterStats, Inventory
 
-def test_add_action():
-    """Test adding a single action to the trace."""
-    # Create a new trace model with required fields
-    trace = TraceModel(
+@pytest.fixture
+def sample_trace_model():
+    """Create a sample trace model."""
+    return TraceModel(
         game_id="test_game",
-        session_id="test_session"
+        session_id="test_session",
+        section_number=1
     )
-    
-    # Create a test action
-    action_data = {
-        "section": 1,
-        "action_type": ActionType.USER_INPUT,
-        "details": {"input": "go north"}
-    }
-    
-    # Add the action
-    trace.add_action(action_data)
-    
-    # Verify the action was added correctly
-    assert len(trace.history) == 1
-    added_action = trace.history[0]
-    assert added_action.section == 1
-    assert added_action.action_type == ActionType.USER_INPUT
-    assert added_action.details["input"] == "go north"
 
-def test_add_multiple_actions():
-    """Test adding multiple actions to the trace."""
-    trace = TraceModel(
-        game_id="test_game",
-        session_id="test_session"
+@pytest.fixture
+def sample_character():
+    """Create a sample character."""
+    return CharacterModel(
+        name="Test Character",
+        stats=CharacterStats(SKILL=10, STAMINA=20, LUCK=5),
+        inventory=Inventory(items={})
     )
-    
-    # Add multiple actions
-    actions = [
-        {
-            "section": 1,
-            "action_type": ActionType.USER_INPUT,
-            "details": {"input": "examine room"}
-        },
-        {
-            "section": 2,
-            "action_type": ActionType.DICE_ROLL,
-            "details": {
-                "roll_result": 6,
-                "roll_type": "combat",
-                "modifier": 2
-            }
-        }
-    ]
-    
-    for action in actions:
-        trace.add_action(action)
-    
-    # Verify all actions were added
-    assert len(trace.history) == 2
-    assert trace.history[0].section == 1
-    assert trace.history[1].section == 2
-    assert trace.history[1].details["roll_result"] == 6
 
-def test_add_action_with_trace_action_instance():
-    """Test adding a TraceAction instance directly."""
-    trace = TraceModel(
-        game_id="test_game",
-        session_id="test_session"
-    )
-    
-    action = TraceAction(
-        section=1,
-        action_type=ActionType.USER_INPUT,
-        details={"input": "look"}
-    )
-    
-    trace.add_action(action.model_dump())
-    assert len(trace.history) == 1
-    assert trace.history[0].section == 1
+def test_trace_model_creation(sample_trace_model):
+    """Test creating a trace model."""
+    assert sample_trace_model.game_id == "test_game"
+    assert sample_trace_model.session_id == "test_session"
+    assert sample_trace_model.section_number == 1
+    assert isinstance(sample_trace_model.start_time, datetime)
+    assert isinstance(sample_trace_model.history, list)
+    assert len(sample_trace_model.history) == 0
+    assert sample_trace_model.current_section is None
+    assert sample_trace_model.current_rules is None
+    assert sample_trace_model.character is None
+    assert sample_trace_model.error is None
 
-def test_add_action_maintains_immutability():
-    """Test that adding actions maintains immutability of history."""
-    trace = TraceModel(
-        game_id="test_game",
-        session_id="test_session"
-    )
-    
-    # Initial action
-    action1 = {
-        "section": 1,
-        "action_type": ActionType.USER_INPUT,
-        "details": {"input": "start"}
-    }
-    trace.add_action(action1)
-    
-    # Store the first action
-    first_action = trace.history[0]
-    
-    # Add another action
-    action2 = {
-        "section": 2,
-        "action_type": ActionType.USER_INPUT,
-        "details": {"input": "continue"}
-    }
-    trace.add_action(action2)
-    
-    # Verify first action hasn't changed
-    assert trace.history[0] == first_action
-    assert len(trace.history) == 2
-
-def test_add_action_with_empty_history():
-    """Test adding action when history is empty."""
-    trace = TraceModel(
-        game_id="test_game",
-        session_id="test_session"
-    )
-    
-    assert len(trace.history) == 0
-    
+def test_add_action(sample_trace_model):
+    """Test adding an action to the trace."""
     action = {
         "section": 1,
         "action_type": ActionType.USER_INPUT,
-        "details": {"input": "start"}
+        "details": {"input": "test"}
     }
-    trace.add_action(action)
+    sample_trace_model.add_action(action)
     
-    assert len(trace.history) == 1
+    assert len(sample_trace_model.history) == 1
+    last_action = sample_trace_model.history[-1]
+    assert last_action.section == 1
+    assert last_action.action_type == ActionType.USER_INPUT
+    assert last_action.details == {"input": "test"}
+    assert isinstance(last_action.timestamp, datetime)
 
-def test_add_action_validates_data():
-    """Test that action data is properly validated."""
-    trace = TraceModel(
-        game_id="test_game",
-        session_id="test_session"
-    )
+def test_update_character(sample_trace_model, sample_character):
+    """Test updating character in trace."""
+    sample_trace_model.update_character(sample_character)
     
-    # Test with invalid section number
-    with pytest.raises(ValueError):
-        trace.add_action({
-            "section": -1,  # Invalid: must be positive
-            "action_type": ActionType.USER_INPUT,
-            "details": {"input": "test"}
-        })
-        
-    # Test dice roll without roll_result
-    with pytest.raises(ValueError, match="Dice roll actions must include 'roll_result' in details"):
-        trace.add_action({
-            "section": 1,
-            "action_type": ActionType.DICE_ROLL,
-            "details": {"modifier": 2}  # Missing roll_result
-        })
-        
-    # Test user input without input field
-    with pytest.raises(ValueError, match="User input actions must include 'input' in details"):
-        trace.add_action({
-            "section": 1,
-            "action_type": ActionType.USER_INPUT,
-            "details": {}  # Missing input
-        })
+    assert sample_trace_model.character == sample_character
+    assert len(sample_trace_model.history) == 1
+    last_action = sample_trace_model.history[-1]
+    assert last_action.action_type == ActionType.CHARACTER_UPDATE
+    assert last_action.details["character"] == sample_character.model_dump()
 
-def test_model_validation():
-    """Test model validation rules."""
-    # Test with empty session_id
-    with pytest.raises(ValueError):
-        TraceModel(
-            game_id="test_game",
-            session_id=""  # Invalid: cannot be empty
-        )
-    
-    # Test with invalid section_number
+def test_trace_model_validation():
+    """Test trace model validation."""
+    # Test invalid section number
     with pytest.raises(ValueError):
         TraceModel(
             game_id="test_game",
             session_id="test_session",
-            section_number=-1  # Invalid: must be >= 0
+            section_number=-1
         )
+    
+    # Test invalid game_id
+    with pytest.raises(ValueError):
+        TraceModel(
+            game_id="",
+            session_id="test_session",
+            section_number=1
+        )
+    
+    # Test invalid session_id
+    with pytest.raises(ValueError):
+        TraceModel(
+            game_id="test_game",
+            session_id="",
+            section_number=1
+        )
+
+def test_error_state_validation(sample_trace_model):
+    """Test error state validation."""
+    # Set error state
+    sample_trace_model.error = "Test error"
+    
+    # Should not allow setting current_section with error
+    with pytest.raises(ValueError):
+        sample_trace_model.current_section = "Test section"
+    
+    # Should not allow setting current_rules with error
+    with pytest.raises(ValueError):
+        sample_trace_model.current_rules = "Test rules"

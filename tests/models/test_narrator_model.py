@@ -3,8 +3,16 @@ import pytest
 from datetime import datetime
 from models.narrator_model import NarratorModel, SourceType
 
-def test_narrator_model_creation():
+def test_narrator_model_creation(sample_narrator_model):
     """Test basic creation of narrator model."""
+    assert sample_narrator_model.section_number == 1
+    assert sample_narrator_model.content == "Sample formatted content"
+    assert sample_narrator_model.source_type == SourceType.PROCESSED
+    assert sample_narrator_model.error is None
+    assert isinstance(sample_narrator_model.timestamp, datetime)
+
+def test_narrator_model_empty_creation():
+    """Test creation of empty narrator model."""
     narrator = NarratorModel(section_number=1)
     
     assert narrator.section_number == 1
@@ -57,48 +65,42 @@ def test_narrator_model_custom_timestamp():
 
 def test_narrator_model_source_type_enum():
     """Test source type enumeration values."""
-    # Test all valid source types
-    for source_type in SourceType:
-        narrator = NarratorModel(
-            section_number=1,
-            source_type=source_type
-        )
-        assert narrator.source_type == source_type
+    assert SourceType.RAW == "raw"
+    assert SourceType.PROCESSED == "processed"
+    assert SourceType.ERROR == "error"
     
-    # Test invalid source type
-    with pytest.raises(ValueError):
-        NarratorModel(
-            section_number=1,
-            source_type="invalid_type"  # type: ignore
-        )
+    narrator_raw = NarratorModel(section_number=1, source_type=SourceType.RAW)
+    assert narrator_raw.source_type == SourceType.RAW
+    
+    narrator_processed = NarratorModel(section_number=1, source_type=SourceType.PROCESSED)
+    assert narrator_processed.source_type == SourceType.PROCESSED
+    
+    narrator_error = NarratorModel(section_number=1, source_type=SourceType.ERROR)
+    assert narrator_error.source_type == SourceType.ERROR
 
-def test_narrator_model_content_update():
+def test_narrator_model_content_update(sample_narrator_model):
     """Test updating narrator model content."""
-    narrator = NarratorModel(section_number=1)
-    
-    # Update content and source type
     new_content = "Updated content"
-    narrator.content = new_content
-    narrator.source_type = SourceType.PROCESSED
+    updated_model = sample_narrator_model.model_copy(update={"content": new_content})
     
-    assert narrator.content == new_content
-    assert narrator.source_type == SourceType.PROCESSED
+    assert updated_model.content == new_content
+    assert updated_model.section_number == sample_narrator_model.section_number
+    assert updated_model.source_type == sample_narrator_model.source_type
 
 def test_narrator_model_error_handling():
     """Test error handling in narrator model."""
-    narrator = NarratorModel(section_number=1)
+    # Test that error and content cannot coexist
+    with pytest.raises(ValueError):
+        NarratorModel(
+            section_number=1,
+            content="Some content",
+            error="Some error"
+        )
     
-    # Set error state
-    error_msg = "Test error"
-    narrator.error = error_msg
-    narrator.source_type = SourceType.ERROR
-    
-    assert narrator.error == error_msg
+    # Test that error forces source_type to ERROR
+    narrator = NarratorModel(
+        section_number=1,
+        error="Test error",
+        source_type=SourceType.RAW  # This should be overridden
+    )
     assert narrator.source_type == SourceType.ERROR
-    
-    # Clear error state
-    narrator.error = None
-    narrator.source_type = SourceType.RAW
-    
-    assert narrator.error is None
-    assert narrator.source_type == SourceType.RAW

@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Union, Literal, Annotated
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from models.decision_model import NextActionType
 
 class DiceType(str, Enum):
     """Type of dice roll."""
@@ -49,45 +50,45 @@ class Choice(BaseModel):
             if self.target_section is None:
                 raise ValueError("Direct choices must have a target section")
             if self.dice_type not in (None, DiceType.NONE):
-                raise ValueError("Direct choices cannot have dice type other than none")
+                raise ValueError("Direct choices cannot have dice rolls")
             if self.conditions:
                 raise ValueError("Direct choices cannot have conditions")
-            if self.dice_results:
-                raise ValueError("Direct choices cannot have dice results")
-        
-        if self.type == ChoiceType.CONDITIONAL and not self.conditions:
-            raise ValueError("Conditional choices must have conditions")
-            
-        if self.type == ChoiceType.DICE:
-            if self.dice_type is None:
-                raise ValueError("Dice choices must have a dice type")
+                
+        elif self.type == ChoiceType.CONDITIONAL:
+            if not self.conditions:
+                raise ValueError("Conditional choices must have conditions")
+            if self.dice_type not in (None, DiceType.NONE):
+                raise ValueError("Conditional choices cannot have dice rolls")
+                
+        elif self.type == ChoiceType.DICE:
+            if self.dice_type in (None, DiceType.NONE):
+                raise ValueError("Dice choices must specify dice type")
             if not self.dice_results:
                 raise ValueError("Dice choices must have dice results")
-            if self.dice_type == DiceType.NONE:
-                raise ValueError("Dice choices cannot have dice_type none")
+            if self.conditions:
+                raise ValueError("Dice choices cannot have conditions")
                 
-        if self.type == ChoiceType.MIXED:
+        elif self.type == ChoiceType.MIXED:
             if not self.conditions:
                 raise ValueError("Mixed choices must have conditions")
-            if self.dice_type is None:
-                raise ValueError("Mixed choices must have a dice type")
+            if self.dice_type in (None, DiceType.NONE):
+                raise ValueError("Mixed choices must specify dice type")
             if not self.dice_results:
                 raise ValueError("Mixed choices must have dice results")
-            if self.dice_type == DiceType.NONE:
-                raise ValueError("Mixed choices cannot have dice_type none")
                 
         return self
 
 class RulesModel(BaseModel):
     """Current rules being processed."""
-    section_number: Annotated[int, Field(gt=0, description="Current section number")]
+    
+    section_number: Annotated[int, Field(..., gt=0, description="Current section number")]
     dice_type: DiceType = Field(default=DiceType.NONE, description="Type of dice roll needed")
     needs_dice: bool = Field(default=False, description="Indicates if a dice roll is needed")
     needs_user_response: bool = Field(
         default=False,
         description="Indicates if a user response is needed"
     )
-    next_action: Optional[Literal["user_first", "dice_first"]] = Field(
+    next_action: Optional[NextActionType] = Field(
         default=None,
         description="Order of actions ('user_first' or 'dice_first')"
     )
@@ -116,7 +117,7 @@ class RulesModel(BaseModel):
         description="Type of source for the content"
     )
     last_update: datetime = Field(default_factory=datetime.now, description="Date de mise à jour spécifique aux règles")
-    
+
     @model_validator(mode='after')
     def validate_rules(self) -> 'RulesModel':
         """Validate the rules model for consistency."""
@@ -158,7 +159,7 @@ class RulesModel(BaseModel):
                 raise ValueError("next_action cannot be user_first when needs_user_response is False")
             
         return self
-        
+
     def __add__(self, other: 'RulesModel') -> 'RulesModel':
         """Merge two RulesModels for LangGraph parallel results.
         Verifies section numbers match and takes the latest model.
