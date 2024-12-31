@@ -109,23 +109,33 @@ def test_rules_model_next_action_validation():
     # Test with user_first
     rules_user = RulesModel(
         section_number=1,
-        next_action=NextActionType.USER_FIRST
+        needs_user_response=True,
+        next_action="user_first"
     )
-    assert rules_user.next_action == NextActionType.USER_FIRST
+    assert rules_user.next_action == "user_first"
     
     # Test avec needs_dice
     rules_dice = RulesModel(
         section_number=1,
         needs_dice=True,
-        next_action=NextActionType.DICE_FIRST
+        dice_type=DiceType.COMBAT,
+        next_action="dice_first"
     )
-    assert rules_dice.next_action == NextActionType.DICE_FIRST
+    assert rules_dice.next_action == "dice_first"
     
     # Test invalid next_action
     with pytest.raises(ValueError):
         RulesModel(
             section_number=1,
+            needs_user_response=True,
             next_action="invalid"
+        )
+    
+    # Test next_action sans needs_dice ou needs_user_response
+    with pytest.raises(ValueError):
+        RulesModel(
+            section_number=1,
+            next_action="user_first"
         )
 
 def test_rules_model_source_types():

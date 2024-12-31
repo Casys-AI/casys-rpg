@@ -1,16 +1,11 @@
-"""Models for the decision agent."""
-from typing import List, Optional, Literal
+"""Models for decision making."""
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator
-
+from models.types.common_types import NextActionType
 from models.rules_model import DiceType
 from models.trace_model import ActionType
-
-class NextActionType(str, Enum):
-    """Type of next action required."""
-    USER_FIRST = "user_first"
-    DICE_FIRST = "dice_first"
 
 class DiceResult(BaseModel):
     """Result of a dice roll."""

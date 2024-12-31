@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Union, Literal, Annotated
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from models.decision_model import NextActionType
+from models.types.common_types import NextActionType
 
 class DiceType(str, Enum):
     """Type of dice roll."""
