@@ -281,7 +281,7 @@ def test_mixed_model_addition():
     narrator1 = NarratorModel(
         section_number=1,
         content="Content 1",
-        source_type="raw"
+        source_type=SourceType.RAW
     )
     
     rules1 = RulesModel(
@@ -431,6 +431,7 @@ def test_workflow_section_sync():
     
     # Premier état avec section 2
     state_dict_1 = {
+        'game_id': 'test_game',  # Ajout du game_id requis
         'session_id': 'test',
         'section_number': 2,
         'narrative': narrator_section_2,
@@ -442,6 +443,7 @@ def test_workflow_section_sync():
     
     # Simuler le workflow qui cause le problème
     state_dict_2 = {
+        'game_id': 'test_game',  # Ajout du game_id requis
         'session_id': 'test',
         'section_number': [2, 2, 2],  # LangGraph accumule les sections
         'narrative': [narrator_section_2, narrator_section_2],  # LangGraph essaie d'additionner
@@ -865,7 +867,7 @@ async def test_workflow_id_preservation():
     config = StorageConfig()
     cache_manager = CacheManager(config)
     state_manager = StateManager(config, cache_manager)
-    rules_manager = RulesManager(config)
+    rules_manager = RulesManager(config, cache_manager)
     workflow_manager = WorkflowManager(state_manager, rules_manager)
     
     # Test Case 1: Input sans IDs
@@ -916,7 +918,7 @@ async def test_workflow_complete_id_preservation():
     config = StorageConfig()
     cache_manager = CacheManager(config)
     state_manager = StateManager(config, cache_manager)
-    rules_manager = RulesManager(config)
+    rules_manager = RulesManager(config, cache_manager)
     workflow_manager = WorkflowManager(state_manager, rules_manager)
     
     # 1. Créer un état initial avec des IDs connus
@@ -959,3 +961,64 @@ async def test_workflow_complete_id_preservation():
     assert combined_state.narrative.section_number == 2, "narrative.section_number devrait être mis à jour"
     assert combined_state.narrative.content == "Updated section", "narrative.content devrait être mis à jour"
     assert combined_state.rules.section_number == 2, "rules.section_number devrait être mis à jour"
+
+@pytest.mark.asyncio
+async def test_basic_id_preservation():
+    """Test la préservation basique des IDs."""
+    initial_state = TestModelFactory.create_test_game_state(
+        game_id="test_game_id",
+        session_id="test_session_id",
+        section_number=1
+    )
+    
+    # Vérifier que les IDs sont préservés après une mise à jour simple
+    update_state = TestModelFactory.create_test_game_state(section_number=2)
+    combined_state = initial_state + update_state
+    
+    assert combined_state.game_id == initial_state.game_id
+    assert combined_state.session_id == initial_state.session_id
+
+@pytest.mark.asyncio
+async def test_model_update_with_id_preservation():
+    """Test que la mise à jour des modèles préserve les IDs."""
+    initial_state = TestModelFactory.create_test_game_state(
+        game_id="test_game_id",
+        session_id="test_session_id",
+        section_number=1,
+        narrative=TestModelFactory.create_test_narrator_model(content="Initial")
+    )
+    
+    # Mise à jour du contenu narratif
+    update_state = TestModelFactory.create_test_game_state(
+        section_number=2,
+        narrative=TestModelFactory.create_test_narrator_model(
+            section_number=2,
+            content="Updated"
+        )
+    )
+    
+    combined_state = initial_state + update_state
+    assert combined_state.game_id == initial_state.game_id
+    assert combined_state.session_id == initial_state.session_id
+    assert combined_state.narrative.content == "Updated"
+    assert combined_state.narrative.section_number == 2
+
+@pytest.mark.asyncio
+async def test_workflow_state_initialization():
+    """Test l'initialisation correcte de l'état dans le workflow."""
+    config = StorageConfig()
+    cache_manager = CacheManager(config)
+    state_manager = StateManager(config, cache_manager)
+    await state_manager.initialize()  # Important: initialiser le state manager
+    
+    rules_manager = RulesManager(config, cache_manager)
+    workflow_manager = WorkflowManager(state_manager, rules_manager)
+    
+    initial_state = TestModelFactory.create_test_game_state(
+        game_id="test_game_id",
+        session_id="test_session_id"
+    )
+    
+    workflow_state = await workflow_manager.start_workflow(initial_state)
+    assert workflow_state.game_id == initial_state.game_id
+    assert workflow_state.session_id == initial_state.session_id
