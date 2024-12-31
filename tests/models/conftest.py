@@ -322,7 +322,12 @@ def sample_narrative_content(model_factory) -> dict:
 @pytest.fixture
 def sample_narrator_model(model_factory, sample_metadata) -> NarratorModel:
     """Provide sample narrator model."""
-    return model_factory.create_narrator_model(metadata=sample_metadata)
+    return model_factory.create_narrator_model(
+        content="Sample formatted content",
+        metadata=sample_metadata,
+        source_type=NarratorSourceType.PROCESSED,
+        section_number=1
+    )
 
 @pytest.fixture
 def sample_rule_condition(model_factory) -> dict:

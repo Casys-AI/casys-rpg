@@ -51,7 +51,7 @@ class TraceModel(BaseModel):
     """Current state of the game trace."""
     model_config = ConfigDict(validate_assignment=True)  # Validate on attribute assignment
 
-    game_id: str = Field(description="Unique game identifier")
+    game_id: Annotated[str, Field(min_length=1, description="Unique game identifier")]
     session_id: Annotated[str, Field(min_length=1, description="Unique session identifier")]
     section_number: Annotated[int, Field(ge=0, description="Current section number")] = 0
     start_time: datetime = Field(
