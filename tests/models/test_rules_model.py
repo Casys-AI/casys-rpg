@@ -1,21 +1,44 @@
 """Tests for rules model."""
 import pytest
 from datetime import datetime
-from models.rules_model import RulesModel, DiceType, SourceType, Choice, ChoiceType
-from models.decision_model import NextActionType
+from models.rules_model import (
+    RulesModel, DiceType, Choice, ChoiceType,
+    SourceType
+)
+from models.types.common_types import NextActionType
 
 @pytest.fixture
 def sample_rules_model():
-    """Create a sample rules model."""
-    return RulesModel(section_number=1)
+    """Create a sample rules model for testing."""
+    return RulesModel(
+        section_number=1,
+        dice_type=DiceType.COMBAT,
+        needs_dice=True,
+        needs_user_response=True,
+        next_action=NextActionType.USER_FIRST,
+        conditions=["has_sword"],
+        choices=[
+            Choice(
+                text="Go to section 2",
+                type=ChoiceType.DIRECT,
+                target_section=2
+            ),
+            Choice(
+                text="Use sword if you have it",
+                type=ChoiceType.CONDITIONAL,
+                conditions=["has_sword"],
+                target_section=3
+            )
+        ]
+    )
 
 def test_rules_model_creation(sample_rules_model):
     """Test basic creation of rules model."""
     assert sample_rules_model.section_number == 1
-    assert sample_rules_model.dice_type == DiceType.NONE
-    assert not sample_rules_model.needs_dice
-    assert not sample_rules_model.needs_user_response
-    assert sample_rules_model.next_action is None
+    assert sample_rules_model.dice_type == DiceType.COMBAT
+    assert sample_rules_model.needs_dice
+    assert sample_rules_model.needs_user_response
+    assert sample_rules_model.next_action == NextActionType.USER_FIRST
     assert isinstance(sample_rules_model.last_update, datetime)
 
 def test_rules_model_empty_creation():
@@ -197,3 +220,100 @@ def test_rules_model_choice_validation():
             text="Invalid dice choice",
             type=ChoiceType.DICE
         )
+
+def test_choice_validation():
+    """Test validation rules for choices."""
+    # Test invalid choice key
+    with pytest.raises(ValueError):
+        Choice(
+            text="",
+            type=ChoiceType.DIRECT,
+            target_section=1
+        )
+    
+    # Test direct choice validation
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.DIRECT,
+            conditions=["has_sword"]  # Direct choices can't have conditions
+        )
+    
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.DIRECT,
+            dice_type=DiceType.COMBAT  # Direct choices can't have dice
+        )
+    
+    # Test conditional choice validation
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.CONDITIONAL,
+            target_section=1,
+            dice_type=DiceType.COMBAT  # Conditional choices can't have dice
+        )
+    
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.CONDITIONAL,
+            target_section=1  # Must have conditions
+        )
+    
+    # Test dice choice validation
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.DICE,
+            conditions=["has_sword"]  # Dice choices can't have conditions
+        )
+    
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.DICE,
+            target_section=1  # Must have dice_results
+        )
+    
+    # Test mixed choice validation
+    with pytest.raises(ValueError):
+        Choice(
+            text="Test choice",
+            type=ChoiceType.MIXED,
+            target_section=1  # Must have both conditions and dice
+        )
+    
+    # Test valid choices
+    direct = Choice(
+        text="Go to section 2",
+        type=ChoiceType.DIRECT,
+        target_section=2
+    )
+    assert direct.target_section == 2
+    
+    conditional = Choice(
+        text="Use sword if you have it",
+        type=ChoiceType.CONDITIONAL,
+        conditions=["has_sword"],
+        target_section=3
+    )
+    assert "has_sword" in conditional.conditions
+    
+    dice = Choice(
+        text="Roll for combat",
+        type=ChoiceType.DICE,
+        dice_type=DiceType.COMBAT,
+        dice_results={"1-3": 4, "4-6": 5}
+    )
+    assert dice.dice_type == DiceType.COMBAT
+    
+    mixed = Choice(
+        text="Use sword in combat",
+        type=ChoiceType.MIXED,
+        conditions=["has_sword"],
+        dice_type=DiceType.COMBAT,
+        dice_results={"1-3": 6, "4-6": 7}
+    )
+    assert mixed.type == ChoiceType.MIXED

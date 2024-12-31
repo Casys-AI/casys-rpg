@@ -1,6 +1,8 @@
 """Models for game initialization."""
 from typing import Optional
 from pydantic import BaseModel, Field
+##################
+# SHould migrate to models.game_state and use with model factory
 
 class GameInitRequest(BaseModel):
     """Request model for game initialization."""

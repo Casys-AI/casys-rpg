@@ -5,11 +5,11 @@ Defines the interface for agent management operations.
 from typing import Dict, Optional, Any, AsyncGenerator, Protocol, runtime_checkable, TYPE_CHECKING
 from models.game_state import GameState
 from config.agents.agent_config_base import AgentConfigBase
-from agents.factories.game_factory import GameFactory
 
 if TYPE_CHECKING:
     from models.types.agent_types import GameAgents
     from models.types.manager_types import GameManagers
+    from agents.factories.game_factory import GameFactory
 
 @runtime_checkable
 class AgentManagerProtocol(Protocol):
@@ -26,8 +26,8 @@ class AgentManagerProtocol(Protocol):
         self,
         agents: 'GameAgents',
         managers: 'GameManagers',
-        game_factory: GameFactory,
-        story_graph_config: Optional[AgentConfigBase] = None
+        game_factory: 'GameFactory',
+        story_graph_config: Optional['AgentConfigBase'] = None
     ) -> None:
         """Initialize agent manager.
         

@@ -4,7 +4,7 @@ Creates and configures game components.
 """
 
 import logging
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, TYPE_CHECKING
 
 from config.game_config import GameConfig
 from config.agents.agent_config_base import AgentConfigBase
@@ -17,7 +17,6 @@ from managers.trace_manager import TraceManager
 from managers.rules_manager import RulesManager
 from managers.decision_manager import DecisionManager
 from managers.narrator_manager import NarratorManager
-from managers.workflow_manager import WorkflowManager
 
 from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
@@ -97,7 +96,7 @@ class GameFactory:
             )
             decision_manager = DecisionManager()  # No config needed for now
             narrator_manager = NarratorManager(manager_configs.storage_config, self._cache_manager)
-            workflow_manager = WorkflowManager(state_manager, rules_manager)
+            workflow_manager = self._create_workflow_manager(state_manager, rules_manager)
             
             managers = {
                 "state_manager": state_manager,
@@ -116,6 +115,23 @@ class GameFactory:
             logger.error(f"Failed to create managers: {str(e)}")
             raise
         
+    def _create_workflow_manager(
+        self,
+        state_manager: StateManagerProtocol,
+        rules_manager: RulesManagerProtocol
+    ) -> WorkflowManagerProtocol:
+        """Create workflow manager instance.
+        
+        Args:
+            state_manager: State manager instance
+            rules_manager: Rules manager instance
+            
+        Returns:
+            WorkflowManagerProtocol: Workflow manager instance
+        """
+        from managers.workflow_manager import WorkflowManager
+        return WorkflowManager(state_manager, rules_manager)
+
     def _create_agents(self, managers: Dict[str, ManagerProtocols]) -> Dict[str, AgentProtocols]:
         """Create all game agents.
         

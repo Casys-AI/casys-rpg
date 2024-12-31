@@ -13,6 +13,7 @@ from models import (
     CharacterModel, CharacterStats, RulesError
 )
 from config.agents import RulesAgentConfig
+from config.game_config import GameConfig
 
 @pytest.fixture
 def mock_rules_manager() -> RulesManagerProtocol:
@@ -40,10 +41,10 @@ def model_factory() -> ModelFactory:
 @pytest.fixture
 def game_factory(mock_rules_manager, mock_cache_manager) -> GameFactory:
     """Create a game factory for testing."""
-    return GameFactory(
-        rules_manager=mock_rules_manager,
-        cache_manager=mock_cache_manager
-    )
+    config = GameConfig()
+    config.manager_configs.rules_config = mock_rules_manager
+    config.manager_configs.cache_config = mock_cache_manager
+    return GameFactory(config=config)
 
 @pytest.fixture
 def rules_config() -> RulesAgentConfig:
@@ -71,15 +72,15 @@ def sample_character(model_factory) -> CharacterModel:
     )
 
 @pytest.fixture
-def sample_rules_model(model_factory) -> RulesModel:
+def sample_rules_model() -> RulesModel:
     """Create sample rules model."""
-    return model_factory.create_rules_model(
+    return RulesModel(
         section_number=1,
         needs_dice=True,
         dice_type=DiceType.COMBAT,
         conditions=[
-            RuleCondition(text="Must have sword", item_required="sword"),
-            RuleCondition(text="SKILL > 8", stat_check={"stat": "SKILL", "value": 8, "operator": ">"})
+            "Must have sword",
+            "SKILL > 8"
         ],
         choices=[
             Choice(
@@ -90,17 +91,13 @@ def sample_rules_model(model_factory) -> RulesModel:
             ),
             Choice(
                 text="Try stealth",
-                type=ChoiceType.SKILL,
-                skill_check={"stat": "SKILL", "value": 8, "operator": ">"},
-                success_section=145,
-                failure_section=278
+                type=ChoiceType.CONDITIONAL,
+                conditions=["SKILL > 8"],
+                target_section=145
             )
         ],
-        validation=RuleValidation(
-            required_items=["sword"],
-            required_stats={"SKILL": 8}
-        ),
-        rules_summary="Combat or stealth required"
+        next_action=NextActionType.USER_FIRST,
+        needs_user_response=True
     )
 
 @pytest.fixture
@@ -117,9 +114,10 @@ def sample_game_state(game_factory, sample_character) -> GameState:
 @pytest.mark.asyncio
 async def test_rules_agent_initialization(rules_agent):
     """Test rules agent initialization."""
+    assert rules_agent is not None
     assert rules_agent.config is not None
+    assert rules_agent.config.llm is not None
     assert rules_agent.rules_manager is not None
-    assert rules_agent.llm is not None
 
 @pytest.mark.asyncio
 async def test_process_rules_cache_hit(

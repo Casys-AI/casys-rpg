@@ -1,7 +1,7 @@
 """
 Workflow Manager
 """
-from typing import Dict, Any, Optional, List, AsyncGenerator
+from typing import Dict, Any, Optional, List, AsyncGenerator, TYPE_CHECKING
 from loguru import logger
 from pydantic import BaseModel
 import uuid
@@ -10,10 +10,11 @@ from datetime import datetime
 from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
-from agents.protocols.story_graph_protocol import StoryGraphProtocol
 from models.game_state import GameState
 from models.errors_model import GameError, WorkflowError, RulesError
 
+if TYPE_CHECKING:
+    from agents.protocols.story_graph_protocol import StoryGraphProtocol
 
 class WorkflowManager(WorkflowManagerProtocol):
     """Workflow Manager implementation."""
@@ -58,6 +59,9 @@ class WorkflowManager(WorkflowManagerProtocol):
         try:
             logger.info("Starting workflow node (improved version)")
             logger.debug("Input data received: Type: {}, Value: {}", type(input_data), input_data)
+
+            # Initialize state manager first
+            await self.state_manager.initialize()
 
             if not input_data:
                 logger.error("No input data provided")

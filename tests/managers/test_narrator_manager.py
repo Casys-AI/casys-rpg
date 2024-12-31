@@ -3,11 +3,17 @@ import pytest
 import pytest_asyncio
 from unittest.mock import Mock, AsyncMock
 from datetime import datetime
+from pathlib import Path
 
 from managers.narrator_manager import NarratorManager
 from config.storage_config import StorageConfig
 from models.narrator_model import NarratorModel, SourceType
 from models.errors_model import NarratorError
+
+@pytest.fixture
+def mock_config():
+    """Create a mock configuration."""
+    return StorageConfig(base_path=Path("./test_data"))
 
 @pytest.fixture
 def mock_cache_manager():
@@ -16,32 +22,33 @@ def mock_cache_manager():
     cache.get_cached_data = AsyncMock(return_value=None)
     cache.save_cached_data = AsyncMock()
     cache.exists_data = AsyncMock(return_value=True)
-    cache.load_raw_data = AsyncMock(return_value=None)
+    cache.exists_raw_content = AsyncMock(return_value=True)
+    cache.load_raw_content = AsyncMock(return_value=None)
     return cache
-
-@pytest.fixture
-def mock_config():
-    """Create a test storage config."""
-    return StorageConfig(base_path="/test/path")
 
 @pytest.fixture
 def narrator_manager(mock_config, mock_cache_manager):
     """Create a test narrator manager."""
-    return NarratorManager(config=mock_config, cache_manager=mock_cache_manager)
+    return NarratorManager(
+        config=mock_config,
+        cache_manager=mock_cache_manager
+    )
 
 @pytest.fixture
 def sample_content():
     """Sample content for testing."""
-    return """# Section 1
-    
-This is a test section with some content."""
+    return {
+        "section_number": 1,
+        "content": "Test content",
+        "source_type": SourceType.RAW
+    }
 
 @pytest.fixture
 def sample_narrator_model():
     """Create a sample narrator model."""
     return NarratorModel(
         section_number=1,
-        content="# Section 1\nTest content",
+        content="Test content",
         source_type=SourceType.PROCESSED,
         timestamp=datetime.now()
     )
@@ -49,31 +56,31 @@ def sample_narrator_model():
 @pytest.mark.asyncio
 async def test_get_cached_content(narrator_manager, mock_cache_manager, sample_narrator_model):
     """Test getting cached content."""
-    # Configure mock
-    mock_cache_manager.get_cached_data.return_value = sample_narrator_model.model_dump()
-    
-    # Test successful retrieval
-    content = await narrator_manager.get_cached_content(1)
-    assert content is not None
-    assert content.section_number == sample_narrator_model.section_number
+    # Setup mock with markdown format
+    mock_cache_manager.get_cached_data.return_value = f"# Section {sample_narrator_model.section_number}\n{sample_narrator_model.content}"
+
+    # Test getting existing content
+    result = await narrator_manager.get_cached_content(1)
+    assert result is not None
+    assert result.section_number == sample_narrator_model.section_number
+    assert result.content == sample_narrator_model.content
     mock_cache_manager.get_cached_data.assert_called_once_with(
         key="section_1",
         namespace="sections"
     )
-    
-    # Test cache miss
+
+    # Test getting non-existent content
     mock_cache_manager.get_cached_data.return_value = None
-    content = await narrator_manager.get_cached_content(999)
-    assert content is None
+    result = await narrator_manager.get_cached_content(2)
+    assert result is None
 
 @pytest.mark.asyncio
 async def test_save_content(narrator_manager, mock_cache_manager, sample_narrator_model):
     """Test saving content."""
-    # Test successful save
     await narrator_manager.save_content(sample_narrator_model)
     mock_cache_manager.save_cached_data.assert_called_once_with(
         key=f"section_{sample_narrator_model.section_number}",
-        data=sample_narrator_model.model_dump(),
+        data=sample_narrator_model.content.strip(),
         namespace="sections"
     )
 
@@ -82,31 +89,31 @@ async def test_exists_section(narrator_manager, mock_cache_manager):
     """Test checking if section exists."""
     # Test existing section
     mock_cache_manager.exists_data.return_value = True
-    exists = await narrator_manager.exists_section(1)
-    assert exists is True
+    result = await narrator_manager.exists_section(1)
+    assert result is True
     mock_cache_manager.exists_data.assert_called_with(
         key="section_1",
         namespace="sections"
     )
-    
+
     # Test non-existent section
     mock_cache_manager.exists_data.return_value = False
-    exists = await narrator_manager.exists_section(999)
-    assert exists is False
+    result = await narrator_manager.exists_section(2)
+    assert result is False
 
 @pytest.mark.asyncio
 async def test_load_raw_content(narrator_manager, mock_cache_manager, sample_content):
     """Test loading raw content."""
     # Test successful load
-    mock_cache_manager.load_raw_data.return_value = sample_content
-    content = await narrator_manager.load_raw_content(1)
-    assert content == sample_content
-    mock_cache_manager.load_raw_data.assert_called_with(
-        key="section_1",
-        namespace="sections"
+    mock_cache_manager.load_raw_content.return_value = sample_content
+    result = await narrator_manager.load_raw_content(1)
+    assert result == sample_content
+    mock_cache_manager.load_raw_content.assert_called_with(
+        key="1",
+        namespace="raw_content"
     )
-    
-    # Test failed load
-    mock_cache_manager.load_raw_data.return_value = None
-    content = await narrator_manager.load_raw_content(999)
-    assert content is None
+
+    # Test load with error
+    mock_cache_manager.load_raw_content.side_effect = Exception("Test error")
+    with pytest.raises(NarratorError):
+        await narrator_manager.load_raw_content(1)

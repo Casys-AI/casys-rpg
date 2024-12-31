@@ -97,17 +97,25 @@ def story_graph_config() -> AgentConfigBase:
 @pytest_asyncio.fixture
 async def story_graph(
     story_graph_config, mock_workflow_manager,
-    mock_narrator_agent, mock_rules_agent,
-    mock_decision_agent, mock_trace_agent
+    mock_state_manager, mock_narrator_agent, 
+    mock_rules_agent, mock_decision_agent, 
+    mock_trace_agent
 ) -> StoryGraphProtocol:
     """Create a test story graph."""
+    managers = {
+        "workflow_manager": mock_workflow_manager,
+        "state_manager": mock_state_manager
+    }
+    agents = {
+        "narrator_agent": mock_narrator_agent,
+        "rules_agent": mock_rules_agent,
+        "decision_agent": mock_decision_agent,
+        "trace_agent": mock_trace_agent
+    }
     return StoryGraph(
         config=story_graph_config,
-        workflow_manager=mock_workflow_manager,
-        narrator_agent=mock_narrator_agent,
-        rules_agent=mock_rules_agent,
-        decision_agent=mock_decision_agent,
-        trace_agent=mock_trace_agent
+        managers=managers,
+        agents=agents
     )
 
 @pytest.fixture
@@ -206,11 +214,8 @@ def sample_game_state(game_factory, sample_character, sample_metadata) -> GameSt
 async def test_story_graph_initialization(story_graph):
     """Test story graph initialization."""
     assert story_graph.config is not None
-    assert story_graph.workflow_manager is not None
-    assert story_graph.narrator_agent is not None
-    assert story_graph.rules_agent is not None
-    assert story_graph.decision_agent is not None
-    assert story_graph.trace_agent is not None
+    assert story_graph.managers is not None
+    assert story_graph.agents is not None
 
 @pytest.mark.asyncio
 async def test_process_narrative_node(

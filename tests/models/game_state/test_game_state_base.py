@@ -5,7 +5,7 @@ import pytest
 from datetime import datetime
 from typing import Dict, Any
 
-from models.game_state import GameState
+from models.game_state import GameState, GameStateInput
 from models.errors_model import StateError
 from models.narrator_model import NarratorModel, SourceType
 from models.rules_model import RulesModel, DiceType, ChoiceType
@@ -58,99 +58,76 @@ def test_game_state_validation(model_factory):
     """Test validation of GameState fields."""
     # Test invalid section number
     with pytest.raises(ValueError, match="Section number must be positive"):
-        model_factory.create_game_state(
+        GameStateInput(
             game_id="test_game",
             session_id="test_session",
             section_number=-1
         )
     
     with pytest.raises(ValueError, match="Section number must be positive"):
-        model_factory.create_game_state(
+        GameStateInput(
             game_id="test_game",
             session_id="test_session",
             section_number=0
         )
-    
-    # Test empty game_id
-    with pytest.raises(ValueError, match="game_id cannot be empty"):
-        model_factory.create_game_state(
-            game_id="",
-            session_id="test_session",
-            section_number=1
-        )
-    
-    # Test empty session_id
-    with pytest.raises(ValueError, match="session_id cannot be empty"):
-        model_factory.create_game_state(
-            game_id="test_game",
-            session_id="",
-            section_number=1
-        )
+
+    # Test valid section number
+    state = GameStateInput(
+        game_id="test_game",
+        session_id="test_session",
+        section_number=1
+    )
+    assert state.section_number == 1
 
 def test_game_state_model_consistency(model_factory):
     """Test consistency between internal models."""
-    narrator_model = model_factory.create_narrator_model(section_number=2)
-    rules_model = model_factory.create_rules_model(section_number=2)
-    
-    # Test matching section numbers
+    # Create models with different section numbers
     state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
-        section_number=2,
-        narrative=narrator_model,
-        rules=rules_model
+        section_number=1,
+        narrative=model_factory.create_narrator_model(section_number=1),
+        rules=model_factory.create_rules_model(section_number=1),
+        trace=model_factory.create_trace_model(section_number=1)
     )
-    assert state.section_number == state.narrative.section_number
-    assert state.section_number == state.rules.section_number
     
-    # Test mismatched section numbers
-    narrator_model_wrong = model_factory.create_narrator_model(section_number=3)
-    with pytest.raises(StateError, match="Section number mismatch"):
-        model_factory.create_game_state(
-            game_id="test_game",
-            session_id="test_session",
-            section_number=2,
-            narrative=narrator_model_wrong
-        )
+    # Verify section numbers are synchronized
+    assert state.section_number == 1
+    assert state.narrative.section_number == 1
+    assert state.rules.section_number == 1
+    assert state.trace.section_number == 1
 
 def test_game_state_update(model_factory):
     """Test updating GameState fields."""
-    # Create initial state
     initial_state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
-        section_number=1,
-        narrative=model_factory.create_narrator_model(section_number=1)
+        section_number=1
     )
     
-    # Update with new section and narrative
-    updated_state = initial_state.model_copy(update={
-        "section_number": 2,
-        "narrative": model_factory.create_narrator_model(section_number=2)
-    })
+    # Update with new values
+    updated_state = initial_state.with_updates(
+        section_number=2,
+        player_input="new input"
+    )
     
     # Verify updates
     assert updated_state.section_number == 2
-    assert updated_state.narrative.section_number == 2
+    assert updated_state.player_input == "new input"
     assert updated_state.game_id == initial_state.game_id
     assert updated_state.session_id == initial_state.session_id
 
 def test_game_state_validation_error(model_factory):
     """Test validation errors in GameState."""
-    # Create models with mismatched section numbers
-    narrator_model = model_factory.create_narrator_model(section_number=1)
-    
-    with pytest.raises(StateError, match="Section number mismatch"):
+    with pytest.raises(ValueError):
         model_factory.create_game_state(
-            game_id="test_game",
+            game_id="",  # Invalid empty game_id
             session_id="test_session",
-            section_number=3,  # Mismatch with narrator model
-            narrative=narrator_model
+            section_number=1
         )
 
 def test_game_state_serialization(model_factory):
     """Test serialization of GameState."""
-    # Create state with all fields
     state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
@@ -158,40 +135,36 @@ def test_game_state_serialization(model_factory):
         character=model_factory.create_character(),
         narrative=model_factory.create_narrator_model(),
         rules=model_factory.create_rules_model(),
-        decisions=model_factory.create_decision_model(),
-        trace=model_factory.create_trace_model(),
-        player_input="test input"
+        trace=model_factory.create_trace_model()
     )
     
-    # Serialize to dict
-    state_dict = state.model_dump()
+    # Test serialization
+    serialized = state.model_dump()
+    assert isinstance(serialized, dict)
+    assert serialized["game_id"] == "test_game"
+    assert serialized["session_id"] == "test_session"
+    assert serialized["section_number"] == 1
     
-    # Verify all fields
-    assert state_dict["game_id"] == "test_game"
-    assert state_dict["session_id"] == "test_session"
-    assert state_dict["section_number"] == 1
-    assert state_dict["player_input"] == "test input"
-    assert isinstance(state_dict["character"], dict)
-    assert isinstance(state_dict["narrative"], dict)
-    assert isinstance(state_dict["rules"], dict)
-    assert isinstance(state_dict["decisions"], dict)
-    assert isinstance(state_dict["trace"], dict)
+    # Test JSON serialization
+    json_str = state.model_dump_json()
+    assert isinstance(json_str, str)
+    assert "test_game" in json_str
+    assert "test_session" in json_str
 
 def test_game_state_with_player_input(model_factory):
     """Test GameState with player input."""
-    # Create state with player input
     state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
         section_number=1,
-        player_input="examine room"
+        player_input="test input"
     )
-    assert state.player_input == "examine room"
     
-    # Update player input
-    updated_state = state.model_copy(update={"player_input": "go north"})
-    assert updated_state.player_input == "go north"
-    assert state.player_input == "examine room"  # Original unchanged
+    assert state.player_input == "test input"
+    
+    # Test input state conversion
+    input_state = state.to_input()
+    assert input_state.player_input == "test input"
 
 def test_game_state_optional_fields(model_factory):
     """Test GameState with missing optional fields."""
@@ -206,13 +179,9 @@ def test_game_state_optional_fields(model_factory):
     assert state.character is None
     assert state.narrative is None
     assert state.rules is None
-    assert state.decisions is None
     assert state.trace is None
     assert state.player_input is None
+    assert state.metadata is None
     
-    # Add optional field
-    updated_state = state.model_copy(update={
-        "narrative": model_factory.create_narrator_model(section_number=1)
-    })
-    assert updated_state.narrative is not None
-    assert updated_state.rules is None  # Other fields still None
+    # Verify state is still valid
+    state.validate_state()

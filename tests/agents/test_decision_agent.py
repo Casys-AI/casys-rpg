@@ -10,8 +10,12 @@ from managers.protocols import DecisionManagerProtocol, RulesManagerProtocol
 
 from models import (
     GameState, RulesModel, DiceType, Choice, ChoiceType,
-    DecisionModel, CharacterModel, CharacterStats, DecisionError, StateError
+    DecisionModel, CharacterModel, CharacterStats, DecisionError, StateError, Inventory, Item
 )
+from models.types.common_types import NextActionType
+from models.trace_model import ActionType
+from models.types.agent_types import GameAgents
+from models.types.manager_types import GameManagers
 from config.agents import DecisionAgentConfig
 
 @pytest.fixture
@@ -37,12 +41,37 @@ def model_factory() -> ModelFactory:
     return ModelFactory()
 
 @pytest.fixture
-def game_factory(mock_decision_manager, mock_rules_agent) -> GameFactory:
-    """Create a game factory for testing."""
-    return GameFactory(
+def mock_game_managers(mock_decision_manager, mock_rules_agent) -> GameManagers:
+    """Create mock game managers."""
+    return GameManagers(
+        state_manager=AsyncMock(),
+        cache_manager=AsyncMock(),
+        character_manager=AsyncMock(),
+        trace_manager=AsyncMock(),
+        rules_manager=mock_rules_agent,
         decision_manager=mock_decision_manager,
-        rules_agent=mock_rules_agent
+        narrator_manager=AsyncMock(),
+        workflow_manager=AsyncMock()
     )
+
+@pytest.fixture
+def mock_game_agents(mock_rules_agent, decision_agent) -> GameAgents:
+    """Create mock game agents."""
+    return GameAgents(
+        narrator_agent=AsyncMock(),
+        rules_agent=mock_rules_agent,
+        decision_agent=decision_agent,
+        trace_agent=AsyncMock()
+    )
+
+@pytest.fixture
+def game_factory(mock_game_managers, mock_game_agents) -> GameFactory:
+    """Create a game factory for testing."""
+    factory = GameFactory()
+    # Mock the internal create methods to return our mocks
+    factory._create_managers = lambda: {"decision_manager": mock_game_managers.decision_manager}
+    factory._create_agents = lambda _: {"decision_agent": mock_game_agents.decision_agent}
+    return factory
 
 @pytest.fixture
 def decision_config(mock_rules_agent) -> DecisionAgentConfig:
@@ -61,53 +90,55 @@ async def decision_agent(decision_config, mock_decision_manager) -> DecisionAgen
     )
 
 @pytest.fixture
-def sample_character(model_factory) -> CharacterModel:
+def sample_character() -> CharacterModel:
     """Create a sample character for testing."""
-    return model_factory.create_character(
+    return CharacterModel(
         name="Test Character",
-        stats=CharacterStats(SKILL=10, STAMINA=20, LUCK=5),
-        inventory=["sword", "potion"]
-    )
-
-@pytest.fixture
-def sample_rules_model(model_factory) -> RulesModel:
-    """Create sample rules model."""
-    return model_factory.create_rules_model(
-        section_number=1,
-        needs_dice=True,
-        dice_type=DiceType.COMBAT,
-        conditions=[
-            RuleCondition(text="Must have sword", item_required="sword"),
-            RuleCondition(text="SKILL > 8", stat_check={"stat": "SKILL", "value": 8, "operator": ">"})
-        ],
-        choices=[
-            Choice(
-                text="Combat with troll",
-                type=ChoiceType.DICE,
-                dice_type=DiceType.COMBAT,
-                dice_results={"success": 145, "failure": 278}
-            )
-        ],
-        rules_summary="Combat with troll required"
-    )
-
-@pytest.fixture
-def sample_decision_model(model_factory) -> DecisionModel:
-    """Create sample decision model."""
-    return model_factory.create_decision_model(
-        section_number=1,
-        decision_type=DecisionType.CHOICE,
-        choices={"1": "Combat with troll", "2": "Try stealth"},
-        validation=ChoiceValidation(
-            valid_choices=["1", "2"],
-            conditions={"2": ["SKILL > 8"]}
+        stats=CharacterStats(
+            endurance=20,
+            chance=20,
+            skill=20
+        ),
+        inventory=Inventory(
+            items={"sword": Item(name="sword", quantity=1)}
         )
     )
 
 @pytest.fixture
-def sample_game_state(game_factory, sample_character) -> GameState:
+def sample_rules_model() -> RulesModel:
+    """Create sample rules model."""
+    return RulesModel(
+        section_number=1,
+        dice_type=DiceType.NONE,
+        needs_dice=False,
+        needs_user_response=True,
+        next_action=NextActionType.USER_FIRST,
+        conditions=["SKILL > 8"],
+        choices=[
+            Choice(
+                text="Fight the monster",
+                type=ChoiceType.DIRECT,
+                target_section=2
+            )
+        ],
+        rules_summary="Test combat rules"
+    )
+
+@pytest.fixture
+def sample_decision_model() -> DecisionModel:
+    """Create sample decision model."""
+    return DecisionModel(
+        section_number=1,
+        next_section=None,
+        awaiting_action=ActionType.USER_INPUT,
+        next_action=NextActionType.USER_FIRST,
+        conditions=["SKILL > 8"]
+    )
+
+@pytest.fixture
+def sample_game_state(model_factory, sample_character) -> GameState:
     """Create a sample game state."""
-    return game_factory.create_game_state(
+    return model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
         section_number=1,
@@ -137,7 +168,7 @@ async def test_process_decision_cache_hit(
     # Verify result
     assert isinstance(result, DecisionModel)
     assert result.section_number == sample_game_state.section_number
-    assert len(result.choices) == 2
+    assert len(result.conditions) == 1
     
     # Verify cache usage
     mock_decision_manager.get_cached_decision.assert_called_once_with(1)

@@ -88,7 +88,7 @@ class ModelFactory:
             source_type=SourceType.RAW
         )
         
-        # TODO: Ajouter la création du TraceModel quand il sera implémenté
+        # TODO: ajouter la construction de trace
         trace_model = trace
             
         # 4. Validation de la cohérence entre les modèles

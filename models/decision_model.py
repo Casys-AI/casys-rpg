@@ -1,8 +1,8 @@
 """Models for decision making."""
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from models.types.common_types import NextActionType
 from models.rules_model import DiceType
 from models.trace_model import ActionType
@@ -19,11 +19,11 @@ class DiceResult(BaseModel):
             raise ValueError("Dice value must be between 1 and 6")
         return v
 
-    class Config:
-        """Configuration for the model."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat()
         }
+    )
 
 class AnalysisResult(BaseModel):
     """Result of decision analysis."""
@@ -38,11 +38,11 @@ class AnalysisResult(BaseModel):
             raise ValueError("Next section must be positive")
         return v
 
-    class Config:
-        """Configuration for the model."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat()
         }
+    )
 
 class DecisionModel(BaseModel):
     """A decision made in the game."""
@@ -69,14 +69,16 @@ class DecisionModel(BaseModel):
             raise ValueError("Next section must be positive")
         return v
     
-    @model_validator(mode='after')
-    def validate_conditions(self):
-        # Remove any duplicate conditions
-        self.conditions = list(dict.fromkeys(self.conditions))
-        return self
+    @model_validator(mode='before')
+    def validate_conditions(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        # Remove duplicates from conditions while preserving order
+        if 'conditions' in data:
+            if isinstance(data['conditions'], (list, tuple)):
+                data['conditions'] = list(dict.fromkeys(data['conditions']))
+        return data
 
-    class Config:
-        """Configuration for the model."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat()
         }
+    )
