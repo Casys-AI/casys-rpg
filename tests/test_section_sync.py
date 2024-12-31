@@ -4,6 +4,12 @@ from datetime import datetime
 from models.game_state import GameState
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, DiceType, SourceType
+from config.storage_config import StorageConfig
+from managers.cache_manager import CacheManager
+from managers.state_manager import StateManager
+from managers.workflow_manager import WorkflowManager
+from managers.rules_manager import RulesManager
+from tests.test_model_factory import TestModelFactory
 from operator import or_, add
 from typing import Annotated, Optional
 from pydantic import BaseModel, field_validator, model_validator
@@ -702,29 +708,35 @@ def test_langgraph_fanin():
     assert final_state.narrative.content == "New content"  # Nouveau contenu
     assert final_state.rules is None  # Ancien état ignoré
 
-def test_gamestate_cycles():
+@pytest.mark.asyncio
+async def test_gamestate_cycles():
     """Test le comportement du GameState dans les différents cycles du workflow."""
     
+    # Créer un state_manager pour le test
+    config = StorageConfig()
+    cache_manager = CacheManager(config)
+    state_manager = StateManager(config, cache_manager)
+    
     # CYCLE 1 - Section 1
-    # État initial du cycle 1
-    initial_state = GameState(
-        session_id='test_session',
+    # État initial du cycle 1 via le state_manager
+    initial_state = await state_manager.create_initial_state()
+    
+    # Mettre à jour l'état initial avec les modèles
+    initial_state.narrative = NarratorModel(
         section_number=1,
-        narrative=NarratorModel(
-            section_number=1,
-            content="Initial content",
-            source_type=SourceType.RAW
-        ),
-        rules=RulesModel(
-            section_number=1,
-            dice_type=DiceType.NONE,
-            source_type=SourceType.RAW
-        )
+        content="Initial content",
+        source_type=SourceType.RAW
+    )
+    initial_state.rules = RulesModel(
+        section_number=1,
+        dice_type=DiceType.NONE,
+        source_type=SourceType.RAW
     )
     
     # Fan-in dans le même cycle
     rules_update = GameState(
-        session_id='different_session',  # Devrait être ignoré
+        session_id=initial_state.session_id,
+        game_id=initial_state.game_id,
         section_number=1,
         rules=RulesModel(
             section_number=1,
@@ -734,7 +746,8 @@ def test_gamestate_cycles():
     )
     
     narrator_update = GameState(
-        session_id='another_session',  # Devrait être ignoré
+        session_id=initial_state.session_id,
+        game_id=initial_state.game_id,
         section_number=1,
         narrative=NarratorModel(
             section_number=1,
@@ -746,8 +759,9 @@ def test_gamestate_cycles():
     # Simuler le fan-in du cycle 1
     cycle1_state = rules_update + narrator_update  # narrator_update sera le dernier état
     
-    # Vérifier que seul le dernier état est gardé, avec le session_id préservé
-    assert cycle1_state.session_id == 'different_session'  # Le session_id du premier état
+    # Vérifier que seul le dernier état est gardé, avec les IDs préservés
+    assert cycle1_state.session_id == initial_state.session_id  # Le session_id est préservé
+    assert cycle1_state.game_id == initial_state.game_id  # Le game_id est préservé
     assert cycle1_state.narrative.content == "Updated content"  # Du dernier état
     assert cycle1_state.rules is None  # L'état précédent est ignoré
     
@@ -755,17 +769,20 @@ def test_gamestate_cycles():
     # Le DecisionAgent donne une nouvelle section
     decision_update = GameState(
         session_id=cycle1_state.session_id,  # Garder le même session_id
+        game_id=cycle1_state.game_id,  # Garder le même game_id
         section_number=2  # Nouvelle section
     )
     
     # Créer le nouvel état initial pour le cycle 2
     cycle2_state = GameState(
         session_id=decision_update.session_id,
+        game_id=decision_update.game_id,
         section_number=decision_update.section_number
     )
     
-    # Vérifier que seuls session_id et section_number sont préservés
-    assert cycle2_state.session_id == 'different_session'
+    # Vérifier que seuls les IDs et section_number sont préservés
+    assert cycle2_state.session_id == initial_state.session_id
+    assert cycle2_state.game_id == initial_state.game_id
     assert cycle2_state.section_number == 2
     assert cycle2_state.narrative is None  # Tout le reste doit être None
     assert cycle2_state.rules is None
@@ -773,20 +790,25 @@ def test_gamestate_cycles():
     assert cycle2_state.trace is None
     assert cycle2_state.error is None
 
-def test_first_cycle_section_number():
+@pytest.mark.asyncio
+async def test_first_cycle_section_number():
     """Test que le premier cycle commence bien avec section_number = 1."""
     
-    # Création d'un nouvel état sans section_number spécifié
-    initial_state = GameState(
-        session_id='test_session'  # Seul le session_id est requis au début
-    )
+    # Créer un state_manager pour le test
+    config = StorageConfig()
+    cache_manager = CacheManager(config)
+    state_manager = StateManager(config, cache_manager)
+    
+    # Créer l'état initial via le state_manager
+    initial_state = await state_manager.create_initial_state()
     
     # Vérifier que le section_number est initialisé à 1
     assert initial_state.section_number == 1
     
     # Simuler les mises à jour du premier cycle
     rules_update = GameState(
-        session_id='different_session',
+        session_id=initial_state.session_id,  # Utiliser le même session_id
+        game_id=initial_state.game_id,  # Utiliser le même game_id
         section_number=1,  # Doit correspondre au premier cycle
         rules=RulesModel(
             section_number=1,
@@ -796,7 +818,8 @@ def test_first_cycle_section_number():
     )
     
     narrator_update = GameState(
-        session_id='another_session',
+        session_id=initial_state.session_id,  # Utiliser le même session_id
+        game_id=initial_state.game_id,  # Utiliser le même game_id
         section_number=1,  # Doit correspondre au premier cycle
         narrative=NarratorModel(
             section_number=1,
@@ -811,10 +834,13 @@ def test_first_cycle_section_number():
     # Vérifier que le section_number reste à 1
     assert first_cycle_state.section_number == 1
     assert first_cycle_state.narrative.section_number == 1
+    assert first_cycle_state.game_id == initial_state.game_id  # Vérifier que le game_id est préservé
+    assert first_cycle_state.session_id == initial_state.session_id  # Vérifier que le session_id est préservé
     
     # Vérifier que les mises à jour avec un mauvais section_number sont rejetées
     bad_update = GameState(
-        session_id='test',
+        session_id=initial_state.session_id,
+        game_id=initial_state.game_id,
         section_number=2,  # Mauvais section_number pour le premier cycle
         narrative=NarratorModel(
             section_number=2,
@@ -828,4 +854,108 @@ def test_first_cycle_section_number():
     assert final_state.section_number == 2  # Prend le dernier état
     assert final_state.narrative.section_number == 2  # Le modèle doit aussi être cohérent
     assert final_state.narrative.content == "Wrong section"
-    assert final_state.session_id == first_cycle_state.session_id  # Garde le session_id original
+    assert final_state.game_id == initial_state.game_id  # Garde le game_id original
+    assert final_state.session_id == initial_state.session_id  # Garde le session_id original
+
+@pytest.mark.asyncio
+async def test_workflow_id_preservation():
+    """Test que le workflow préserve bien les game_id et session_id."""
+    
+    # Setup
+    config = StorageConfig()
+    cache_manager = CacheManager(config)
+    state_manager = StateManager(config, cache_manager)
+    rules_manager = RulesManager(config)
+    workflow_manager = WorkflowManager(state_manager, rules_manager)
+    
+    # Test Case 1: Input sans IDs
+    input_data = TestModelFactory.create_test_rules_model(
+        dice_type=DiceType.NONE
+    ).model_dump()
+    
+    # Le workflow devrait créer un nouvel état avec des IDs
+    result1 = await workflow_manager.start_workflow(input_data)
+    assert result1.game_id is not None, "game_id devrait être généré"
+    assert result1.session_id is not None, "session_id devrait être généré"
+    
+    # Test Case 2: Input avec IDs existants
+    existing_game_id = "test_game_id"
+    existing_session_id = "test_session_456"
+    input_data_with_ids = TestModelFactory.create_test_game_state(
+        game_id=existing_game_id,
+        session_id=existing_session_id,
+        rules=TestModelFactory.create_test_rules_model(
+            dice_type=DiceType.NONE
+        )
+    ).model_dump()
+    
+    # Le workflow devrait préserver les IDs existants
+    result2 = await workflow_manager.start_workflow(input_data_with_ids)
+    assert result2.game_id == existing_game_id, "game_id existant devrait être préservé"
+    assert result2.session_id == existing_session_id, "session_id existant devrait être préservé"
+    
+    # Test Case 3: Input avec GameState
+    input_state = TestModelFactory.create_test_game_state(
+        game_id=existing_game_id,
+        session_id=existing_session_id,
+        rules=TestModelFactory.create_test_rules_model(
+            dice_type=DiceType.NONE
+        )
+    )
+    
+    # Le workflow devrait préserver les IDs du GameState
+    result3 = await workflow_manager.start_workflow(input_state)
+    assert result3.game_id == existing_game_id, "game_id du GameState devrait être préservé"
+    assert result3.session_id == existing_session_id, "session_id du GameState devrait être préservé"
+
+@pytest.mark.asyncio
+async def test_workflow_complete_id_preservation():
+    """Test que les IDs sont préservés à travers tout le workflow."""
+    
+    # Setup
+    config = StorageConfig()
+    cache_manager = CacheManager(config)
+    state_manager = StateManager(config, cache_manager)
+    rules_manager = RulesManager(config)
+    workflow_manager = WorkflowManager(state_manager, rules_manager)
+    
+    # 1. Créer un état initial avec des IDs connus
+    initial_state = TestModelFactory.create_test_game_state(
+        game_id="test_game_id",
+        session_id="test_session_id",
+        section_number=1,
+        rules=TestModelFactory.create_test_rules_model(
+            dice_type=DiceType.NONE
+        ),
+        narrative=TestModelFactory.create_test_narrator_model(
+            content="Initial section"
+        ),
+        decision=TestModelFactory.create_test_decision_model(
+            choices={"next": "Section 2"}
+        )
+    )
+    
+    # 2. Démarrer le workflow
+    workflow_state = await workflow_manager.start_workflow(initial_state)
+    assert workflow_state.game_id == initial_state.game_id, "game_id devrait être préservé après start_workflow"
+    assert workflow_state.session_id == initial_state.session_id, "session_id devrait être préservé après start_workflow"
+    
+    # 3. Simuler une mise à jour du workflow
+    update_state = TestModelFactory.create_test_game_state(
+        section_number=2,
+        narrative=TestModelFactory.create_test_narrator_model(
+            section_number=2,
+            content="Updated section"
+        )
+    )
+    
+    # 4. Combiner les états (comme dans le workflow)
+    combined_state = workflow_state + update_state
+    assert combined_state.game_id == initial_state.game_id, "game_id devrait être préservé après addition"
+    assert combined_state.session_id == initial_state.session_id, "session_id devrait être préservé après addition"
+    assert combined_state.section_number == 2, "section_number devrait être mis à jour"
+    
+    # 5. Vérifier que les modèles internes sont cohérents
+    assert combined_state.narrative.section_number == 2, "narrative.section_number devrait être mis à jour"
+    assert combined_state.narrative.content == "Updated section", "narrative.content devrait être mis à jour"
+    assert combined_state.rules.section_number == 2, "rules.section_number devrait être mis à jour"
