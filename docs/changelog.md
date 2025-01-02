@@ -21,12 +21,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Trace Agent
 - WebSocket-based real-time updates
 - Redis state management
-- FAISS-based rules indexing
 - Basic web interface
 - Documentation complète de l'architecture frontend
-- Nouvelles bonnes pratiques pour Qwik
+- Nouvelles bonnes pratiques pour Svelte  
 
 ### Changed
+- **CharacterManager**
+  - Made save_character async to properly handle cache operations
+  - Added character_id parameter with "current" as default
+  - Made save_character_stats and update_character_stats async
+  - Improved error handling and logging
+  - Better character state management
+
+- **StateManager**
+  - Added CharacterManager as a dependency
+  - Improved character creation and management
+  - Better separation of concerns with CharacterManager
+  - Updated tests to use proper mocks
+  - Character state now managed by CharacterManager
+
+- **WorkflowManager**
+  - Extracted section transition logic to _handle_section_transition
+  - Simplified start_workflow by delegating to StateManager
+  - Better workflow state tracking and logging
+  - Improved error handling
+  - Added workflow metadata management
+
 - **StoryGraph**
   - Refactored to use dictionary-based dependency injection
   - Managers and agents now passed as collections
@@ -71,6 +91,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed incompatible model_post_init usage
 - Corrected Pydantic configuration format
 - Fixed model validation workflow
+- Character save operations now properly async
+- Section transition handling in workflow
+- Character state persistence
+- Workflow state transitions
+- Error handling in character operations
 
 ### Architecture
 - Improved dependency injection patterns
@@ -103,6 +128,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - useVisibleTask$ remplacé par useTask$
 - Classes GameService et WebSocketService
 - Code legacy non utilisé
+
+### Technical Debt
+- Consider adding character versioning
+- Add more comprehensive error states
+- Improve cache invalidation strategy
+- Add performance metrics
+- Consider implementing character templates
 
 ## [0.1.0] - 2024-12-31
 ### Added

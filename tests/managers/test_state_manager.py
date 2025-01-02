@@ -9,6 +9,7 @@ from managers.state_manager import StateManager
 from config.storage_config import StorageConfig
 from models.game_state import GameState
 from models.errors_model import StateError
+from managers.protocols.character_manager_protocol import CharacterManagerProtocol
 
 @pytest.fixture
 def mock_cache_manager():
@@ -19,14 +20,26 @@ def mock_cache_manager():
     return cache
 
 @pytest.fixture
+def mock_character_manager():
+    """Create a mock character manager."""
+    manager = Mock(spec=CharacterManagerProtocol)
+    manager.save_character = Mock()
+    manager.load_character = Mock()
+    return manager
+
+@pytest.fixture
 def config():
     """Create a test storage config."""
     return StorageConfig.get_default_config(base_path="./test_data")
 
 @pytest_asyncio.fixture
-async def state_manager(config, mock_cache_manager):
+async def state_manager(config, mock_cache_manager, mock_character_manager):
     """Create and initialize a test state manager."""
-    manager = StateManager(config=config, cache_manager=mock_cache_manager)
+    manager = StateManager(
+        config=config, 
+        cache_manager=mock_cache_manager,
+        character_manager=mock_character_manager
+    )
     await manager.initialize()  # Initialize the manager
     return manager
 

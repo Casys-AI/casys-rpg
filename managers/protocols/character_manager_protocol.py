@@ -33,27 +33,25 @@ class CharacterManagerProtocol(Protocol):
         """
         ...
 
-    async def save_character_stats(self, stats: Dict[str, Any]) -> Optional[CharacterError]:
-        """
-        Save character stats.
+    async def save_character_stats(self, stats: Dict[str, Any]) -> None:
+        """Save character stats.
         
         Args:
-            stats: Dictionary of stats to update
+            stats: Stats to save
             
-        Returns:
-            Optional[CharacterError]: Error if save failed
+        Raises:
+            CharacterError: If save fails
         """
         ...
 
-    async def update_character_stats(self, stat_updates: Dict[str, Any]) -> Optional[CharacterError]:
-        """
-        Update character stats.
+    async def update_character_stats(self, stats_update: Dict[str, Any]) -> None:
+        """Update character stats.
         
         Args:
-            stat_updates: Dictionary of stats to update
+            stats_update: Stats to update
             
-        Returns:
-            Optional[CharacterError]: Error if update failed
+        Raises:
+            CharacterError: If update fails
         """
         ...
 
@@ -82,15 +80,15 @@ class CharacterManagerProtocol(Protocol):
         """Get timestamp of last save operation."""
         ...
 
-    def save_character(self, character: CharacterModel) -> None:
-        """
-        Save character data to cache.
+    async def save_character(self, character: CharacterModel, character_id: str = "current") -> None:
+        """Save character data to cache.
         
         Args:
             character: Character model to save
+            character_id: ID to use for storage, defaults to "current"
             
         Raises:
-            CharacterError: If save operation fails
+            CharacterError: If save fails
         """
         ...
 
