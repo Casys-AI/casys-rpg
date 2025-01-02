@@ -81,11 +81,20 @@ class GameFactory:
             manager_configs = self._config.manager_configs
             
             # Create managers with their specific configs
-            state_manager = StateManager(manager_configs.storage_config, self._cache_manager)
+            # 1. D'abord character_manager car state_manager en dépend
             character_manager = CharacterManager(
                 manager_configs.character_config or manager_configs.storage_config, 
                 self._cache_manager
             )
+            
+            # 2. Ensuite state_manager avec character_manager
+            state_manager = StateManager(
+                manager_configs.storage_config, 
+                self._cache_manager,
+                character_manager
+            )
+            
+            # 3. Les autres managers
             trace_manager = TraceManager(
                 manager_configs.trace_config or manager_configs.storage_config, 
                 self._cache_manager

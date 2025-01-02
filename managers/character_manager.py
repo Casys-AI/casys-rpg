@@ -38,7 +38,7 @@ class CharacterManager(CharacterManagerProtocol):
             self.logger.error(f"Error getting character stats: {e}")
             raise CharacterError(f"Failed to get character stats: {str(e)}")
 
-    def save_character_stats(self, stats: Dict[str, Any]) -> None:
+    async def save_character_stats(self, stats: Dict[str, Any]) -> None:
         """Save character stats."""
         try:
             if not self.current_character:
@@ -48,7 +48,7 @@ class CharacterManager(CharacterManagerProtocol):
             self._validate_stats(stats)
             
             self.current_character.stats.update(stats)
-            self.save_character(self.current_character)
+            await self.save_character(self.current_character)
             
         except Exception as e:
             self.logger.error(f"Error saving character stats: {e}")
@@ -71,19 +71,28 @@ class CharacterManager(CharacterManagerProtocol):
             self.logger.error(f"Error loading character: {e}")
             raise CharacterError(f"Failed to load character: {str(e)}")
 
-    def save_character(self, character: CharacterModel) -> None:
-        """Save character data to cache."""
+    async def save_character(self, character: CharacterModel, character_id: str = "current") -> None:
+        """Save character data to cache.
+        
+        Args:
+            character: Character model to save
+            character_id: ID to use for storage, defaults to "current"
+            
+        Raises:
+            CharacterError: If save fails
+        """
         try:
-            self.cache.save_cached_data(
-                key=str(character.id),
+            await self.cache.save_cached_data(
+                key=character_id,
                 namespace="characters",
                 data=character.model_dump()
             )
+            self._current_character = character
         except Exception as e:
             self.logger.error(f"Error saving character: {e}")
             raise CharacterError(f"Failed to save character: {str(e)}")
 
-    def update_character_stats(self, stats_update: Dict[str, Any]) -> None:
+    async def update_character_stats(self, stats_update: Dict[str, Any]) -> None:
         """Update character stats."""
         try:
             if not self.current_character:
@@ -94,7 +103,7 @@ class CharacterManager(CharacterManagerProtocol):
             
             # Update stats
             self.current_character.stats.update(stats_update)
-            self.save_character(self.current_character)
+            await self.save_character(self.current_character)
             
         except Exception as e:
             self.logger.error(f"Error updating character stats: {e}")

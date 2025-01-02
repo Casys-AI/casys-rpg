@@ -3,6 +3,7 @@ Tests for GameState in workflow context.
 """
 import pytest
 from datetime import datetime
+from unittest.mock import Mock
 
 from models.game_state import GameState
 from models.narrator_model import NarratorModel
@@ -14,13 +15,15 @@ from managers.cache_manager import CacheManager
 from managers.state_manager import StateManager
 from managers.rules_manager import RulesManager
 from managers.workflow_manager import WorkflowManager
+from managers.character_manager import CharacterManager
 
 @pytest.mark.asyncio
 async def test_workflow_state_initialization():
     """Test l'initialisation correcte de l'état dans le workflow."""
     config = StorageConfig()
     cache_manager = CacheManager(config)
-    state_manager = StateManager(config, cache_manager)
+    character_manager = CharacterManager(config, cache_manager)
+    state_manager = StateManager(config, cache_manager, character_manager)
     await state_manager.initialize()  # Important: initialiser le state manager
     
     rules_manager = RulesManager(config, cache_manager)
@@ -40,7 +43,8 @@ async def test_workflow_state_update():
     """Test la mise à jour de l'état dans le workflow."""
     config = StorageConfig()
     cache_manager = CacheManager(config)
-    state_manager = StateManager(config, cache_manager)
+    character_manager = CharacterManager(config, cache_manager)
+    state_manager = StateManager(config, cache_manager, character_manager)
     await state_manager.initialize()
     
     rules_manager = RulesManager(config, cache_manager)

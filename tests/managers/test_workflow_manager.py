@@ -10,13 +10,22 @@ from managers.protocols.workflow_manager_protocol import WorkflowManagerProtocol
 from models.game_state import GameStateInput, GameState
 from managers.protocols.state_manager_protocol import StateManagerProtocol
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
+from managers.protocols.character_manager_protocol import CharacterManagerProtocol
 from managers.workflow_manager import WorkflowManager
 from managers.state_manager import StateManager
 from managers.cache_manager import CacheManager
 from config.storage_config import StorageConfig
 
 @pytest.fixture
-def state_manager():
+def mock_character_manager():
+    """Create a mock character manager."""
+    manager = AsyncMock(spec=CharacterManagerProtocol)
+    manager.save_character = AsyncMock()
+    manager.load_character = AsyncMock()
+    return manager
+
+@pytest.fixture
+def state_manager(mock_character_manager):
     manager = AsyncMock(spec=StateManagerProtocol)
     manager.get_game_id = AsyncMock(return_value=None)
     manager.initialize = AsyncMock()
@@ -34,8 +43,8 @@ def rules_manager():
     return AsyncMock(spec=RulesManagerProtocol)
 
 @pytest.fixture
-def workflow_manager(state_manager, rules_manager):
-    return WorkflowManager(state_manager, rules_manager)
+def workflow_manager(state_manager, rules_manager, mock_character_manager):
+    return WorkflowManager(state_manager, rules_manager, mock_character_manager)
 
 @pytest.mark.asyncio
 async def test_start_workflow_new_session(workflow_manager, state_manager):

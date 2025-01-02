@@ -7,17 +7,24 @@ from models.game_state import GameState
 from models.errors_model import StateError
 from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
+from managers.protocols.character_manager_protocol import CharacterManagerProtocol
 
 @runtime_checkable
 class StateManagerProtocol(Protocol):
     """Protocol defining the interface for state management."""
     
-    def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol) -> None:
+    def __init__(
+        self, 
+        config: StorageConfig, 
+        cache_manager: CacheManagerProtocol,
+        character_manager: CharacterManagerProtocol
+    ) -> None:
         """Initialize with configuration and cache manager.
         
         Args:
             config: Storage configuration
             cache_manager: Cache manager for state storage
+            character_manager: Character manager for character operations
         """
         ...
     

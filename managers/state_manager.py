@@ -3,7 +3,7 @@ State Manager Module
 Manages game state persistence and validation.
 """
 
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, Union
 from pydantic import BaseModel, ValidationError
 import json
 import logging
@@ -11,12 +11,14 @@ from datetime import datetime
 import uuid
 from loguru import logger
 
-from models.game_state import GameState, GameStateInput, GameStateOutput
+from models.game_state import GameState
 from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from managers.protocols.state_manager_protocol import StateManagerProtocol
+from managers.protocols.character_manager_protocol import CharacterManagerProtocol
 from models.errors_model import StateError
-from models.character_model import CharacterModel, CharacterStats  # Import CharacterModel and CharacterStats
+from models.character_model import CharacterModel, CharacterStats
+from agents.factories.model_factory import ModelFactory
 
 def _json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -24,57 +26,74 @@ def _json_serial(obj):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
 
-
 class StateManager(StateManagerProtocol):
     """Manages game state persistence and basic validation."""
     
-    def __init__(self, config: StorageConfig, cache_manager: CacheManagerProtocol):
+    def __init__(
+        self, 
+        config: StorageConfig, 
+        cache_manager: CacheManagerProtocol,
+        character_manager: CharacterManagerProtocol
+    ):
         """Initialize StateManager with configuration.
         
         Args:
             config: Storage configuration
             cache_manager: Cache manager for state storage
+            character_manager: Character manager for character operations
         """
         logger.info("Initializing StateManager")
         self.config = config
         self.cache = cache_manager
-        self.logger = logging.getLogger(__name__)
+        self.character_manager = character_manager
         self._current_state: Optional[GameState] = None
         self._game_id: Optional[str] = None
+        logger.debug("StateManager initialized with config: {}", config)
 
-    async def initialize(self, game_id: Optional[str] = None) -> None:
-        """Initialize state manager and generate game ID.
-        
-        Args:
-            game_id: Optional game ID to use. If not provided, a new one will be generated.
+    async def initialize(self) -> None:
+        """Initialize state manager.
+        Sets up any necessary resources and state.
         """
-        logger.info("Initializing StateManager")
-        self._game_id = game_id if game_id else str(uuid.uuid4())
-        logger.debug("Generated game ID: {}", self._game_id)
+        logger.info("Initializing state resources")
+        if not self._game_id:
+            self._game_id = str(uuid.uuid4())
+            logger.debug("Generated new game ID: {}", self._game_id)
+            
         self.config.game_id = self._game_id
         await self.cache.update_game_id(self._game_id)
-        logger.info(f"Initialized state manager with game ID: {self._game_id}")
+        logger.info("State manager initialized with game ID: {}", self._game_id)
 
     @property
-    def game_id(self) -> str:
+    def game_id(self) -> Optional[str]:
         """Get current game ID."""
-        if not self._game_id:
-            raise StateError("State manager not initialized")
         return self._game_id
 
     async def get_game_id(self) -> Optional[str]:
         """Get current game ID."""
         return self._game_id
 
-    @staticmethod
-    def generate_session_id() -> str:
-        """Generate a unique session ID."""
-        return str(uuid.uuid4())
-
     @property
     def current_state(self) -> Optional[GameState]:
         """Get current game state."""
         return self._current_state
+
+    async def get_current_state(self) -> Optional[GameState]:
+        """Get current game state."""
+        return self._current_state
+
+    @property
+    def current_timestamp(self) -> str:
+        """Get current timestamp in ISO format.
+        
+        Returns:
+            str: Current timestamp in ISO format
+        """
+        return datetime.utcnow().isoformat()
+
+    @staticmethod
+    def generate_session_id() -> str:
+        """Generate a unique session ID."""
+        return str(uuid.uuid4())
 
     def _validate_format(self, state: GameState) -> bool:
         """Validate basic state format.
@@ -99,88 +118,169 @@ class StateManager(StateManagerProtocol):
             return True
             
         except Exception as e:
-            logger.error(f"Error validating state format: {e}")
+            logger.error("Error validating state format: {}", str(e))
             return False
 
-    def _serialize_state(self, state: GameState) -> str:
-        """Serialize state to JSON.
+    async def validate_state(
+        self, 
+        state_data: Union[Dict[str, Any], GameState]
+    ) -> GameState:
+        """Validate and convert state data to GameState.
         
         Args:
-            state: State to serialize
+            state_data: State data to validate
             
         Returns:
-            str: JSON string
+            GameState: Validated state instance
             
         Raises:
-            StateError: If serialization fails
+            StateError: If validation fails
         """
         try:
-            state_dict = state.model_dump()
-            # Préserver explicitement les IDs
-            state_dict["session_id"] = state.session_id
-            state_dict["game_id"] = self._game_id
-            return json.dumps(state_dict, default=_json_serial)
-        except Exception as e:
-            logger.error(f"Error serializing state: {e}")
-            raise StateError(f"Failed to serialize state: {str(e)}")
-
-    def _deserialize_state(self, json_data: str) -> GameState:
-        """Deserialize JSON to state.
-        
-        Args:
-            json_data: JSON string to deserialize
+            logger.debug("Validating state data: {}", state_data)
             
-        Returns:
-            GameState: Deserialized state
-            
-        Raises:
-            StateError: If deserialization fails
-        """
-        try:
-            state_dict = json.loads(json_data)
-            return GameState.model_validate(state_dict)
-        except Exception as e:
-            logger.error(f"Error deserializing state: {e}")
-            raise StateError(f"Failed to deserialize state: {str(e)}")
-
-    async def _persist_state(self, state: GameState) -> GameState:
-        """Persist state to storage.
-        
-        Args:
-            state: State to persist
-            
-        Returns:
-            GameState: Persisted state
-            
-        Raises:
-            StateError: If persistence fails
-        """
-        try:
-            if not self._game_id:
-                raise StateError("No game ID set for persistence")
-
-            json_data = self._serialize_state(state)
-            
-            # Sauvegarder l'état courant
-            await self.cache.save_cached_data(
-                key=f"game_{self._game_id}_current",
-                namespace="state",
-                data=json_data
-            )
-            
-            # Sauvegarder aussi par section pour l'historique
-            await self.cache.save_cached_data(
-                key=f"game_{self._game_id}_section_{state.section_number}",
-                namespace="state",
-                data=json_data
-            )
-            
-            self._current_state = state
+            if isinstance(state_data, GameState):
+                if not self._validate_format(state_data):
+                    raise StateError("Invalid state format")
+                return state_data
+                
+            state = GameState(**state_data)
+            if not self._validate_format(state):
+                raise StateError("Invalid state format")
+                
             return state
             
         except Exception as e:
-            logger.error(f"Error persisting state: {e}")
-            raise StateError(f"Failed to persist state: {str(e)}")
+            error_msg = f"State validation failed: {str(e)}"
+            logger.error(error_msg)
+            raise StateError(error_msg) from e
+
+    async def create_initial_state(
+        self, 
+        input_data: Optional[Union[Dict[str, Any], GameState]] = None
+    ) -> GameState:
+        """Create and initialize a new game state.
+        
+        This method handles:
+        1. Validation and conversion of input data
+        2. Generation of new session_id and game_id if needed
+        3. Merging of input data with default state
+        4. Creation of initial character via CharacterManager
+        
+        Args:
+            input_data: Optional initial state data to merge
+            
+        Returns:
+            GameState: The newly created and initialized state
+            
+        Raises:
+            StateError: If state creation or validation fails
+        """
+        try:
+            logger.info("Creating initial state")
+            
+            # 1. S'assurer que le state manager est initialisé
+            if not self._game_id:
+                await self.initialize()
+
+            # 2. Extraire ou générer les IDs
+            session_id = None
+            game_id = self._game_id
+            
+            if isinstance(input_data, GameState):
+                session_id = input_data.session_id
+                input_data = input_data.model_dump()
+            elif isinstance(input_data, dict):
+                session_id = input_data.get("session_id")
+            
+            if not session_id:
+                session_id = self.generate_session_id()
+
+            # 3. Créer le personnage initial via CharacterManager
+            initial_character = CharacterModel(
+                stats=CharacterStats(
+                    endurance=20,
+                    chance=20,
+                    skill=20
+                )
+            )
+            self.character_manager.save_character(initial_character)
+            
+            # 4. Créer l'état initial avec ModelFactory
+            initial_state = ModelFactory.create_game_state(
+                game_id=game_id,
+                session_id=session_id,
+                section_number=1,
+                character_id="current",  # On utilise "current" comme ID
+                timestamp=self.current_timestamp
+            )
+            
+            # 5. Fusionner avec input_data si présent
+            if input_data:
+                initial_state = initial_state.with_updates(**input_data)
+
+            # 6. Valider et sauvegarder
+            validated_state = await self.validate_state(initial_state)
+            saved_state = await self.save_state(validated_state)
+            
+            self._current_state = saved_state
+            return saved_state
+
+        except Exception as e:
+            error_msg = f"Failed to create initial state: {str(e)}"
+            logger.error(error_msg)
+            raise StateError(error_msg) from e
+
+    async def create_error_state(
+        self, 
+        error_message: str,
+        current_state: Optional[GameState] = None
+    ) -> GameState:
+        """Create an error state from the current state.
+        
+        Args:
+            error_message: Error message to include
+            current_state: Optional current state to base error on
+            
+        Returns:
+            GameState: Error state instance
+        """
+        try:
+            logger.info("Creating error state")
+            base_state = current_state or self._current_state
+            
+            if base_state:
+                # Utiliser la méthode de GameState
+                error_state = GameState.create_error_state(
+                    error_message=error_message,
+                    session_id=base_state.session_id,
+                    game_id=base_state.game_id,
+                    section_number=base_state.section_number,
+                    current_state=base_state
+                )
+            else:
+                # Créer un état minimal avec ModelFactory
+                error_state = ModelFactory.create_game_state(
+                    session_id=self.generate_session_id(),
+                    game_id=self._game_id or str(uuid.uuid4()),
+                    error=error_message,
+                    timestamp=self.current_timestamp
+                )
+            
+            saved_state = await self.save_state(error_state)
+            logger.debug("Created error state: {}", saved_state)
+            return saved_state
+            
+        except Exception as e:
+            # En cas d'erreur lors de la création de l'état d'erreur,
+            # créer un état minimal avec ModelFactory
+            logger.error("Failed to create error state: {}", str(e))
+            return ModelFactory.create_game_state(
+                session_id=self.generate_session_id(),
+                game_id=self._game_id or str(uuid.uuid4()),
+                error=f"{error_message} (Error state creation failed: {str(e)})",
+                timestamp=self.current_timestamp
+            )
 
     async def save_state(self, state: GameState) -> GameState:
         """Save state with basic validation.
@@ -198,13 +298,31 @@ class StateManager(StateManagerProtocol):
             if not self._game_id:
                 raise StateError("State manager not initialized")
                 
-            if not self._validate_format(state):
-                raise StateError("Invalid state format")
-                
-            return await self._persist_state(state)
+            # Valider l'état
+            validated_state = await self.validate_state(state)
+            
+            # Sérialiser
+            json_data = validated_state.model_dump()
+            
+            # Sauvegarder l'état courant
+            await self.cache.save_cached_data(
+                key=f"game_{self._game_id}_current",
+                namespace="state",
+                data=json_data
+            )
+            
+            # Sauvegarder aussi par section pour l'historique
+            await self.cache.save_cached_data(
+                key=f"game_{self._game_id}_section_{state.section_number}",
+                namespace="state",
+                data=json_data
+            )
+            
+            self._current_state = validated_state
+            return validated_state
             
         except Exception as e:
-            logger.error(f"Error saving state: {e}")
+            logger.error("Error saving state: {}", str(e))
             raise StateError(f"Failed to save state: {str(e)}")
 
     async def load_state(self, section_number: int) -> Optional[GameState]:
@@ -231,20 +349,17 @@ class StateManager(StateManagerProtocol):
             if not json_data:
                 return None
                 
-            state = self._deserialize_state(json_data)
+            state = GameState(**json.loads(json_data))
             self._current_state = state
             return state
             
         except Exception as e:
-            logger.error(f"Error loading state: {e}")
+            logger.error("Error loading state: {}", str(e))
             raise StateError(f"Failed to load state: {str(e)}")
 
     async def get_section_history(self) -> List[int]:
-        """Get list of available sections for current game."""
+        """Get list of all saved section numbers for current game."""
         try:
-            if not self._game_id:
-                raise StateError("State manager not initialized")
-                
             # Récupérer toutes les sections sauvegardées pour ce game_id
             sections = []
             pattern = f"game_{self._game_id}_section_*"
@@ -252,24 +367,19 @@ class StateManager(StateManagerProtocol):
             
             for key in keys:
                 # Extraire le numéro de section de la clé
-                section = int(key.split('_')[-1])
+                section = int(key.split("_")[-1])
                 sections.append(section)
                 
             return sorted(sections)
             
         except Exception as e:
-            logger.error(f"Error getting section history: {e}")
+            logger.error("Error getting section history: {}", str(e))
             raise StateError(f"Failed to get section history: {str(e)}")
 
-    async def get_current_state(self) -> Optional[GameState]:
-        """Get current game state."""
-        return self._current_state
-
     async def clear_state(self) -> None:
-        """Clear current game state and cache."""
-        logger.info("Clearing game state")
+        """Clear current state and cache."""
         try:
-            # Nettoyer l'état en mémoire
+            logger.info("Clearing game state")
             self._current_state = None
             self._game_id = None
             
@@ -280,8 +390,8 @@ class StateManager(StateManagerProtocol):
             logger.info("Game state cleared successfully")
             
         except Exception as e:
-            logger.error(f"Error clearing game state: {e}")
-            raise StateError(f"Failed to clear game state: {str(e)}")
+            logger.error("Error clearing state: {}", str(e))
+            raise StateError(f"Failed to clear state: {str(e)}")
 
     async def switch_game(self, new_game_id: str) -> None:
         """Switch to a different game.
@@ -293,111 +403,54 @@ class StateManager(StateManagerProtocol):
             StateError: If switch fails
         """
         try:
-            # Sauvegarder l'état actuel si nécessaire
-            if self._current_state:
-                await self._persist_state(self._current_state)
-                
-            # Changer de partie
-            old_game_id = self._game_id
-            await self.initialize(new_game_id)
-            
-            logger.info(f"Switched from game {old_game_id} to {new_game_id}")
+            logger.info("Switching to game: {}", new_game_id)
+            self._game_id = new_game_id
+            self.config.game_id = new_game_id
+            await self.cache.update_game_id(new_game_id)
+            await self.initialize()  # Réinitialiser avec le nouveau game_id
+            self._current_state = None  # Reset current state
+            logger.info("Switched to game: {}", new_game_id)
             
         except Exception as e:
-            logger.error(f"Error switching game: {e}")
-            raise StateError(f"Failed to switch game: {str(e)}")
+            error_msg = f"Failed to switch game: {str(e)}"
+            logger.error(error_msg)
+            raise StateError(error_msg) from e
 
-    async def create_initial_state(self, **init_params: Dict[str, Any]) -> GameState:
-        """Create and return the initial game state.
-
-        Args:
-            **init_params: Additional parameters for initializing the state
-
-        Returns:
-            GameState: The initial state
-        """
-        try:
-            if not self._game_id:
-                await self.initialize()
-
-            # Générer automatiquement un session_id via la méthode statique
-            session_id = self.generate_session_id()
-            logger.info(f"Creating initial state with session_id: {session_id}")
-
-            # Créer et sauvegarder le personnage initial
-            initial_character = CharacterModel(
-                stats=CharacterStats(
-                    endurance=20,
-                    chance=20,
-                    skill=20
-                )
-            )
-            await self.cache.save_cached_data(
-                key="current",
-                namespace="characters",
-                data=initial_character.model_dump()
-            )
-
-            # Définir les paramètres nécessaires pour GameState
-            params = {
-                'section_number': 1,
-                'session_id': session_id,
-                'game_id': self._game_id, 
-                'last_update': self.get_current_timestamp(),
-                'character_id': "current",
-                **init_params  #useful?
-            }
-
-            # Créer l'état initial
-            logger.debug(f"Parameters for initial GameState: {params}")
-            initial_state = GameState(**params)
-
-            # Sauvegarder l'état initial
-            saved_state = await self.save_state(initial_state)
-            self._current_state = saved_state
-
-            return saved_state
-
-        except Exception as e:
-            logger.error(f"Failed to create initial state: {e}", exc_info=True)
-            raise StateError(f"Failed to create initial state: {e}")
-
-    async def create_error_state(self, error_message: str) -> GameState:
-        """Create error state.
+    async def _persist_state(self, state: GameState) -> GameState:
+        """Persist state to storage.
         
         Args:
-            error_message: Error message
+            state: State to persist
             
         Returns:
-            GameState: Error state
+            GameState: Persisted state
             
         Raises:
-            StateError: If creation fails
+            StateError: If persistence fails
         """
         try:
             if not self._game_id:
-                await self.initialize()
-                
-            # Générer un nouveau session_id si pas d'état courant
-            session_id = (self._current_state.session_id 
-                        if self._current_state 
-                        else await self.generate_session_id())
-                
-            error_state = GameState(
-                session_id=session_id,
-                section_number=self._current_state.section_number if self._current_state else 1,
-                error=error_message
+                raise StateError("No game ID set for persistence")
+
+            json_data = state.model_dump()
+            
+            # Sauvegarder l'état courant
+            await self.cache.save_cached_data(
+                key=f"game_{self._game_id}_current",
+                namespace="state",
+                data=json_data
             )
-            return await self.save_state(error_state)
+            
+            # Sauvegarder aussi par section pour l'historique
+            await self.cache.save_cached_data(
+                key=f"game_{self._game_id}_section_{state.section_number}",
+                namespace="state",
+                data=json_data
+            )
+            
+            self._current_state = state
+            return state
             
         except Exception as e:
-            logger.error(f"Error creating error state: {e}")
-            raise StateError(f"Failed to create error state: {str(e)}")
-
-    def get_current_timestamp(self) -> str:
-        """Get current timestamp in ISO format.
-        
-        Returns:
-            str: Current timestamp in ISO format
-        """
-        return datetime.now().isoformat()
+            logger.error(f"Error persisting state: {e}")
+            raise StateError(f"Failed to persist state: {str(e)}")
