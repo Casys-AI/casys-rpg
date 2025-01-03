@@ -2,16 +2,20 @@
 hide:
   - navigation
   - toc
-title: Complex Adaptive Systems
 ---
 
 <div class="hero-section">
     <div class="container">
-        <h1 class="hero-title">Complex Adaptive Systems</h1>
-        <p class="hero-subtitle">A neurosymbolic framework orchestrating LLMs and rule-based agents through formalized graph-based cognitive workflows</p>
-        <div class="hero-buttons">
-            <a href="/getting-started/" class="hero-button">Get Started</a>
-            <a href="/architecture/cognitive-loop/" class="hero-button">Learn More</a>
+        <div class="hero-content">
+            <h1 class="hero-title">Complex <strong>Adaptive Systems</strong> of AI</h1>
+            <p class="hero-subtitle">A neurosymbolic framework orchestrating LLMs and rule-based agents through formalized graph-based cognitive workflows.</p>
+            <div class="hero-buttons">
+                <a href="/getting-started" class="hero-button primary">Get Started</a>
+                <a href="https://github.com/yourusername/casys-rpg" class="hero-button secondary">View on GitHub</a>
+            </div>
+        </div>
+        <div class="hero-logo">
+            <img src="assets/icons/android-chrome-512x512.png" alt="Complex Adaptive Systems Logo">
         </div>
     </div>
 </div>
@@ -34,7 +38,7 @@ title: Complex Adaptive Systems
         <h2>Structure and Orchestration</h2>
         <div class="workflow-grid">
             <div class="workflow-item">
-                <h3>📊 Logical Structure</h3>
+                <h3><span class="material-icons">analytics</span> Logical Structure</h3>
                 <ul>
                     <li>Definition of graphs representing critical steps</li>
                     <li>Nodes embodying logic and processing</li>
@@ -44,7 +48,7 @@ title: Complex Adaptive Systems
                 </ul>
             </div>
             <div class="workflow-item">
-                <h3>⚙️ Agent Orchestration</h3>
+                <h3><span class="material-icons">settings</span> Agent Orchestration</h3>
                 <ul>
                     <li>Contextual invocation of appropriate agents</li>
                     <li>Shared state for decision coherence</li>
@@ -105,7 +109,7 @@ title: Complex Adaptive Systems
         <h2>Multiple Applications</h2>
         <div class="applications-grid">
             <div class="application-card">
-                <span class="app-icon">📚</span>
+                <span class="material-icons">auto_stories</span>
                 <h3>Interactive Storytelling</h3>
                 <p>Create immersive narratives where:</p>
                 <ul>
@@ -116,7 +120,7 @@ title: Complex Adaptive Systems
                 </ul>
             </div>
             <div class="application-card">
-                <span class="app-icon">🏭</span>
+                <span class="material-icons">build</span>
                 <h3>Industrial Diagnostics</h3>
                 <p>Model verification protocols with:</p>
                 <ul>
@@ -127,7 +131,7 @@ title: Complex Adaptive Systems
                 </ul>
             </div>
             <div class="application-card">
-                <span class="app-icon">🌳</span>
+                <span class="material-icons">account_tree</span>
                 <h3>Branching Processes</h3>
                 <p>Handle any branching workflow:</p>
                 <ul>
@@ -182,27 +186,27 @@ title: Complex Adaptive Systems
     <div class="container">
         <div class="generative-content">
             <div>
-                <h2>Generative & Accessibility Features</h2>
+                <h2><span class="material-icons">psychology</span> Generative & Accessibility Features</h2>
                 <p class="highlight-text">Beyond manual workflow execution, Complex Adaptive Systems enables automatic graph generation from your existing documents</p>
                 <div class="features-list">
                     <div class="feature">
-                        <span class="feature-icon">🤖</span>
+                        <span class="material-icons">memory</span>
                         <p>Neurosymbolic assistant (LLM + rules)</p>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">💬</span>
+                        <span class="material-icons">history</span>
                         <p>Intuitive conversational interface</p>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">📝</span>
+                        <span class="material-icons">replay</span>
                         <p>Import from Obsidian notes</p>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">🔄</span>
+                        <span class="material-icons">auto_awesome</span>
                         <p>Automatic workflow generation</p>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">📊</span>
+                        <span class="material-icons">visibility</span>
                         <p>Visual graph representation</p>
                     </div>
                 </div>
@@ -216,7 +220,7 @@ title: Complex Adaptive Systems
         <h2>Memory, History & Traceability</h2>
         <div class="trace-grid">
             <div class="trace-card">
-                <span class="trace-icon">📊</span>
+                <span class="material-icons">history</span>
                 <h3>Comprehensive Logging</h3>
                 <p>Every agent action is recorded with:</p>
                 <ul>
@@ -227,7 +231,7 @@ title: Complex Adaptive Systems
                 </ul>
             </div>
             <div class="trace-card">
-                <span class="trace-icon">🔄</span>
+                <span class="material-icons">replay</span>
                 <h3>Replay & Rollback</h3>
                 <p>Advanced history features:</p>
                 <ul>
@@ -238,7 +242,7 @@ title: Complex Adaptive Systems
                 </ul>
             </div>
             <div class="trace-card">
-                <span class="trace-icon">📋</span>
+                <span class="material-icons">description</span>
                 <h3>Audit & Compliance</h3>
                 <p>Complete decision journey tracking:</p>
                 <ul>
@@ -258,32 +262,32 @@ title: Complex Adaptive Systems
         <p class="summary-intro">A comprehensive framework combining:</p>
         <div class="summary-grid">
             <div class="summary-item">
-                <span class="summary-icon">📊</span>
+                <span class="material-icons">graph</span>
                 <h3>Graph Engine</h3>
                 <p>Sophisticated graph processing with node management and transition logic</p>
             </div>
             <div class="summary-item">
-                <span class="summary-icon">🤖</span>
+                <span class="material-icons">group</span>
                 <h3>Agent System</h3>
                 <p>Coordinated multi-agent system with specialized cognitive capabilities</p>
             </div>
             <div class="summary-item">
-                <span class="summary-icon">💾</span>
+                <span class="material-icons">memory</span>
                 <h3>State Management</h3>
                 <p>Robust state handling with immutability and validation</p>
             </div>
             <div class="summary-item">
-                <span class="summary-icon">🔄</span>
+                <span class="material-icons">auto_awesome</span>
                 <h3>Auto Generation</h3>
                 <p>Intelligent workflow creation from structured documentation</p>
             </div>
             <div class="summary-item">
-                <span class="summary-icon">👥</span>
+                <span class="material-icons">accessibility</span>
                 <h3>Accessibility</h3>
                 <p>No-code interface for non-developers</p>
             </div>
             <div class="summary-item">
-                <span class="summary-icon">🔍</span>
+                <span class="material-icons">extension</span>
                 <h3>Extensibility</h3>
                 <p>Flexible architecture for custom agents and workflows</p>
             </div>
