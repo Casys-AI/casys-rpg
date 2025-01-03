@@ -120,35 +120,90 @@ class AgentManager(AgentManagerProtocol):
     async def initialize_game(self) -> GameState:
         """
         Initialise un nouveau jeu : crée un état initial, puis lance le workflow
-        une première fois pour la “section 1” ou autre.
+        une première fois pour la "section 1" ou autre.
         """
         try:
             logger.info("Initializing new game")
+            state_dict = None
 
             # 1. Créer un état initial
             initial_state = await self.managers['state_manager'].create_initial_state()
+            logger.debug("Initial state created, narrative content: {}", 
+                        initial_state.narrative.content if initial_state.narrative else "None")
             # Exemple : session_id, game_id, section_number=1, etc.
 
             # 2. Convertir en dict complet
             state_dict = initial_state.model_dump(exclude_unset=False)
+            logger.debug("State converted to dict, narrative content: {}", 
+                        state_dict.get('narrative', {}).get('content') if state_dict.get('narrative') else "None")
 
             # 3. Vérifier session_id / game_id
             if not state_dict.get("session_id"):
                 state_dict["session_id"] = initial_state.session_id
             if not state_dict.get("game_id"):
                 state_dict["game_id"] = initial_state.game_id
+            logger.debug("State dict after ID verification: {}", state_dict)
 
             # 4. Récupérer ou compiler le workflow
             workflow = await self.get_story_workflow()
+            logger.debug("Story workflow retrieved")
 
             # 5. Préparer un thread_config basé sur le session_id
             thread_config = {"configurable": {"thread_id": str(initial_state.session_id)}}
+            logger.debug("Thread config prepared: {}", thread_config)
 
-            # 6. Appeler le workflow en “one-shot”
+            # 6. Appeler le workflow en "one-shot"
+            logger.debug("Invoking workflow with state dict: {}", state_dict)
             result = await workflow.ainvoke(state_dict, thread_config)
+            logger.debug("Workflow result received: {}", result)
 
             # 7. Analyser le résultat
             if isinstance(result, dict):
+                # Extraire le contenu des différents modèles pour le logging
+                narrative_content = None
+                rules_summary = None
+                decision_next = None
+                trace_details = None
+
+                # Narrative
+                narrative = result.get('narrative')
+                if isinstance(narrative, dict):
+                    narrative_content = narrative.get('content')
+                elif hasattr(narrative, 'content'):
+                    narrative_content = narrative.content
+                
+                if narrative_content:
+                    narrative_content = (narrative_content[:100] + "...") if len(narrative_content) > 100 else narrative_content
+                
+                logger.debug("Result is dict, narrative content: {}", narrative_content)
+                
+                # Rules
+                rules = result.get('rules')
+                if isinstance(rules, dict):
+                    rules_summary = rules.get('rules_summary')
+                elif hasattr(rules, 'rules_summary'):
+                    rules_summary = rules.rules_summary
+
+                # Decision
+                decision = result.get('decision')
+                if isinstance(decision, dict):
+                    decision_next = decision.get('next_section')
+                elif hasattr(decision, 'next_section'):
+                    decision_next = decision.next_section
+
+                # Trace
+                trace = result.get('trace')
+                if isinstance(trace, dict):
+                    trace_details = trace.get('details')
+                elif hasattr(trace, 'details'):
+                    trace_details = trace.details
+                
+                logger.debug("Result analysis:")
+                logger.debug(" - Narrative content: {}", narrative_content)
+                logger.debug(" - Rules summary: {}", rules_summary)
+                logger.debug(" - Decision next section: {}", decision_next)
+                logger.debug(" - Trace details: {}", trace_details)
+                
                 # Préserver les IDs si besoin
                 if not result.get("session_id"):
                     result["session_id"] = initial_state.session_id
@@ -157,8 +212,18 @@ class AgentManager(AgentManagerProtocol):
 
                 # Construire un nouvel état
                 new_state = GameState(**result)
+                logger.debug("New state created from result:")
+                logger.debug(" - Narrative: {}", 
+                           (new_state.narrative.content[:100] + "...") if new_state.narrative and len(new_state.narrative.content) > 100 else new_state.narrative.content if new_state.narrative else "None")
+                logger.debug(" - Rules: {}", new_state.rules.rules_summary if new_state.rules else "None")
+                logger.debug(" - Decision: {}", new_state.decision.next_section if new_state.decision else "None")
+                logger.debug(" - Trace: {}", new_state.trace.details if new_state.trace else "None")
+                
                 # Sauvegarder le nouvel état
                 await self.managers['state_manager'].save_state(new_state)
+                logger.debug("New state saved, narrative content: {}", 
+                           (new_state.narrative.content[:100] + "...") if new_state.narrative and len(new_state.narrative.content) > 100 else new_state.narrative.content if new_state.narrative else "None")
+                
                 logger.info("Game initialization completed successfully")
                 return new_state
 

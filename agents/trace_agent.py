@@ -97,7 +97,7 @@ class TraceAgent(BaseAgent):
     async def record_state(self, state: GameState) -> TraceModel:
         """Record game state and return trace."""
         try:
-            return await self._process_trace(state.section_number, state.content)
+            return await self._process_trace(state.section_number, state.narrative.content)
         except Exception as e:
             self.logger.error(f"Error recording state: {e}")
             raise TraceError(message=f"Failed to record state: {str(e)}")
@@ -132,7 +132,7 @@ class TraceAgent(BaseAgent):
             # Process trace
             trace = await self._process_trace(
                 state.section_number,
-                state.content
+                state.narrative.content
             )
             
             if isinstance(trace, TraceError):

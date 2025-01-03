@@ -51,6 +51,8 @@ class NarratorAgent(BaseAgent):
             cached_content = await self.narrator_manager.get_cached_content(section_number)
             if cached_content:
                 logger.info("Content found in cache for section {}", section_number)
+                logger.debug("Cached narrative content: {}", 
+                           (cached_content.content[:100] + "...") if len(cached_content.content) > 100 else cached_content.content)
                 return cached_content
             
             # Get raw content if not provided
@@ -61,6 +63,8 @@ class NarratorAgent(BaseAgent):
                     logger.error("Failed to get raw content: {}", raw_content_result.message)
                     return raw_content_result
                 content = raw_content_result
+                logger.debug("Raw content fetched: {}", 
+                           (content[:100] + "...") if len(content) > 100 else content)
             
             # Process content with LLM
             logger.info("Processing content for section {} with LLM", section_number)
@@ -69,6 +73,9 @@ class NarratorAgent(BaseAgent):
                 logger.error("Failed to process content: {}", processed_result.message)
                 return processed_result
                 
+            logger.debug("Processed narrative content: {}", 
+                       (processed_result.content[:100] + "...") if len(processed_result.content) > 100 else processed_result.content)
+            
             # Save to cache
             save_result = await self.narrator_manager.save_content(processed_result)
             if isinstance(save_result, NarratorError):
@@ -105,7 +112,8 @@ class NarratorAgent(BaseAgent):
             
             logger.debug("Sending request to LLM")
             response = await self.config.llm.ainvoke(messages)
-            logger.debug("Received response from LLM: {}", response.content[:200] + "..." if len(response.content) > 200 else response.content)
+            logger.debug("Received response from LLM: {}", 
+                       (response.content[:100] + "...") if len(response.content) > 100 else response.content)
             
             try:
                 # Valider que la réponse est du JSON valide
@@ -117,7 +125,8 @@ class NarratorAgent(BaseAgent):
                     json_match = re.search(r'\{[\s\S]*\}', content)
                     if json_match:
                         content = json_match.group(0)
-                        logger.debug("Extracted JSON block: {}", content[:200] + "..." if len(content) > 200 else content)
+                        logger.debug("Extracted JSON block: {}", 
+                                   (content[:100] + "...") if len(content) > 100 else content)
                     else:
                         logger.error("No JSON object found in response")
                         raise ValueError("Response does not contain a JSON object")
@@ -185,37 +194,24 @@ class NarratorAgent(BaseAgent):
             Dict[str, Any]: Updated narrative content
         """
         try:
-            state = GameState.model_validate(input_data.get("state", {}))
+            state = input_data.get("state")
+            if not state:
+                raise ValueError("No state provided in input data")
+                
             logger.debug("Processing narrative for state: session={}, section={}", 
                         state.session_id, state.section_number)
             
-            # Process current section
-            section_result = await self._process_section(state.section_number)
+            # Process section
+            result = await self._process_section(state.section_number)
+            if isinstance(result, NarratorError):
+                yield {"narrative": result}
+                return
             
-            if isinstance(section_result, NarratorError):
-                logger.error("Error processing section: {}", section_result.message)
-                error_model = NarratorModel(
-                    section_number=state.section_number,
-                    content="",
-                    error=section_result.message,
-                    source_type=SourceType.ERROR,
-                    timestamp=datetime.now()
-                )
-                yield {"narrative": error_model}
-            else:
-                logger.debug("Section processed successfully")
-                yield {"narrative": section_result}
-                
+            yield {"narrative": result}
+            
         except Exception as e:
-            logger.exception("Error in ainvoke: {}", str(e))
-            error_model = NarratorModel(
-                section_number=state.section_number,
-                content="",
-                error=str(e),
-                source_type=SourceType.ERROR,
-                timestamp=datetime.now()
-            )
-            yield {"narrative": error_model}
-
+            logger.exception("Error in narrator agent: {}", str(e))
+            yield {"narrative": NarratorError(message=str(e))}
+            
 # Register NarratorAgent as implementing NarratorAgentProtocol
 NarratorAgentProtocol.register(NarratorAgent)

@@ -105,7 +105,7 @@ class GameFactory:
             )
             decision_manager = DecisionManager()  # No config needed for now
             narrator_manager = NarratorManager(manager_configs.storage_config, self._cache_manager)
-            workflow_manager = self._create_workflow_manager(state_manager, rules_manager)
+            workflow_manager = self._create_workflow_manager(state_manager)
             
             managers = {
                 "state_manager": state_manager,
@@ -126,20 +126,18 @@ class GameFactory:
         
     def _create_workflow_manager(
         self,
-        state_manager: StateManagerProtocol,
-        rules_manager: RulesManagerProtocol
+        state_manager: StateManagerProtocol
     ) -> WorkflowManagerProtocol:
         """Create workflow manager instance.
         
         Args:
             state_manager: State manager instance
-            rules_manager: Rules manager instance
             
         Returns:
             WorkflowManagerProtocol: Workflow manager instance
         """
         from managers.workflow_manager import WorkflowManager
-        return WorkflowManager(state_manager, rules_manager)
+        return WorkflowManager(state_manager)
 
     def _create_agents(self, managers: Dict[str, ManagerProtocols]) -> Dict[str, AgentProtocols]:
         """Create all game agents.

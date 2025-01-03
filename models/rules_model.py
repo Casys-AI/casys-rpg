@@ -160,28 +160,20 @@ class RulesModel(BaseModel):
             
         return self
 
-    def __add__(self, other: 'RulesModel') -> 'RulesModel':
-        """Merge two RulesModels for LangGraph parallel results.
-        Verifies section numbers match and takes the latest model.
-        
-        Args:
-            other: Another RulesModel to merge with
+    @model_validator(mode='after')
+    def validate_rules(self) -> 'RulesModel':
+        """Validate the rules model for consistency."""
+        # Validate dice_type based on needs_dice
+        if self.needs_dice and self.dice_type == DiceType.NONE:
+            raise ValueError("Dice type must be specified when dice roll is needed")
+        if not self.needs_dice and self.dice_type != DiceType.NONE:
+            self.dice_type = DiceType.NONE  # Reset dice type if no dice needed
             
-        Returns:
-            The latest RulesModel if sections match
+        # Validate error state
+        if self.error and self.source_type != SourceType.ERROR:
+            self.source_type = SourceType.ERROR
             
-        Raises:
-            AssertionError: If section numbers don't match
-        """
-        if not isinstance(other, RulesModel):
-            return self
-            
-        # Vérifier que les sections correspondent
-        assert self.section_number == other.section_number, \
-            f"Cannot add RulesModels with different section numbers: {self.section_number} != {other.section_number}"
-            
-        # Prendre le dernier modèle
-        return other
+        return self
 
     class Config:
         """Configuration for the model."""

@@ -12,6 +12,9 @@ Utilisations:
 from typing import Optional, Dict, Any
 from datetime import datetime
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 from models.game_state import GameState
 from models.rules_model import RulesModel, DiceType, SourceType
@@ -27,24 +30,21 @@ class ModelFactory:
     def create_game_state(
         game_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        section_number: int = 1,
+        section_number: Optional[int] = None,
         narrative: Optional[NarratorModel] = None,
         rules: Optional[RulesModel] = None,
         decision: Optional[DecisionModel] = None,
         trace: Optional[TraceModel] = None,
         **kwargs: Dict[str, Any]
     ) -> GameState:
-        """Créer un GameState avec la logique métier.
+        """Créer un GameState vide.
         
-        Cette méthode:
-        1. Génère les IDs si non fournis
-        2. Initialise tous les modèles requis avec la logique métier
-        3. Valide la cohérence entre les modèles
-        4. Applique les règles métier globales
+        Cette méthode crée un GameState avec les valeurs fournies ou None.
+        La génération des IDs est gérée par le StateManager.
         
         Args:
-            game_id: ID du jeu (généré si non fourni)
-            session_id: ID de session (généré si non fourni)
+            game_id: ID du jeu (géré par StateManager)
+            session_id: ID de session (géré par StateManager)
             section_number: Numéro de section
             narrative: Modèle narratif
             rules: Modèle de règles
@@ -53,63 +53,27 @@ class ModelFactory:
             **kwargs: Attributs supplémentaires
             
         Returns:
-            GameState: État de jeu initialisé avec tous les modèles requis
+            GameState: État de jeu vide
             
         Raises:
             ValueError: Si section_number < 1
         """
-        # 1. Validation de base
-        if section_number < 1:
-            raise ValueError("section_number must be positive")
             
-        # 2. Génération des IDs
-        if not game_id:
-            game_id = str(uuid.uuid4())
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            
-        # 3. Initialisation des modèles avec la logique métier
-        rules_model = rules or RulesModel(
-            section_number=section_number,
-            dice_type=DiceType.NONE,
-            source_type=SourceType.RAW,
-            dice_results={}
-        )
-        
-        narrator_model = narrative or NarratorModel(
-            section_number=section_number,
-            content=f"Section {section_number}",
-            source_type=SourceType.RAW
-        )
-        
-        decision_model = decision or DecisionModel(
-            section_number=section_number,
-            choices={},
-            source_type=SourceType.RAW
-        )
-        
-        # TODO: ajouter la construction de trace
-        trace_model = trace
-            
-        # 4. Validation de la cohérence entre les modèles
-        if rules_model.section_number != section_number:
-            raise ValueError(f"rules_model.section_number ({rules_model.section_number}) != section_number ({section_number})")
-        if narrator_model.section_number != section_number:
-            raise ValueError(f"narrator_model.section_number ({narrator_model.section_number}) != section_number ({section_number})")
-        if decision_model.section_number != section_number:
-            raise ValueError(f"decision_model.section_number ({decision_model.section_number}) != section_number ({section_number})")
-            
-        # 5. Création du GameState avec tous les modèles initialisés
-        return GameState(
+        # Création du GameState vide
+        game_state = GameState(
             game_id=game_id,
             session_id=session_id,
             section_number=section_number,
-            narrative=narrator_model,
-            rules=rules_model,
-            decision=decision_model,
-            trace=trace_model,
+            narrative=narrative,
+            rules=rules,
+            decision=decision,
+            trace=trace,
             **kwargs
         )
+        
+        logger.debug("Created empty GameState")
+        
+        return game_state
     
     # Les autres méthodes create_* ne sont plus nécessaires car nous utilisons
     # directement les constructeurs des modèles existants

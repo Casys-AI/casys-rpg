@@ -88,7 +88,7 @@ class StoryGraph(StoryGraphProtocol):
             self._graph.add_node("node_rules", self._process_rules)
             self._graph.add_node("node_narrator", self._process_narrative)
             self._graph.add_node("node_decision", self._process_decision)
-            self._graph.add_node("node_trace", self._process_trace)  # Ajouté pour la traçabilité
+            #self._graph.add_node("node_trace", self._process_trace)  # Ajouté pour la traçabilité
             self._graph.add_node("node_end", self.workflow_manager.end_workflow)
 
             # Ajouter les connexions
@@ -98,10 +98,10 @@ class StoryGraph(StoryGraphProtocol):
 
             # Fan-in : fusion des résultats de `rules` et `narrator` dans `decision`
             self._graph.add_edge(["node_rules", "node_narrator"], "node_decision")
-
+            
             # Ajout du nœud de trace avant de terminer
-            self._graph.add_edge("node_decision", "node_trace")
-            self._graph.add_edge("node_trace", "node_end")
+            self._graph.add_edge("node_decision", "node_end")
+            #self._graph.add_edge("node_trace", "node_end")
             self._graph.add_edge("node_end", END)
 
             # Compiler le graphe
@@ -115,6 +115,8 @@ class StoryGraph(StoryGraphProtocol):
         """Process game rules for the current state."""
         try:
             logger.info("Processing rules for section {}", input_data.section_number)
+            logger.debug("Input narrative content before rules: {}", 
+                        input_data.narrative.content if input_data.narrative else "None")
             
             if not input_data:
                 raise GameError("No input data available for rules processing")
@@ -132,21 +134,35 @@ class StoryGraph(StoryGraphProtocol):
                     output = input_data.with_updates(rules=rules)
                     logger.debug("Rules processing completed for section {}", 
                                input_data.section_number)
+                    logger.debug("Output narrative content after rules: {}", 
+                               output.narrative.content if output.narrative else "None")
+                    logger.debug("rules_agent returned: {}", result)
+
                     return output
                     
             raise GameError("No valid rules result")
             
         except Exception as e:
             logger.exception("Error processing rules: {}", str(e))
-            return input_data.with_updates(error=str(e))
+            logger.debug("Input narrative content before error: {}", 
+                        input_data.narrative.content if input_data.narrative else "None")
+            error_state = input_data.with_updates(error=str(e))
+            logger.debug("Output narrative content after error: {}", 
+                        error_state.narrative.content if error_state.narrative else "None")
+            return error_state
 
     async def _process_narrative(self, input_data: GameState) -> GameState:
         """Process narrative for the current state."""
         try:
             logger.info("Processing narrative for section {}", input_data.section_number)
+            logger.debug("Input narrative content before processing: {}", 
+                        input_data.narrative.content if input_data.narrative else "None")
             
             if not input_data:
                 raise GameError("No input data available for narrative processing")
+
+            if input_data.narrative:
+                logger.debug("Input narrative content: {}", input_data.narrative.content)
 
             if not self.narrator_agent:
                 logger.debug("No narrator agent available, returning input state")
@@ -159,19 +175,24 @@ class StoryGraph(StoryGraphProtocol):
                     if isinstance(narrator_result, NarratorError):
                         raise narrator_result
                     
-                    output = input_data.with_updates(
-                        narrative=narrator_result,
-                        narrative_content=input_data.content
-                    )
+                    logger.debug("Received narrative content from agent: {}", 
+                               (narrator_result.content[:100] + "...") if len(narrator_result.content) > 100 else narrator_result.content)
+                    output = input_data.with_updates(narrative=narrator_result)
+                    logger.debug("Updated game state narrative content: {}", 
+                               (output.narrative.content[:100] + "...") if output.narrative and len(output.narrative.content) > 100 else output.narrative.content if output.narrative else "None")
                     logger.debug("Narrative processing completed for section {}", 
                                input_data.section_number)
                     return output
 
             raise GameError("No valid narrative result")
-
         except Exception as e:
             logger.exception("Error processing narrative: {}", str(e))
-            return input_data.with_updates(error=str(e))
+            logger.debug("Input narrative content before error: {}", 
+                        input_data.narrative.content if input_data.narrative else "None")
+            error_state = input_data.with_updates(error=str(e))
+            logger.debug("Output narrative content after error: {}", 
+                        error_state.narrative.content if error_state.narrative else "None")
+            return error_state
 
     async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""

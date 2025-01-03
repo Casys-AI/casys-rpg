@@ -1,11 +1,245 @@
-2025-01-02 12:30:15 | SUCCESS  | config.logging_config:setup_logging:61 - Logging configured successfully
-2025-01-02 12:30:19 | DEBUG    | __main__:<module>:28 - Loading .env from: C:\Users\erpes\Desktop\casys-rpg\.env
-2025-01-02 12:30:19 | DEBUG    | config.logging_config:log_env_variables:80 - Environment variables:
-2025-01-02 12:30:19 | DEBUG    | config.logging_config:log_env_variables:83 - CASYS_HOST: None
-2025-01-02 12:30:19 | DEBUG    | config.logging_config:log_env_variables:83 - CASYS_PORT: 8000
-2025-01-02 12:30:19 | DEBUG    | config.logging_config:log_env_variables:83 - CASYS_RELOAD: None
-2025-01-02 12:30:19 | DEBUG    | config.logging_config:log_env_variables:83 - LOG_LEVEL: DEBUG
-2025-01-02 12:30:19 | INFO     | __main__:<module>:39 - Démarrage du serveur sur 127.0.0.1:8000
-2025-01-02 12:30:19 | SUCCESS  | config.logging_config:setup_logging:61 - Logging configured successfully
-2025-01-02 12:30:22 | SUCCESS  | config.logging_config:setup_logging:61 - Logging configured successfully
-2025-01-02 12:30:22 | INFO     | api.app:lifespan:72 - Starting up...
+2025-01-03 12:52:48 | SUCCESS  | config.logging_config:setup_logging:63 - Logging configured successfully
+2025-01-03 12:52:52 | DEBUG    | __main__:<module>:28 - Loading .env from: C:\Users\erpes\Desktop\casys-rpg\.env
+2025-01-03 12:52:52 | DEBUG    | config.logging_config:log_env_variables:82 - Environment variables:
+2025-01-03 12:52:52 | DEBUG    | config.logging_config:log_env_variables:85 - CASYS_HOST: None
+2025-01-03 12:52:52 | DEBUG    | config.logging_config:log_env_variables:85 - CASYS_PORT: 8000
+2025-01-03 12:52:52 | DEBUG    | config.logging_config:log_env_variables:85 - CASYS_RELOAD: None
+2025-01-03 12:52:52 | DEBUG    | config.logging_config:log_env_variables:85 - LOG_LEVEL: DEBUG
+2025-01-03 12:52:52 | INFO     | __main__:<module>:39 - Démarrage du serveur sur 127.0.0.1:8000
+2025-01-03 12:52:53 | SUCCESS  | config.logging_config:setup_logging:63 - Logging configured successfully
+2025-01-03 12:52:57 | INFO     | config.logging_config:setup_logging:31 - Configuring logging with level: DEBUG
+2025-01-03 12:52:57 | SUCCESS  | config.logging_config:setup_logging:63 - Logging configured successfully
+2025-01-03 12:52:57 | INFO     | api.app:lifespan:72 - Starting up...
+2025-01-03 12:53:27 | INFO     | managers.dependencies:get_agent_manager:57 - Creating new AgentManager instance
+2025-01-03 12:53:27 | DEBUG    | managers.dependencies:get_agent_manager:59 - Creating new GameFactory instance
+2025-01-03 12:53:27 | INFO     | managers.filesystem_adapter:__init__:27 - Initializing FileSystemAdapter
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:32 - Creating base directory: C:\Users\erpes\Desktop\casys-rpg\data
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:39 - Creating namespace directory for raw_content: C:\Users\erpes\Desktop\casys-rpg\data\sections
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:39 - Creating namespace directory for rules: C:\Users\erpes\Desktop\casys-rpg\data\cache\rules
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:39 - Creating namespace directory for sections: C:\Users\erpes\Desktop\casys-rpg\data\cache\sections
+2025-01-03 12:53:27 | INFO     | managers.filesystem_adapter:__init__:42 - FileSystemAdapter initialized successfully
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:43 - Base path: C:\Users\erpes\Desktop\casys-rpg\data
+2025-01-03 12:53:27 | DEBUG    | managers.filesystem_adapter:__init__:44 - Encoding: utf-8
+2025-01-03 12:53:27 | DEBUG    | managers.cache_manager:__init__:53 - CacheManager initialized with config: StorageConfig
+2025-01-03 12:53:27 | DEBUG    | managers.cache_manager:__init__:54 - Base storage path: C:\Users\erpes\Desktop\casys-rpg\data
+2025-01-03 12:53:27 | DEBUG    | managers.dependencies:get_agent_manager:64 - Creating game components
+2025-01-03 12:53:27 | INFO     | managers.state_manager:__init__:45 - Initializing StateManager
+2025-01-03 12:53:27 | DEBUG    | managers.state_manager:__init__:51 - StateManager initialized with config: base_path=WindowsPath('data') encoding='utf-8' max_cache_size=1000 game_id=None manager_id='' persistence_enabled=True debug=False cache_enabled=True options={} namespaces={'state': NamespaceConfig(path=WindowsPath('cache/games/{game_id}/states'), format=<StorageFormat.JSON: 'json'>, ttl_seconds=3600, cache_enabled=True, per_game=True), 'trace': NamespaceConfig(path=WindowsPath('cache/games/{game_id}/traces'), format=<StorageFormat.JSON: 'json'>, ttl_seconds=None, cache_enabled=True, per_game=True), 'characters': NamespaceConfig(path=WindowsPath('cache/games/{game_id}/characters'), format=<StorageFormat.JSON: 'json'>, ttl_seconds=None, cache_enabled=True, per_game=True), 'raw_content': NamespaceConfig(path=WindowsPath('sections'), format=<StorageFormat.MARKDOWN: 'markdown'>, ttl_seconds=None, cache_enabled=False, per_game=False), 'rules': NamespaceConfig(path=WindowsPath('cache/rules'), format=<StorageFormat.MARKDOWN: 'markdown'>, ttl_seconds=None, cache_enabled=True, per_game=False), 'sections': NamespaceConfig(path=WindowsPath('cache/sections'), format=<StorageFormat.MARKDOWN: 'markdown'>, ttl_seconds=None, cache_enabled=True, per_game=False)}
+2025-01-03 12:53:27 | INFO     | managers.rules_manager:__init__:30 - Initializing RulesManager
+2025-01-03 12:53:27 | DEBUG    | managers.rules_manager:__init__:34 - RulesManager initialized with config: StorageConfig
+2025-01-03 12:53:27 | INFO     | managers.narrator_manager:__init__:28 - Initializing NarratorManager
+2025-01-03 12:53:27 | DEBUG    | managers.narrator_manager:__init__:31 - NarratorManager initialized with config: StorageConfig
+2025-01-03 12:53:27 | INFO     | managers.workflow_manager:__init__:33 - Initializing WorkflowManager
+2025-01-03 12:53:27 | DEBUG    | managers.workflow_manager:__init__:35 - WorkflowManager initialized with state_manager: StateManager
+2025-01-03 12:53:29 | DEBUG    | managers.dependencies:get_agent_manager:72 - Initializing AgentManager with components
+2025-01-03 12:53:29 | INFO     | managers.agent_manager:__init__:85 - Initializing AgentManager
+2025-01-03 12:53:29 | INFO     | managers.agent_manager:__init__:97 - AgentManager initialization completed
+2025-01-03 12:53:29 | INFO     | managers.dependencies:get_agent_manager:79 - AgentManager initialized successfully
+2025-01-03 12:53:29 | INFO     | managers.agent_manager:initialize_game:126 - Initializing new game
+2025-01-03 12:53:29 | INFO     | managers.state_manager:create_initial_state:215 - Creating initial state
+2025-01-03 12:53:29 | INFO     | managers.state_manager:initialize:57 - Initializing state resources
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:initialize:60 - Generated new game ID: cb27b313-49d1-4e81-b8e6-a860886140a0
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:update_game_id:359 - Updating game ID to: cb27b313-49d1-4e81-b8e6-a860886140a0
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:update_game_id:369 - Creating per-game directory for state: data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:update_game_id:369 - Creating per-game directory for trace: data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\traces
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:update_game_id:369 - Creating per-game directory for characters: data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\characters
+2025-01-03 12:53:29 | INFO     | managers.state_manager:initialize:64 - State manager initialized with game ID: cb27b313-49d1-4e81-b8e6-a860886140a0
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata=None narrative=None rules=None decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:333 - Saving state, input narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata=None narrative=None rules=None decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:341 - State validated, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:346 - State serialized, narrative content in json: None
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_current in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_current
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:355 - Current state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1 in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:363 - Section state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:366 - Current state updated, final narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:131 - Initial state created, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:137 - State converted to dict, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:145 - State dict after ID verification: {'session_id': '42f0389d-1e58-4c30-bd85-c418393a01be', 'game_id': 'cb27b313-49d1-4e81-b8e6-a860886140a0', 'metadata': None, 'narrative': None, 'rules': None, 'decision': None, 'trace': None, 'character': None, 'error': None, 'section_number': 1, 'player_input': None}
+2025-01-03 12:53:29 | INFO     | managers.agent_manager:get_story_workflow:352 - Getting story workflow
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:get_story_workflow:356 - Story graph not configured, configuring now
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:get_story_workflow:365 - Compiling workflow
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_setup_workflow:82 - Setting up LangGraph workflow with parallel processing
+2025-01-03 12:53:29 | SUCCESS  | agents.story_graph:_setup_workflow:109 - Workflow setup completed
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:149 - Story workflow retrieved
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:153 - Thread config prepared: {'configurable': {'thread_id': '42f0389d-1e58-4c30-bd85-c418393a01be'}}
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:156 - Invoking workflow with state dict: {'session_id': '42f0389d-1e58-4c30-bd85-c418393a01be', 'game_id': 'cb27b313-49d1-4e81-b8e6-a860886140a0', 'metadata': None, 'narrative': None, 'rules': None, 'decision': None, 'trace': None, 'character': None, 'error': None, 'section_number': 1, 'player_input': None}
+2025-01-03 12:53:29 | INFO     | managers.workflow_manager:start_workflow:111 - Starting workflow
+2025-01-03 12:53:29 | INFO     | managers.state_manager:create_initial_state:215 - Creating initial state
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:279 - Creating new state with updates for session_id=42f0389d-1e58-4c30-bd85-c418393a01be
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:280 - Creating new state with updates for section_number=1
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata=None narrative=None rules=None decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:333 - Saving state, input narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata=None narrative=None rules=None decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:341 - State validated, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:346 - State serialized, narrative content in json: None
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_current in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_current
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:355 - Current state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1 in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:363 - Section state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:366 - Current state updated, final narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: {'session_id': '42f0389d-1e58-4c30-bd85-c418393a01be', 'game_id': 'cb27b313-49d1-4e81-b8e6-a860886140a0', 'metadata': {'node': 'start'}, 'narrative': None, 'rules': None, 'decision': None, 'trace': None, 'character': None, 'error': None, 'section_number': 1, 'player_input': None}
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:176 - Input is Dict, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:179 - Created GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:185 - State format validated, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:333 - Saving state, input narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata={'node': 'start'} narrative=None rules=None decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:341 - State validated, narrative content: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:346 - State serialized, narrative content in json: None
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_current in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_current
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:355 - Current state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1 in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:363 - Section state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:366 - Current state updated, final narrative content: None
+2025-01-03 12:53:29 | INFO     | managers.workflow_manager:start_workflow:132 - Workflow started successfully: session=42f0389d-1e58-4c30-bd85-c418393a01be, section=cb27b313-49d1-4e81-b8e6-a860886140a0
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_process_rules:117 - Processing rules for section 1
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_rules:118 - Input narrative content before rules: None
+2025-01-03 12:53:29 | DEBUG    | agents.rules_agent:ainvoke:251 - Processing rules for state: session=42f0389d-1e58-4c30-bd85-c418393a01be, section=1
+2025-01-03 12:53:29 | DEBUG    | agents.rules_agent:_process_section_rules:53 - Starting process_section_rules for section 1
+2025-01-03 12:53:29 | INFO     | managers.rules_manager:get_cached_rules:38 - Getting cached rules for section 1
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:184 - Getting data for key section_1_rules in namespace rules
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:208 - Looking for file: C:\Users\erpes\Desktop\casys-rpg\data\cache\rules\section_1_rules.md
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:read_file_async:100 - Reading from file: C:\Users\erpes\Desktop\casys-rpg\data\cache\rules\section_1_rules.md
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_process_narrative:157 - Processing narrative for section 1
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_narrative:158 - Input narrative content before processing: None
+2025-01-03 12:53:29 | DEBUG    | agents.narrator_agent:ainvoke:201 - Processing narrative for state: session=42f0389d-1e58-4c30-bd85-c418393a01be, section=1
+2025-01-03 12:53:29 | DEBUG    | agents.narrator_agent:_process_section:48 - Starting process_section for section 1
+2025-01-03 12:53:29 | INFO     | managers.narrator_manager:get_cached_content:35 - Getting cached content for section 1
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:184 - Getting data for key section_1 in namespace sections
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:208 - Looking for file: C:\Users\erpes\Desktop\casys-rpg\data\cache\sections\section_1.md
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:read_file_async:100 - Reading from file: C:\Users\erpes\Desktop\casys-rpg\data\cache\sections\section_1.md
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:read_file_async:117 - Successfully read from file: C:\Users\erpes\Desktop\casys-rpg\data\cache\rules\section_1_rules.md (591 characters)
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:213 - Found in persistent storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_deserialize_data:107 - Deserializing data for namespace rules with format StorageFormat.MARKDOWN
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:260 - Parsing markdown content for section 1
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:279 - Parsed sections: ['Metadata', 'Analysis', 'Choices', 'Summary', 'Error']
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:298 - Parsed metadata: {'last_update': '2025-01-02T17:25:55.262062', 'source': 'llm_analysis', 'source_type': 'processed'}
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:318 - Parsed analysis: {'needs_dice': 'false', 'dice_type': 'none', 'needs_user_response': 'true', 'next_action': 'user_first', 'conditions': 'None', 'target_sections': '48, 398'}
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:192 - Parsing choices from content
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:202 - Parsing choice: 'Engager la procédure d'évasion'
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:218 - Parsed dice type: none
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:235 - Parsed target section: 48
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:250 - Choice parsed successfully: 'Engager la procédure d'évasion'
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:202 - Parsing choice: 'Continuer votre route'
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:218 - Parsed dice type: none
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:235 - Parsed target section: 398
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_parse_choices:250 - Choice parsed successfully: 'Continuer votre route'
+2025-01-03 12:53:29 | INFO     | managers.rules_manager:_parse_choices:255 - Successfully parsed 2 choices
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:328 - Parsed 2 choices
+2025-01-03 12:53:29 | DEBUG    | managers.rules_manager:_markdown_to_rules:373 - Creating RulesModel with data: {'section_number': 1, 'dice_type': <DiceType.NONE: 'none'>, 'needs_dice': False, 'needs_user_response': True, 'next_action': 'user_first', 'conditions': [], 'choices_count': 2, 'source': 'llm_analysis', 'source_type': <SourceType.PROCESSED: 'processed'>}
+2025-01-03 12:53:29 | INFO     | managers.rules_manager:_markdown_to_rules:385 - Successfully created RulesModel for section 1
+2025-01-03 12:53:29 | INFO     | managers.rules_manager:get_cached_rules:51 - Successfully retrieved rules for section 1 from cache
+2025-01-03 12:53:29 | INFO     | agents.rules_agent:_process_section_rules:58 - Rules found in cache for section 1
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:279 - Creating new state with updates for session_id=42f0389d-1e58-4c30-bd85-c418393a01be
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:280 - Creating new state with updates for section_number=1
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_rules:135 - Rules processing completed for section 1
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_rules:137 - Output narrative content after rules: None
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_rules:139 - rules_agent returned: {'rules': RulesModel(section_number=1, dice_type=<DiceType.NONE: 'none'>, needs_dice=False, needs_user_response=True, next_action=<NextActionType.USER_FIRST: 'user_first'>, conditions=[], choices=[Choice(text="Engager la procédure d'évasion", type=<ChoiceType.DIRECT: 'direct'>, target_section=48, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={}), Choice(text='Continuer votre route', type=<ChoiceType.DIRECT: 'direct'>, target_section=398, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={})], rules_summary="Le joueur doit choisir entre engager la procédure d'évasion ou continuer sa route, sans lancer de dés.", error=None, source='llm_analysis', source_type=<SourceType.PROCESSED: 'processed'>, last_update=datetime.datetime(2025, 1, 2, 17, 25, 55, 262062))}
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:read_file_async:117 - Successfully read from file: C:\Users\erpes\Desktop\casys-rpg\data\cache\sections\section_1.md (2540 characters)
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:get_cached_data:213 - Found in persistent storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_deserialize_data:107 - Deserializing data for namespace sections with format StorageFormat.MARKDOWN
+2025-01-03 12:53:29 | DEBUG    | managers.narrator_manager:_markdown_to_narrator:151 - Converting markdown to NarratorModel for section 1
+2025-01-03 12:53:29 | DEBUG    | managers.narrator_manager:get_cached_content:48 - Successfully parsed cached content for section 1
+2025-01-03 12:53:29 | INFO     | agents.narrator_agent:_process_section:53 - Content found in cache for section 1
+2025-01-03 12:53:29 | DEBUG    | agents.narrator_agent:_process_section:54 - Cached narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_narrative:178 - Received narrative content from agent: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:279 - Creating new state with updates for session_id=42f0389d-1e58-4c30-bd85-c418393a01be
+2025-01-03 12:53:29 | DEBUG    | models.game_state:with_updates:280 - Creating new state with updates for section_number=1
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_narrative:181 - Updated game state narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | agents.story_graph:_process_narrative:183 - Narrative processing completed for section 1
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_process_decision:200 - Processing decision for section 1
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_process_decision:211 - Waiting for user input in section 1
+2025-01-03 12:53:29 | INFO     | agents.story_graph:_process_decision:246 - Workflow interrupted for user input: (Interrupt(value='Waiting for user input', resumable=True, ns=['node_decision:5f0a1936-1962-9230-1736-bf7e73a49faf'], when='during'),)
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:158 - Workflow result received: {'session_id': '42f0389d-1e58-4c30-bd85-c418393a01be', 'game_id': 'cb27b313-49d1-4e81-b8e6-a860886140a0', 'metadata': {'node': 'start'}, 'narrative': NarratorModel(section_number=1, content="Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vaisseau spatial. Après avoir vérifié le système de sécurité, vous examinez attentivement le tableau de bord. Il ne présente aucune complexité : une simple console d'ordinateur reliée à un terminal de liaison et quelques écrans.\n\nLe circuit micro-électronique du système alpha ziridium est profondément enfoui dans les entrailles du vaisseau, et vous n'aurez jamais à vous en préoccuper le moins du monde. Si une panne quelconque venait à se déclarer, ou s'il se produisait le moindre incident, votre ingénieur robot interviendrait sur-le-champ.\n\nLa préprogrammation de votre voyage a été établie pour vous mener en premier lieu sur Tropos. Vous entamez les procédures de départ : interrogation de l'ordinateur concernant tous les points vitaux du vaisseau. Une voix impersonnelle se fait entendre aussitôt : « Vérifications effectuées. Fonctionnement optimal. »\n\nPuis vous passez à la deuxième opération : contact avec la tour de contrôle. Paré au décollage ! Vous appuyez sur un bouton... et c'est le grand voyage. Au bout de quelques minutes, les malaises dus à l'accélération s'estompent : vous quittez l'exosphère terrienne et pénétrez dans la nuit spatiale, aussi noire que de l'encre.\n\nLe générateur gravitationnel est automatiquement enclenché, de sorte que la pesanteur normale est maintenue dans votre vaisseau, ce qui vous permet, ainsi qu'à vos robots, de vous déplacer librement. Vous allumez l'écran de vision rétrospective pour observer une dernière fois la Terre qui rétrécit et s'éloigne, des bancs de nuages glissent paresseusement, et le soleil se réfléchit sur les glaces polaires du cercle arctique.\n\nBien que l'occasion vous ait été donnée à maintes reprises de contempler ce spectacle au cours de vos voyages vers Vénus ou vers Mercure, vous ressentez toujours, à sa vue, un petit pincement au cœur et une émotion nostalgique. Reverrez-vous jamais la Terre ? D'un haussement d'épaules, vous chassez ces pensées, car seul compte, désormais, votre mission.\n\nDes heures s'écoulent, uniformes et lentes. Puis votre écran revient soudain à la vie. L'ordinateur de bord vous avertit qu'un autre vaisseau spatial suit la même trajectoire que vous tout en maintenant soigneusement un écart constant. Cela ressemble à s'y méprendre à une filature.\n\nAllez-vous donner l'ordre à votre ordinateur d'engager la procédure d'évasion (rendez-vous au [[48]]) ou préférez-vous continuer votre route (rendez-vous au [[398]]) ?", source_type=<SourceType.RAW: 'raw'>, error=None, timestamp=datetime.datetime(2025, 1, 3, 12, 53, 29, 701474), last_update=datetime.datetime(2025, 1, 3, 12, 53, 29, 701539)), 'rules': RulesModel(section_number=1, dice_type=<DiceType.NONE: 'none'>, needs_dice=False, needs_user_response=True, next_action=<NextActionType.USER_FIRST: 'user_first'>, conditions=[], choices=[Choice(text="Engager la procédure d'évasion", type=<ChoiceType.DIRECT: 'direct'>, target_section=48, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={}), Choice(text='Continuer votre route', type=<ChoiceType.DIRECT: 'direct'>, target_section=398, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={})], rules_summary="Le joueur doit choisir entre engager la procédure d'évasion ou continuer sa route, sans lancer de dés.", error=None, source='llm_analysis', source_type=<SourceType.PROCESSED: 'processed'>, last_update=datetime.datetime(2025, 1, 2, 17, 25, 55, 262062)), 'decision': None, 'trace': None, 'character': None, 'error': None, 'section_number': 1, 'player_input': None}
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:178 - Result is dict, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:201 - Result analysis:
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:202 -  - Narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:203 -  - Rules summary: Le joueur doit choisir entre engager la procédure d'évasion ou continuer sa route, sans lancer de dés.
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:204 -  - Decision next section: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:205 -  - Trace details: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:215 - New state created from result:
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:216 -  - Narrative: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:218 -  - Rules: Le joueur doit choisir entre engager la procédure d'évasion ou continuer sa route, sans lancer de dés.
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:219 -  - Decision: None
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:220 -  - Trace: None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:333 - Saving state, input narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:167 - Validating state data: session_id='42f0389d-1e58-4c30-bd85-c418393a01be' game_id='cb27b313-49d1-4e81-b8e6-a860886140a0' metadata={'node': 'start'} narrative=NarratorModel(section_number=1, content="Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vaisseau spatial. Après avoir vérifié le système de sécurité, vous examinez attentivement le tableau de bord. Il ne présente aucune complexité : une simple console d'ordinateur reliée à un terminal de liaison et quelques écrans.\n\nLe circuit micro-électronique du système alpha ziridium est profondément enfoui dans les entrailles du vaisseau, et vous n'aurez jamais à vous en préoccuper le moins du monde. Si une panne quelconque venait à se déclarer, ou s'il se produisait le moindre incident, votre ingénieur robot interviendrait sur-le-champ.\n\nLa préprogrammation de votre voyage a été établie pour vous mener en premier lieu sur Tropos. Vous entamez les procédures de départ : interrogation de l'ordinateur concernant tous les points vitaux du vaisseau. Une voix impersonnelle se fait entendre aussitôt : « Vérifications effectuées. Fonctionnement optimal. »\n\nPuis vous passez à la deuxième opération : contact avec la tour de contrôle. Paré au décollage ! Vous appuyez sur un bouton... et c'est le grand voyage. Au bout de quelques minutes, les malaises dus à l'accélération s'estompent : vous quittez l'exosphère terrienne et pénétrez dans la nuit spatiale, aussi noire que de l'encre.\n\nLe générateur gravitationnel est automatiquement enclenché, de sorte que la pesanteur normale est maintenue dans votre vaisseau, ce qui vous permet, ainsi qu'à vos robots, de vous déplacer librement. Vous allumez l'écran de vision rétrospective pour observer une dernière fois la Terre qui rétrécit et s'éloigne, des bancs de nuages glissent paresseusement, et le soleil se réfléchit sur les glaces polaires du cercle arctique.\n\nBien que l'occasion vous ait été donnée à maintes reprises de contempler ce spectacle au cours de vos voyages vers Vénus ou vers Mercure, vous ressentez toujours, à sa vue, un petit pincement au cœur et une émotion nostalgique. Reverrez-vous jamais la Terre ? D'un haussement d'épaules, vous chassez ces pensées, car seul compte, désormais, votre mission.\n\nDes heures s'écoulent, uniformes et lentes. Puis votre écran revient soudain à la vie. L'ordinateur de bord vous avertit qu'un autre vaisseau spatial suit la même trajectoire que vous tout en maintenant soigneusement un écart constant. Cela ressemble à s'y méprendre à une filature.\n\nAllez-vous donner l'ordre à votre ordinateur d'engager la procédure d'évasion (rendez-vous au [[48]]) ou préférez-vous continuer votre route (rendez-vous au [[398]]) ?", source_type=<SourceType.RAW: 'raw'>, error=None, timestamp=datetime.datetime(2025, 1, 3, 12, 53, 29, 701474), last_update=datetime.datetime(2025, 1, 3, 12, 53, 29, 701539)) rules=RulesModel(section_number=1, dice_type=<DiceType.NONE: 'none'>, needs_dice=False, needs_user_response=True, next_action=<NextActionType.USER_FIRST: 'user_first'>, conditions=[], choices=[Choice(text="Engager la procédure d'évasion", type=<ChoiceType.DIRECT: 'direct'>, target_section=48, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={}), Choice(text='Continuer votre route', type=<ChoiceType.DIRECT: 'direct'>, target_section=398, conditions=[], dice_type=<DiceType.NONE: 'none'>, dice_results={})], rules_summary="Le joueur doit choisir entre engager la procédure d'évasion ou continuer sa route, sans lancer de dés.", error=None, source='llm_analysis', source_type=<SourceType.PROCESSED: 'processed'>, last_update=datetime.datetime(2025, 1, 2, 17, 25, 55, 262062)) decision=None trace=None character=None error=None section_number=1 player_input=None
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:validate_state:170 - Input is GameState, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:122 - Validating format for state, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:136 - Checking narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:_validate_format:143 - Format validation successful, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:341 - State validated, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:346 - State serialized, narrative content in json: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_current in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_current.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_current
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:355 - Current state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:151 - Saving data for key game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1 in namespace state
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:170 - Serializing data for storage
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:_serialize_data:72 - Serializing data for namespace state with format StorageFormat.JSON
+2025-01-03 12:53:29 | DEBUG    | managers.cache_manager:save_cached_data:173 - Saving to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:67 - Writing to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | DEBUG    | managers.filesystem_adapter:write_file_async:82 - Successfully wrote to file: C:\Users\erpes\Desktop\casys-rpg\data\cache\games\cb27b313-49d1-4e81-b8e6-a860886140a0\states\game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1.json
+2025-01-03 12:53:29 | INFO     | managers.cache_manager:save_cached_data:175 - Successfully saved data for state/game_cb27b313-49d1-4e81-b8e6-a860886140a0_section_1
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:363 - Section state saved to cache
+2025-01-03 12:53:29 | DEBUG    | managers.state_manager:save_state:366 - Current state updated, final narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | DEBUG    | managers.agent_manager:initialize_game:224 - New state saved, narrative content: Vous vous enfoncez confortablement dans le siège antigravitationnel, face aux commandes de votre vai...
+2025-01-03 12:53:29 | INFO     | managers.agent_manager:initialize_game:227 - Game initialization completed successfully
