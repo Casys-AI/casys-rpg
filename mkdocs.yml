@@ -1,5 +1,4 @@
 site_name: Casys.ai
-site_title: Casys.ai
 site_description: Documentation for the Casys RPG Interactive Game Book Engine
 repo_url: https://github.com/Casys-AI/casys-rpg
 repo_name: Casys-AI/casys-rpg
@@ -9,7 +8,26 @@ theme:
   name: material
   logo: assets/icons/android-chrome-192x192.png
   favicon: assets/icons/favicon.ico
-  custom_dir: docs/overrides
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    admonition:
+      note: material/pencil-circle
+      abstract: material/clipboard-text
+      info: material/information
+      tip: material/lightbulb
+      success: material/check-circle
+      question: material/help-circle
+      warning: material/alert
+      failure: material/close-circle
+      danger: material/lightning-bolt
+      bug: material/bug
+      example: material/test-tube
+      quote: material/format-quote-close
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -26,72 +44,117 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
+    # Navigation
     - navigation.instant
     - navigation.tracking
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.indexes
-    - toc.integrate
+    - navigation.footer
+    - navigation.collapse
+    - toc.follow
     - navigation.top
+    - header.autohide
+    
+    # Search
     - search.suggest
     - search.highlight
+    - search.share
+    
+    # Content
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+nav:
+  - Home: index.md
+  - Guides:
+    - Getting Started: content/guides/getting-started/index.md
+    - Concepts:
+      - Overview: content/guides/concepts/index.md
+      - Core Features: content/guides/concepts/core-features.md
+      - Game Mechanics: content/guides/concepts/game-mechanics.md
+      - Architecture Overview: content/guides/concepts/architecture-overview.md
+    - Advanced:
+      - Overview: content/guides/advanced/index.md
+      - AI Integration: content/guides/advanced/ai-integration.md
+      - State Management: content/guides/advanced/state-management.md
+      - Custom Agents: content/guides/advanced/custom-agents.md
+  - Architecture:
+    - Overview: content/architecture/index.md
+    - Components:
+      - Overview: content/architecture/components/index.md
+      - Agents:
+        - Overview: content/architecture/agents/index.md
+        - Story Graph: content/architecture/agents/story-graph.md
+        - Rules Agent: content/architecture/agents/rules.md
+        - Decision Agent: content/architecture/agents/decision.md
+        - Narrator Agent: content/architecture/agents/narrator.md
+        - Trace Agent: content/architecture/agents/trace.md
+    - API:
+      - Overview: content/architecture/api/index.md
+      - Routes: content/architecture/api/routes.md
+      - DTOs: content/architecture/api/dto.md
+      - WebSocket: content/architecture/api/websocket.md
+    - Managers:
+      - Overview: content/architecture/managers/index.md
+      - Core Managers: content/architecture/managers/core.md
+      - Domain Managers: content/architecture/managers/domain.md
+    - Models:
+      - Overview: content/architecture/models/index.md
+      - Game State: content/architecture/models/game-state.md
+      - Data Models: content/architecture/models/data-models.md
+      - Types: content/architecture/models/types.md
+      - Factories: content/architecture/models/factories.md
+      - Dependencies: content/architecture/models/dependencies.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
 
 plugins:
   - search
-  - blog:
-      blog_dir: blog
-      post_url_format: "{slug}"
-      archive: true
-      categories: true
-  - git-revision-date-localized:
-      enable_creation_date: true
-      type: date
 
 markdown_extensions:
-  - attr_list
-  - md_in_html
-  - admonition
-  - pymdownx.details
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - attr_list
+  - md_in_html
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
   - tables
-  - def_list
   - footnotes
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
   - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - def_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/Casys-AI/casys-rpg
-    - icon: fontawesome/brands/python
-      link: https://python.org
-  generator: false
+      link: https://github.com/yourusername
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/yourusername
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/in/yourusername
 
 extra_css:
   - stylesheets/extra.css
-
-nav:
-  - Home: 
-    - Overview: index.md
-  - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quick-start.md
-  - Architecture:
-    - Overview: architecture/overview.md
-    - Cognitive Loop: architecture/cognitive-loop.md
-    - Components: architecture/components.md
-    - Frontend: architecture/frontend.md
-  - Blog: 
-    - Overview: blog/index.md
-    - Posts: blog/posts/
+  - https://fonts.googleapis.com/icon?family=Material+Icons
