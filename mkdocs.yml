@@ -1,34 +1,30 @@
-site_name: Casys RPG Documentation
+site_name: Casys.ai
+site_title: Casys.ai
 site_description: Documentation for the Casys RPG Interactive Game Book Engine
 repo_url: https://github.com/Casys-AI/casys-rpg
 repo_name: Casys-AI/casys-rpg
-site_author: Casys AI Team
-copyright: Copyright &copy; 2024 Casys AI Team
+edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: assets/logo.png
-  favicon: assets/favicon.png
-  icon:
-    repo: fontawesome/brands/github
+  logo: assets/icons/android-chrome-192x192.png
+  favicon: assets/icons/favicon.ico
+  custom_dir: docs/overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep purple
-      accent: purple
+      primary: deep-purple
+      accent: deep-purple
       toggle:
-        icon: material/weather-sunny
+        icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep purple
-      accent: purple
+      primary: deep-purple
+      accent: deep-purple
       toggle:
-        icon: material/weather-night
+        icon: material/brightness-4
         name: Switch to light mode
-  font:
-    text: Roboto
-    code: Roboto Mono
   features:
     - navigation.instant
     - navigation.tracking
@@ -37,47 +33,26 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.indexes
+    - toc.integrate
     - navigation.top
-    - toc.follow
     - search.suggest
     - search.highlight
-    - search.share
     - content.code.copy
-    - content.code.annotate
-    - content.tabs.link
-    - announce.dismiss
-
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/Casys-AI/casys-rpg
-    - icon: fontawesome/brands/python
-      link: https://python.org
-  analytics:
-    provider: google
-    property: !ENV GOOGLE_ANALYTICS_KEY
-  consent:
-    title: Cookie consent
-    description: >- 
-      We use cookies to recognize your repeated visits and preferences, as well
-      as to measure the effectiveness of our documentation and whether users
-      find what they're searching for. With your consent, you're helping us to
-      make our documentation better.
-  version:
-    provider: mike
-    default: latest
 
 plugins:
   - search
-  - tags
+  - blog:
+      blog_dir: blog
+      post_url_format: "{slug}"
+      archive: true
+      categories: true
   - git-revision-date-localized:
       enable_creation_date: true
       type: date
-  - minify:
-      minify_html: true
 
 markdown_extensions:
-  - tables
+  - attr_list
+  - md_in_html
   - admonition
   - pymdownx.details
   - pymdownx.superfences:
@@ -85,51 +60,38 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - tables
+  - def_list
+  - footnotes
   - pymdownx.highlight:
       anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
   - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - attr_list
-  - md_in_html
-  - def_list
-  - pymdownx.critic
-  - pymdownx.caret
-  - pymdownx.keys
-  - pymdownx.mark
-  - pymdownx.tilde
-  - footnotes
-  - abbr
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.snippets
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Casys-AI/casys-rpg
+    - icon: fontawesome/brands/python
+      link: https://python.org
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
-  - Home: index.md
+  - Home: 
+    - Overview: index.md
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quick-start.md
   - Architecture:
     - Overview: architecture/overview.md
+    - Cognitive Loop: architecture/cognitive-loop.md
     - Components: architecture/components.md
-  - Agents:
-    - Overview: agents/overview.md
-    - Rules Agent: agents/rules-agent.md
-    - Decision Agent: agents/decision-agent.md
-    - Narrator Agent: agents/narrator-agent.md
-    - Trace Agent: agents/trace-agent.md
-  - Core Components:
-    - Game Logic: core/game-logic.md
-    - State Management: core/state-management.md
-  - API Reference:
-    - Overview: api/overview.md
-    - Endpoints: api/endpoints.md
-  - Contributing: contributing.md
-  - Code of Conduct: CODE_OF_CONDUCT.md
-  - License: license.md
-  - Changelog: changelog.md
+    - Frontend: architecture/frontend.md
+  - Blog: 
+    - Overview: blog/index.md
+    - Posts: blog/posts/

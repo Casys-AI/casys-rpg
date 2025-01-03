@@ -1,41 +1,479 @@
-# 🎲 Casys RPG - Interactive Game Book Engine
+---
+hide:
+  - navigation
+  - toc
+title: Complex Adaptive Systems
+---
 
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit](https://img.shields.io/badge/streamlit-1.28.0-FF4B4B.svg)](https://streamlit.io)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-00A36C.svg)](https://openai.com/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](license.md)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Casys-AI/casys-rpg/graphs/commit-activity)
+<div class="hero-section">
+    <div class="container">
+        <h1 class="hero-title">Complex Adaptive Systems</h1>
+        <p class="hero-subtitle">A neurosymbolic framework orchestrating LLMs and rule-based agents through formalized graph-based cognitive workflows</p>
+        <div class="hero-buttons">
+            <a href="/getting-started/" class="hero-button">Get Started</a>
+            <a href="/architecture/cognitive-loop/" class="hero-button">Learn More</a>
+        </div>
+    </div>
+</div>
 
-A modern AI-powered engine for interactive game books, leveraging LLM agents for intelligent rule management and decision-making.
+<div class="intro-section">
+    <div class="container">
+        <div class="intro-text">
+            <h2>A New Approach to Cognitive Workflows</h2>
+            <p>
+                Imagine a <strong>cognitive platform</strong> that orchestrates various <strong>agents</strong> 
+                (rules, LLMs, etc.) based on <strong>workflows</strong> formalized as graphs for each 
+                decision process. This platform revolutionizes how we think about interactive systems.
+            </p>
+        </div>
+    </div>
+</div>
 
-## ✨ Key Features
+<div class="workflow-section">
+    <div class="container">
+        <h2>Structure and Orchestration</h2>
+        <div class="workflow-grid">
+            <div class="workflow-item">
+                <h3>📊 Logical Structure</h3>
+                <ul>
+                    <li>Definition of graphs representing critical steps</li>
+                    <li>Nodes embodying logic and processing</li>
+                    <li>Automatic generation from structured knowledge</li>
+                    <li>Support for both narrative and technical nodes</li>
+                    <li>Integration with existing documentation (Obsidian)</li>
+                </ul>
+            </div>
+            <div class="workflow-item">
+                <h3>⚙️ Agent Orchestration</h3>
+                <ul>
+                    <li>Contextual invocation of appropriate agents</li>
+                    <li>Shared state for decision coherence</li>
+                    <li>Blend of symbolic and neural approaches</li>
+                    <li>Real-time agent coordination</li>
+                    <li>Extensible agent architecture</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
-- 🤖 **Intelligent Agents**: Four specialized LLM agents handling different aspects of the game
-- 📚 **RAG-based Rules**: Semantic search and analysis of game rules using FAISS
-- 🎲 **Dynamic Dice System**: Context-aware dice rolling system for combat and chance events
-- 📊 **Character Stats**: Real-time character statistics tracking
-- 🔄 **Game State Management**: Robust state management with save/load capabilities
-- 📝 **Feedback System**: Integrated user feedback collection
-- 🐛 **Debug Mode**: Built-in debugging tools for development
+<div class="feature-section">
+    <div class="container">
+        <h2>Core Features</h2>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <span class="icon">🔄</span>
+                <h3>Graphical Workflows</h3>
+                <p>Define or auto-generate decision graphs with nodes representing critical process steps and transition conditions. Each node can contain:</p>
+                <ul>
+                    <li>Business rules and conditions</li>
+                    <li>LLM interaction points</li>
+                    <li>User input handlers</li>
+                    <li>State transitions</li>
+                </ul>
+            </div>
+            <div class="feature-item">
+                <span class="icon">🤖</span>
+                <h3>Agent System</h3>
+                <p>A sophisticated multi-agent system featuring:</p>
+                <ul>
+                    <li>StoryGraph: Workflow and state transition management</li>
+                    <li>RulesAgent: Game rules analysis and interpretation</li>
+                    <li>DecisionAgent: Decision logic management</li>
+                    <li>NarratorAgent: Content presentation and formatting</li>
+                    <li>TraceAgent: Action history and character stats</li>
+                </ul>
+            </div>
+            <div class="feature-item">
+                <span class="icon">💾</span>
+                <h3>State Management</h3>
+                <p>Immutable state system with:</p>
+                <ul>
+                    <li>Pydantic v2 validation</li>
+                    <li>Complete action traceability</li>
+                    <li>Decision tracking</li>
+                    <li>Asynchronous event handling</li>
+                    <li>In-memory caching</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
-## 🚀 Getting Started
+<div class="applications-section">
+    <div class="container">
+        <h2>Multiple Applications</h2>
+        <div class="applications-grid">
+            <div class="application-card">
+                <span class="app-icon">📚</span>
+                <h3>Interactive Storytelling</h3>
+                <p>Create immersive narratives where:</p>
+                <ul>
+                    <li>Nodes describe key moments</li>
+                    <li>LLM narrator writes immersive descriptions</li>
+                    <li>Decision agent guides progression</li>
+                    <li>Player choices influence the story</li>
+                </ul>
+            </div>
+            <div class="application-card">
+                <span class="app-icon">🏭</span>
+                <h3>Industrial Diagnostics</h3>
+                <p>Model verification protocols with:</p>
+                <ul>
+                    <li>Rule-based verification nodes</li>
+                    <li>LLM interpretation of complex logs</li>
+                    <li>Automated decision routing</li>
+                    <li>Compliance tracking</li>
+                </ul>
+            </div>
+            <div class="application-card">
+                <span class="app-icon">🌳</span>
+                <h3>Branching Processes</h3>
+                <p>Handle any branching workflow:</p>
+                <ul>
+                    <li>Training programs</li>
+                    <li>Security audits</li>
+                    <li>Intelligent checklists</li>
+                    <li>Process automation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
-Check out our [Quick Start Guide](getting-started/quick-start.md) to begin your journey with Casys RPG.
+<div class="architecture-section">
+    <div class="container">
+        <h2>Technical Architecture</h2>
+        <div class="architecture-grid">
+            <div class="architecture-item">
+                <h3>🔧 Core Technologies</h3>
+                <ul>
+                    <li>FastAPI: REST API and WebSocket support</li>
+                    <li>Pydantic v2: Data validation and serialization</li>
+                    <li>LangGraph: Agent orchestration</li>
+                    <li>OpenAI API (gpt-4o-mini): Language model</li>
+                    <li>AsyncIO: Asynchronous processing</li>
+                </ul>
+            </div>
+            <div class="architecture-item">
+                <h3>📦 Configuration Hierarchy</h3>
+                <ul>
+                    <li>GameConfig: Main game configuration</li>
+                    <li>AgentConfigs: Agent-specific settings</li>
+                    <li>ManagerConfigs: Manager configurations</li>
+                    <li>StorageConfig: Storage settings</li>
+                </ul>
+            </div>
+            <div class="architecture-item">
+                <h3>🎮 Manager System</h3>
+                <ul>
+                    <li>AgentManager: High-level coordinator</li>
+                    <li>StateManager: Game state management</li>
+                    <li>CacheManager: Memory cache handling</li>
+                    <li>RulesManager: Game rules management</li>
+                    <li>CharacterManager: Character handling</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
-## 🏗 Architecture Overview
+<div class="generative-section">
+    <div class="container">
+        <div class="generative-content">
+            <div>
+                <h2>Generative & Accessibility Features</h2>
+                <p class="highlight-text">Beyond manual workflow execution, Complex Adaptive Systems enables automatic graph generation from your existing documents</p>
+                <div class="features-list">
+                    <div class="feature">
+                        <span class="feature-icon">🤖</span>
+                        <p>Neurosymbolic assistant (LLM + rules)</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">💬</span>
+                        <p>Intuitive conversational interface</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">📝</span>
+                        <p>Import from Obsidian notes</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">🔄</span>
+                        <p>Automatic workflow generation</p>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">📊</span>
+                        <p>Visual graph representation</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-The system utilizes four specialized LangChain agents working together to create an immersive gaming experience. Learn more in our [Architecture Documentation](architecture/overview.md).
+<div class="traceability-section">
+    <div class="container">
+        <h2>Memory, History & Traceability</h2>
+        <div class="trace-grid">
+            <div class="trace-card">
+                <span class="trace-icon">📊</span>
+                <h3>Comprehensive Logging</h3>
+                <p>Every agent action is recorded with:</p>
+                <ul>
+                    <li>Request details</li>
+                    <li>Response content</li>
+                    <li>Decision justification</li>
+                    <li>State changes</li>
+                </ul>
+            </div>
+            <div class="trace-card">
+                <span class="trace-icon">🔄</span>
+                <h3>Replay & Rollback</h3>
+                <p>Advanced history features:</p>
+                <ul>
+                    <li>Decision history review</li>
+                    <li>Workflow path replay</li>
+                    <li>State rollback capability</li>
+                    <li>Timeline visualization</li>
+                </ul>
+            </div>
+            <div class="trace-card">
+                <span class="trace-icon">📋</span>
+                <h3>Audit & Compliance</h3>
+                <p>Complete decision journey tracking:</p>
+                <ul>
+                    <li>Detailed audit trails</li>
+                    <li>Compliance documentation</li>
+                    <li>Decision justifications</li>
+                    <li>Process verification</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
-## 📚 Documentation Structure
+<div class="summary-section">
+    <div class="container">
+        <h2>Cognitive Workflow Architecture</h2>
+        <p class="summary-intro">A comprehensive framework combining:</p>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span class="summary-icon">📊</span>
+                <h3>Graph Engine</h3>
+                <p>Sophisticated graph processing with node management and transition logic</p>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">🤖</span>
+                <h3>Agent System</h3>
+                <p>Coordinated multi-agent system with specialized cognitive capabilities</p>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">💾</span>
+                <h3>State Management</h3>
+                <p>Robust state handling with immutability and validation</p>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">🔄</span>
+                <h3>Auto Generation</h3>
+                <p>Intelligent workflow creation from structured documentation</p>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">👥</span>
+                <h3>Accessibility</h3>
+                <p>No-code interface for non-developers</p>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">🔍</span>
+                <h3>Extensibility</h3>
+                <p>Flexible architecture for custom agents and workflows</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-- **Getting Started**: Installation and quick start guides
-- **Architecture**: Detailed system design and components
-- **Agents**: In-depth documentation of each agent
-- **Core Components**: Game logic and state management
-- **API Reference**: Complete API documentation
-- **Contributing**: Guidelines for contributors
+<div class="cta-section">
+    <div class="container">
+        <h2>Ready to Get Started?</h2>
+        <p>Build your first cognitive workflow in minutes</p>
+        <div class="cta-buttons">
+            <a href="/getting-started/" class="cta-button primary">Quick Start Guide</a>
+            <a href="https://github.com/yourusername/casys-rpg" class="cta-button secondary">View on GitHub</a>
+        </div>
+    </div>
+</div>
 
-## 🤝 Contributing
+<style>
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
 
-We welcome contributions! Please see our [Contributing Guide](contributing.md) for details.
+.hero-section {
+    padding: 4rem 0;
+    background: var(--md-default-bg-color);
+}
+
+.hero-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: var(--md-primary-fg-color);
+}
+
+.feature-section {
+    padding: 4rem 0;
+    background: var(--md-default-bg-color);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.feature-item {
+    padding: 2rem;
+    background: var(--md-default-bg-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.feature-item h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--md-primary-fg-color);
+    margin-bottom: 1rem;
+}
+
+.applications-section {
+    padding: 4rem 0;
+    background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color) 100%);
+    color: white;
+}
+
+.applications-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.application-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-icon {
+    font-size: 2.5em;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.generative-section {
+    padding: 4rem 0;
+    background: var(--md-default-bg-color);
+}
+
+.generative-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+}
+
+.highlight-text {
+    font-size: 1.2em;
+    margin-bottom: 2rem;
+    color: var(--md-primary-fg-color);
+}
+
+.features-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.feature-icon {
+    color: var(--md-primary-fg-color);
+    font-size: 1.5em;
+}
+
+.traceability-section {
+    padding: 4rem 0;
+    background: var(--md-default-bg-color);
+}
+
+.trace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.trace-card {
+    padding: 2rem;
+    background: var(--md-default-bg-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.trace-icon {
+    font-size: 2.5em;
+    margin-bottom: 1rem;
+    color: var(--md-primary-fg-color);
+}
+
+.summary-section {
+    padding: 4rem 0;
+    background: linear-gradient(135deg, var(--md-primary-fg-color) 0%, var(--md-primary-fg-color--dark) 100%);
+    color: white;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.summary-item {
+    padding: 1rem;
+}
+
+.summary-icon {
+    font-size: 2em;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+[data-md-color-scheme="slate"] .application-card {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+[data-md-color-scheme="slate"] .trace-card {
+    background: var(--md-default-bg-color);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+@media (max-width: 768px) {
+    .generative-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .generative-image {
+        display: none;
+    }
+}
+</style>

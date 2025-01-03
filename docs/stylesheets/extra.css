@@ -1,0 +1,512 @@
+/* Custom header styles */
+.md-header {
+    background: var(--md-default-bg-color) !important;
+    color: var(--md-default-fg-color) !important;
+    box-shadow: none;
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-tabs {
+    background: var(--md-default-bg-color) !important;
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-tabs__link {
+    color: var(--md-default-fg-color) !important;
+    opacity: 0.7;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+    color: var(--md-default-fg-color) !important;
+    opacity: 1;
+}
+
+.md-header__title {
+    color: var(--md-default-fg-color) !important;
+}
+
+.md-header__button.md-logo {
+    padding: 0.2rem;
+}
+
+.md-header__button {
+    color: var(--md-default-fg-color) !important;
+}
+
+.md-header__source {
+    color: var(--md-default-fg-color) !important;
+    opacity: 0.7;
+}
+
+.md-header__source:hover {
+    opacity: 1;
+}
+
+.md-search__input {
+    background-color: rgba(0,0,0,.05) !important;
+    color: var(--md-default-fg-color) !important;
+}
+
+.md-search__input::placeholder {
+    color: var(--md-default-fg-color--light) !important;
+}
+
+/* Make sure the theme switcher is visible */
+.md-header__button.md-icon {
+    color: var(--md-default-fg-color) !important;
+    opacity: 0.7;
+}
+
+.md-header__button.md-icon:hover {
+    opacity: 1;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Remove padding from main content when hero is present */
+.md-content article:has(.hero-section) {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Hero section with cassis purple */
+.hero-section {
+    margin-top: 0;
+    padding: 0;
+    text-align: center;
+    background: linear-gradient(135deg, #7e57c2, #4a1d3d);
+    position: relative;
+    color: white;
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at top right, rgba(126, 87, 194, 0.8), rgba(74, 29, 61, 0.4));
+    z-index: 1;
+}
+
+.hero-section > * {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-title {
+    font-size: 3em;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.hero-subtitle {
+    font-size: 1.5em;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.hero-button {
+    padding: 0.8rem 2rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hero-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.feature-section {
+    padding: 4rem 0;
+    background: var(--section-bg-light);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.feature-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.feature-item .icon {
+    font-size: 2.5em;
+    margin-bottom: 1rem;
+    color: var(--accent-color);
+}
+
+.workflow-section,
+.architecture-section {
+    padding: 4rem 0;
+    background: var(--section-bg-light);
+}
+
+.workflow-grid,
+.architecture-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.workflow-item,
+.architecture-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-item h3,
+.architecture-item h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+}
+
+.workflow-item ul,
+.architecture-item ul,
+.feature-item ul,
+.application-card ul,
+.trace-card ul {
+    list-style: none;
+    padding-left: 1.5rem;
+    margin-top: 1rem;
+}
+
+.workflow-item li,
+.architecture-item li,
+.feature-item li,
+.application-card li,
+.trace-card li {
+    position: relative;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.workflow-item li::before,
+.architecture-item li::before,
+.feature-item li::before,
+.application-card li::before,
+.trace-card li::before {
+    content: "•";
+    position: absolute;
+    left: -1.5rem;
+    color: var(--accent-color);
+}
+
+.workflow-section {
+    padding: 4rem 0;
+    background: var(--section-bg-dark);
+}
+
+.workflow-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.workflow-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-item h3 {
+    color: var(--accent-color);
+    margin-bottom: 1rem;
+}
+
+.workflow-item ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.workflow-item li {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.applications-section {
+    padding: 4rem 0;
+    background: linear-gradient(135deg, #7e57c2, #4a1d3d);
+    color: white;
+}
+
+.applications-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.application-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease;
+}
+
+.application-card:hover {
+    transform: translateY(-5px);
+}
+
+.app-icon {
+    font-size: 2.5em;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.generative-section {
+    padding: 4rem 0;
+    background: var(--section-bg-light);
+}
+
+.generative-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+}
+
+.highlight-text {
+    font-size: 1.2em;
+    margin-bottom: 2rem;
+    color: var(--accent-color);
+}
+
+.features-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-secondary);
+}
+
+.feature-icon {
+    color: var(--accent-color);
+    font-size: 1.5em;
+}
+
+.traceability-section {
+    padding: 4rem 0;
+    background: var(--section-bg-dark);
+}
+
+.trace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.trace-card {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.trace-icon {
+    font-size: 2.5em;
+    margin-bottom: 1rem;
+    color: var(--accent-color);
+}
+
+.summary-section {
+    padding: 4rem 0;
+    background: linear-gradient(135deg, #7e57c2, #4a1d3d);
+    color: white;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.summary-item {
+    padding: 1rem;
+}
+
+.summary-icon {
+    font-size: 2em;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.summary-intro {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--text-secondary);
+    font-size: 1.2em;
+}
+
+.cta-section {
+    padding: 4rem 0;
+    background: var(--section-bg-light);
+    text-align: center;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.cta-button {
+    padding: 1rem 2rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.cta-button.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.cta-button.secondary {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Light mode specific styles */
+[data-md-color-scheme="default"] {
+    --section-bg-light: #f8f9fa;
+    --section-bg-dark: #f1f3f5;
+    --card-bg: #ffffff;
+    --text-primary: #212529;
+    --text-secondary: #495057;
+    --accent-color: #4a1d3d;
+    --border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode specific styles */
+[data-md-color-scheme="slate"] {
+    --section-bg-light: #2b2b2b;
+    --section-bg-dark: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #adb5bd;
+    --accent-color: #7e57c2;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --md-primary-fg-color: #7e57c2;
+}
+
+[data-md-color-scheme="slate"] .md-header {
+    background: var(--md-default-bg-color) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+[data-md-color-scheme="slate"] .feature-item {
+    background: var(--md-default-bg-color);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+[data-md-color-scheme="slate"] .workflow-item,
+[data-md-color-scheme="slate"] .architecture-item {
+    background: var(--md-default-bg-color);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Light mode overrides */
+[data-md-color-scheme="default"] .feature-item,
+[data-md-color-scheme="default"] .workflow-item,
+[data-md-color-scheme="default"] .architecture-item,
+[data-md-color-scheme="default"] .trace-card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+[data-md-color-scheme="default"] h1,
+[data-md-color-scheme="default"] h2,
+[data-md-color-scheme="default"] h3 {
+    color: var(--text-primary);
+}
+
+[data-md-color-scheme="default"] p {
+    color: var(--text-secondary);
+}
+
+[data-md-color-scheme="default"] .feature-item:hover,
+[data-md-color-scheme="default"] .workflow-item:hover,
+[data-md-color-scheme="default"] .architecture-item:hover,
+[data-md-color-scheme="default"] .trace-card:hover {
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .generative-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .generative-image {
+        display: none;
+    }
+    
+    .hero-buttons,
+    .cta-buttons {
+        flex-direction: column;
+    }
+    
+    .hero-button,
+    .cta-button {
+        width: 100%;
+        text-align: center;
+    }
+}
