@@ -74,9 +74,12 @@ class CacheManager(CacheManagerProtocol):
         try:
             if format == StorageFormat.JSON:
                 if isinstance(data, BaseModel):
-                    logger.trace("Serializing Pydantic model to JSON")
-                    data_dict = data.model_dump()
-                    return json.dumps(data_dict, default=_json_serial)
+                    logger.debug("Serializing Pydantic model to JSON, data before: {}", data)
+                    data_dict = data.model_dump(exclude_none=False)
+                    logger.debug("Data after model_dump: {}", data_dict)
+                    serialized = json.dumps(data_dict, default=_json_serial)
+                    logger.debug("Data after json.dumps: {}", serialized)
+                    return serialized
                 logger.trace("Serializing raw data to JSON")
                 return json.dumps(data, default=_json_serial)
             elif format == StorageFormat.MARKDOWN:

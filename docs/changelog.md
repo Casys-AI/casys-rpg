@@ -69,6 +69,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed direct manager arguments from constructors
   - Improved testability and flexibility
 
+- **GameState**
+  - Added `keep_if_not_empty` reducer function for LangGraph fan-in
+    - Returns `b` only if not empty, otherwise keeps `a`
+    - Used to preserve important state values during merging
+  - Modified field annotations in GameStateBase:
+    - Changed `session_id` and `game_id` from `first_not_none` to `keep_if_not_empty`
+    - Ensures IDs are only overwritten with non-empty values
+  - Modified field annotations in GameStateInput:
+    - Changed `section_number` and `player_input` to use `keep_if_not_empty`
+    - Better preservation of input state during merging
+  - Updated GameStateOutput model fields:
+    - Changed `decision`, `trace`, and `character` to use `first_not_none` annotation
+    - All content models now consistently use `first_not_none` for merging
+  - Simplified GameState.with_updates logging:
+    - Removed verbose narrative content logging
+    - Added focused debug logging for session_id and section_number
+
 - Refactoring des services pour utiliser des objets simples au lieu de classes
 - Optimisation de la gestion d'état avec useResource$ et useTask$
 - Amélioration de la gestion WebSocket

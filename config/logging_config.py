@@ -6,7 +6,7 @@ from loguru import logger
 import logging
 
 # Get log level from environment or use INFO as default
-DEFAULT_LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 
 # Intercept standard logging
 class InterceptHandler(logging.Handler):
@@ -28,6 +28,8 @@ class InterceptHandler(logging.Handler):
 def setup_logging():
     """Configure logging with rotation and backup count."""
     try:
+        logger.info(f"Configuring logging with level: {LOG_LEVEL}")
+        
         # Ensure logs directory exists
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
@@ -38,12 +40,12 @@ def setup_logging():
                 {
                     "sink": sys.stdout,
                     "format": "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-                    "level": "INFO"
+                    "level": LOG_LEVEL
                 },
                 {
                     "sink": "logs/debug.log",
                     "format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-                    "level": "DEBUG",
+                    "level": LOG_LEVEL,
                     "rotation": "1 day",
                     "retention": "7 days",
                     "mode": "a",  # Append mode

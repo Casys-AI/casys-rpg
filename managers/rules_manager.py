@@ -14,6 +14,7 @@ from config.storage_config import StorageConfig
 from managers.protocols.cache_manager_protocol import CacheManagerProtocol
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
 from models.rules_model import RulesModel, DiceType, SourceType, Choice, ChoiceType
+from models.types.common_types import NextActionType
 from models.errors_model import RulesError
 
 class RulesManager(RulesManagerProtocol):
@@ -152,7 +153,7 @@ class RulesManager(RulesManagerProtocol):
 - Needs_Dice: {str(rules.needs_dice).lower()}
 - Dice_Type: {rules.dice_type.value}
 - Needs_User_Response: {str(rules.needs_user_response).lower()}
-- Next_Action: {rules.next_action or 'None'}
+- Next_Action: {rules.next_action.value if rules.next_action else 'None'}
 - Conditions: {', '.join(rules.conditions) if rules.conditions else 'None'}
 - Target_Sections: {', '.join(target_sections) if target_sections else 'None'}
 
@@ -359,7 +360,7 @@ class RulesManager(RulesManagerProtocol):
                 "dice_type": DiceType((analysis['dice_type'] or 'none').lower()),
                 "needs_dice": analysis['needs_dice'].lower() == 'true',
                 "needs_user_response": analysis['needs_user_response'].lower() == 'true',
-                "next_action": None if analysis['next_action'] == 'None' else analysis['next_action'],
+                "next_action": None if analysis['next_action'] == 'None' else NextActionType(analysis['next_action'].lower()),
                 "conditions": [] if analysis['conditions'] == 'None' else [c.strip() for c in analysis['conditions'].split(',')],
                 "choices": choices,
                 "rules_summary": '\n'.join(summary).strip(),
@@ -374,7 +375,7 @@ class RulesManager(RulesManagerProtocol):
                 "dice_type": model_data["dice_type"],
                 "needs_dice": model_data["needs_dice"],
                 "needs_user_response": model_data["needs_user_response"],
-                "next_action": model_data["next_action"],
+                "next_action": model_data["next_action"].value if model_data["next_action"] else None,
                 "conditions": model_data["conditions"],
                 "choices_count": len(model_data["choices"]),
                 "source": model_data["source"],

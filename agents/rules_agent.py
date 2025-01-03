@@ -36,58 +36,58 @@ class RulesAgent(BaseAgent):
         self.logger = logger
 
     async def _process_section_rules(
-        self, 
-        section_number: int,
-        content: Optional[str] = None
-    ) -> Union[RulesModel, RulesError]:
+            self, 
+            section_number: int,
+            content: Optional[str] = None
+        ) -> Union[RulesModel, RulesError]:
         """Process rules for a game section.
         
         Args:
             section_number: Section number to process
-            content: Optional content to process
+            content: Optional content to process. If not provided, will be fetched from manager.
             
         Returns:
             Union[RulesModel, RulesError]: Processed rules or error
         """
         try:
-            self.logger.debug(f"Starting process_section_rules for section {section_number}")
+            logger.debug("Starting process_section_rules for section {}", section_number)
             
             # Check cache first
             cached_rules = await self.rules_manager.get_cached_rules(section_number)
             if cached_rules:
-                self.logger.info(f"Rules found in cache for section {section_number}")
+                logger.info("Rules found in cache for section {}", section_number)
                 return cached_rules
             
             # Get raw content if not provided
             if not content:
-                self.logger.debug("No content provided, fetching raw content")
+                logger.debug("No content provided, fetching from manager")
                 raw_content = await self.rules_manager.get_raw_content(section_number)
                 if isinstance(raw_content, RulesError):
-                    self.logger.error(f"No rules found for section {section_number}")
+                    logger.error("Failed to get raw content: {}", raw_content.message)
                     return RulesModel(
                         section_number=section_number,
                         source=SourceType.ERROR,
                         error=raw_content.message
                     )
                 content = raw_content
-            
+
             # Extract rules with LLM
-            self.logger.info(f"Analyzing rules for section {section_number} with LLM")
+            logger.info("Analyzing rules for section {} with LLM", section_number)
             rules = await self._extract_rules_with_llm(section_number, content)
             
             # Save to cache if analysis successful
             if not rules.error:
-                self.logger.debug("Analysis successful, saving to cache")
+                logger.debug("Analysis successful, saving to cache")
                 save_result = await self.rules_manager.save_rules(rules)
                 if isinstance(save_result, RulesError):
-                    self.logger.error(f"Failed to save rules: {save_result.message}")
+                    logger.error("Failed to save rules: {}", save_result.message)
                 else:
-                    self.logger.info("Rules saved successfully")
+                    logger.info("Rules saved successfully")
             
             return rules
             
         except Exception as e:
-            self.logger.error(f"Error processing rules: {str(e)}")
+            logger.error("Error processing rules: {}", str(e))
             return RulesModel(
                 section_number=section_number,
                 source=SourceType.ERROR,
@@ -105,7 +105,7 @@ class RulesAgent(BaseAgent):
             RulesModel: Extracted rules including dice requirements, conditions and choices
         """
         try:
-            self.logger.debug(f"Starting LLM extraction for section {section_number}")
+            logger.debug(f"Starting LLM extraction for section {section_number}")
             
             messages = [
                 SystemMessage(content=self.config.system_message),
@@ -145,12 +145,12 @@ class RulesAgent(BaseAgent):
                     }
                     for field in missing_fields:
                         rules_data[field] = defaults[field]
-                        self.logger.warning(f"Using default value for missing field: {field}")
+                        logger.warning(f"Using default value for missing field: {field}")
                 
                 # Force needs_dice à False si dice_type est none
                 if rules_data['dice_type'].lower() == 'none':
                     rules_data['needs_dice'] = False
-                    self.logger.debug("Forced needs_dice to False because dice_type is none")
+                    logger.debug("Forced needs_dice to False because dice_type is none")
                 
                 # Ajouter les champs supplémentaires
                 rules_data["section_number"] = section_number
@@ -189,16 +189,16 @@ class RulesAgent(BaseAgent):
                         choices.append(choice)
                     rules_data["choices"] = choices
                     
-                    self.logger.debug(f"Processed choices: {choices}")
+                    logger.debug(f"Processed choices: {choices}")
                 
                 # Créer le modèle
                 model = RulesModel(**rules_data)
-                self.logger.debug(f"Created RulesModel: {model}")
+                logger.debug(f"Created RulesModel: {model}")
                 return model
                 
             except json.JSONDecodeError as e:
-                self.logger.error(f"Invalid JSON in LLM response: {e}")
-                self.logger.error(f"Response content: {response.content}")
+                logger.error(f"Invalid JSON in LLM response: {e}")
+                logger.error(f"Response content: {response.content}")
                 # Créer un modèle par défaut en cas d'erreur
                 return RulesModel(
                     section_number=section_number,
@@ -216,8 +216,8 @@ class RulesAgent(BaseAgent):
                 )
                 
         except Exception as e:
-            self.logger.error(f"Error extracting rules with LLM: {e}")
-            self.logger.error(f"Section content: {content}")
+            logger.error(f"Error extracting rules with LLM: {e}")
+            logger.error(f"Section content: {content}")
             # Créer un modèle par défaut en cas d'erreur
             return RulesModel(
                 section_number=section_number,
@@ -234,43 +234,34 @@ class RulesAgent(BaseAgent):
                 last_update=datetime.now()
             )
 
-    async def ainvoke(self, input_data: Dict) -> AsyncGenerator[Dict, None]:
-        """Async invocation for rule processing."""
+    async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+        """Process game state and update rules.
+        
+        Args:
+            input_data: Input data containing game state
+            
+        Yields:
+            Dict[str, Any]: Updated rules content
+        """
         try:
-            state = GameState.model_validate(input_data.get("state", {}))
+            state = input_data.get("state")
+            if not state:
+                raise ValueError("No state provided in input data")
+                
             logger.debug("Processing rules for state: session={}, section={}", 
                         state.session_id, state.section_number)
             
-            # Process rules
-            rules = await self._process_section_rules(
-                state.section_number,
-                state.content
-            )
+            # Process section
+            result = await self._process_section_rules(state.section_number)
+            if isinstance(result, RulesError):
+                yield {"rules": result}
+                return
             
-            if isinstance(rules, RulesError):
-                logger.error("Error processing rules: {}", rules.message)
-                error_rules = RulesModel(
-                    section_number=state.section_number,
-                    content="",
-                    error=rules.message,
-                    source_type=SourceType.ERROR,
-                    timestamp=datetime.now()
-                )
-                yield {"rules": error_rules}
-            else:
-                logger.debug("Rules processed successfully")
-                yield {"rules": rules}
-                
+            yield {"rules": result}
+            
         except Exception as e:
-            logger.exception("Error in ainvoke: {}", str(e))
-            error_rules = RulesModel(
-                section_number=state.section_number,
-                content="",
-                error=str(e),
-                source_type=SourceType.ERROR,
-                timestamp=datetime.now()
-            )
-            yield {"rules": error_rules}
+            logger.exception("Error in rules agent: {}", str(e))
+            yield {"rules": RulesError(message=str(e))}
 
 # Register RulesAgent as implementing RulesAgentProtocol
 RulesAgentProtocol.register(RulesAgent)

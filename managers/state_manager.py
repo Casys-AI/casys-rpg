@@ -95,8 +95,22 @@ class StateManager(StateManagerProtocol):
         """Generate a unique session ID."""
         return str(uuid.uuid4())
 
+    def _truncate_content(self, content: Optional[str], max_length: int = 100) -> str:
+        """Tronque le contenu pour les logs.
+        
+        Args:
+            content: Contenu à tronquer
+            max_length: Longueur maximale
+            
+        Returns:
+            str: Contenu tronqué
+        """
+        if not content:
+            return "None"
+        return f"{content[:max_length]}..." if len(content) > max_length else content
+
     def _validate_format(self, state: GameState) -> bool:
-        """Validate basic state format.
+        """Validate state format.
         
         Args:
             state: State to validate
@@ -105,20 +119,33 @@ class StateManager(StateManagerProtocol):
             bool: True if format is valid
         """
         try:
-            if not state:
+            logger.debug("Validating format for state, narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
+            
+            # Vérifier les champs requis
+            if not state.session_id:
+                logger.error("Missing session_id")
                 return False
                 
-            # Basic format validation
-            if not isinstance(state.section_number, int):
+            if state.section_number is None:
+                logger.error("Missing section_number")
                 return False
                 
-            if state.section_number < 1:
-                return False
-                
+            # Vérifier la cohérence des données
+            if state.narrative:
+                logger.debug("Checking narrative content: {}", 
+                           self._truncate_content(state.narrative.content))
+                if state.narrative.section_number != state.section_number:
+                    logger.error("Narrative section number mismatch: {} != {}", 
+                               state.narrative.section_number, state.section_number)
+                    return False
+                    
+            logger.debug("Format validation successful, narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
             return True
             
         except Exception as e:
-            logger.error("Error validating state format: {}", str(e))
+            logger.error("Error validating format: {}", str(e))
             return False
 
     async def validate_state(
@@ -140,20 +167,28 @@ class StateManager(StateManagerProtocol):
             logger.debug("Validating state data: {}", state_data)
             
             if isinstance(state_data, GameState):
+                logger.debug("Input is GameState, narrative content: {}", 
+                           self._truncate_content(state_data.narrative.content if state_data.narrative else None))
                 if not self._validate_format(state_data):
                     raise StateError("Invalid state format")
                 return state_data
                 
+            logger.debug("Input is Dict, narrative content: {}", 
+                        self._truncate_content(state_data.get('narrative', {}).get('content') if state_data.get('narrative') else None))
             state = GameState(**state_data)
+            logger.debug("Created GameState, narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
+            
             if not self._validate_format(state):
                 raise StateError("Invalid state format")
                 
+            logger.debug("State format validated, narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
             return state
             
         except Exception as e:
-            error_msg = f"State validation failed: {str(e)}"
-            logger.error(error_msg)
-            raise StateError(error_msg) from e
+            logger.error("Error validating state: {}", str(e))
+            raise StateError(f"Failed to validate state: {str(e)}")
 
     async def create_initial_state(
         self, 
@@ -295,14 +330,21 @@ class StateManager(StateManagerProtocol):
             StateError: If validation or save fails
         """
         try:
+            logger.debug("Saving state, input narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
+            
             if not self._game_id:
                 raise StateError("State manager not initialized")
                 
             # Valider l'état
             validated_state = await self.validate_state(state)
+            logger.debug("State validated, narrative content: {}", 
+                        self._truncate_content(validated_state.narrative.content if validated_state.narrative else None))
             
             # Sérialiser
             json_data = validated_state.model_dump()
+            logger.debug("State serialized, narrative content in json: {}", 
+                        self._truncate_content(json_data.get('narrative', {}).get('content') if json_data.get('narrative') else None))
             
             # Sauvegarder l'état courant
             await self.cache.save_cached_data(
@@ -310,6 +352,7 @@ class StateManager(StateManagerProtocol):
                 namespace="state",
                 data=json_data
             )
+            logger.debug("Current state saved to cache")
             
             # Sauvegarder aussi par section pour l'historique
             await self.cache.save_cached_data(
@@ -317,8 +360,12 @@ class StateManager(StateManagerProtocol):
                 namespace="state",
                 data=json_data
             )
+            logger.debug("Section state saved to cache")
             
             self._current_state = validated_state
+            logger.debug("Current state updated, final narrative content: {}", 
+                        self._truncate_content(self._current_state.narrative.content if self._current_state.narrative else None))
+            
             return validated_state
             
         except Exception as e:
@@ -430,9 +477,15 @@ class StateManager(StateManagerProtocol):
         """
         try:
             if not self._game_id:
-                raise StateError("No game ID set for persistence")
-
+                raise StateError("State manager not initialized")
+            
+            logger.debug("Persisting state, narrative content: {}", 
+                        self._truncate_content(state.narrative.content if state.narrative else None))
+            
+            # Sérialiser
             json_data = state.model_dump()
+            logger.debug("State serialized, narrative content in json: {}", 
+                        self._truncate_content(json_data.get('narrative', {}).get('content') if json_data.get('narrative') else None))
             
             # Sauvegarder l'état courant
             await self.cache.save_cached_data(
@@ -440,6 +493,7 @@ class StateManager(StateManagerProtocol):
                 namespace="state",
                 data=json_data
             )
+            logger.debug("Current state saved to cache")
             
             # Sauvegarder aussi par section pour l'historique
             await self.cache.save_cached_data(
@@ -447,10 +501,11 @@ class StateManager(StateManagerProtocol):
                 namespace="state",
                 data=json_data
             )
+            logger.debug("Section state saved to cache")
             
-            self._current_state = state
             return state
             
         except Exception as e:
-            logger.error(f"Error persisting state: {e}")
-            raise StateError(f"Failed to persist state: {str(e)}")
+            error_msg = f"Failed to persist state: {str(e)}"
+            logger.error(error_msg)
+            raise StateError(error_msg) from e

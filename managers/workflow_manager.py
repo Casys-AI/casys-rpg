@@ -22,7 +22,7 @@ class WorkflowManager(WorkflowManagerProtocol):
     def __init__(
         self,
         state_manager: StateManagerProtocol,
-        rules_manager: RulesManagerProtocol
+
     ):
         """Initialize WorkflowManager.
 
@@ -32,10 +32,9 @@ class WorkflowManager(WorkflowManagerProtocol):
         """
         logger.info("Initializing WorkflowManager")
         self.state_manager = state_manager
-        self.rules_manager = rules_manager
-        logger.debug("WorkflowManager initialized with state_manager: {}, rules_manager: {}", 
-                    state_manager.__class__.__name__, 
-                    rules_manager.__class__.__name__)
+        logger.debug("WorkflowManager initialized with state_manager: {}", 
+                    state_manager.__class__.__name__
+                    )
 
     async def handle_error(self, error: Exception) -> GameState:
         """Handle workflow error.
@@ -120,7 +119,7 @@ class WorkflowManager(WorkflowManagerProtocol):
             state = await self.state_manager.create_initial_state(input_data)
             
             # 2. Gérer la transition de section si nécessaire
-            state_dict = state.model_dump(exclude_unset=False)
+            state_dict = state.model_dump(exclude_unset=False, exclude_none=False)
             state_dict = await self._handle_section_transition(state_dict)
             
             # 3. Ajouter les métadonnées du workflow
