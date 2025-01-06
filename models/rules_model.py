@@ -118,6 +118,8 @@ class RulesModel(BaseModel):
     )
     last_update: datetime = Field(default_factory=datetime.now, description="Date de mise à jour spécifique aux règles")
 
+    # TODO: Refactoring needed - Currently there are two identical @model_validator decorators for validate_rules
+    # These should be merged into a single comprehensive validator to avoid Pydantic warnings
     @model_validator(mode='after')
     def validate_rules(self) -> 'RulesModel':
         """Validate the rules model for consistency."""
@@ -160,6 +162,7 @@ class RulesModel(BaseModel):
             
         return self
 
+    # TODO: Refactoring needed - This is a duplicate model_validator that should be merged with the one above
     @model_validator(mode='after')
     def validate_rules(self) -> 'RulesModel':
         """Validate the rules model for consistency."""

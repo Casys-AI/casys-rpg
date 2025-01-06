@@ -9,6 +9,7 @@ from models.decision_model import DecisionModel
 from models.narrator_model import NarratorModel
 from models.rules_model import RulesModel, DiceType, SourceType as RulesSourceType
 from models.trace_model import TraceModel
+from models.errors_model import StateError
 
 logger = get_logger('gamestate')
 
@@ -39,6 +40,13 @@ class GameStateBase(BaseModel):
     game_id: Annotated[str, keep_if_not_empty]    # Le game_id doit être préservé
     metadata: Annotated[Optional[Dict[str, Any]], take_last_value] = None
 
+    @field_validator('game_id')
+    def validate_game_id(cls, v: str) -> str:
+        """Validate that game_id is not empty."""
+        if not v:
+            raise StateError("game_id cannot be empty")
+        return v
+
     model_config = ConfigDict(
         json_encoders={
             datetime: lambda v: v.isoformat()
@@ -57,7 +65,7 @@ class GameStateInput(GameStateBase):
     def validate_section_number(cls, v):
         """Validate section number."""
         if v < 1:
-            raise ValueError("Section number must be positive")
+            raise StateError("Section number must be positive")
         return v
 
 class GameStateOutput(GameStateBase):
@@ -96,7 +104,7 @@ class GameStateOutput(GameStateBase):
         """Synchronize and validate section numbers between models."""
         if self.narrative and self.rules:
             if self.narrative.section_number != self.rules.section_number:
-                raise ValueError(
+                raise StateError(
                     f"Section numbers must match between narrative ({self.narrative.section_number}) "
                     f"and rules ({self.rules.section_number})"
                 )
@@ -110,99 +118,74 @@ class GameState(GameStateInput, GameStateOutput):
     def validate_section_number(cls, v: int) -> int:
         """Validate section number."""
         if v < 1:
-            raise ValueError("Section number must be positive")
+            raise StateError("Section number must be positive")
         return v
 
+    @model_validator(mode='before')
+    @classmethod
+    def handle_langgraph_lists(cls, values):
+        """Handle lists that may be accumulated by LangGraph."""
+        logger.debug("Processing LangGraph lists. Initial values: {}", values)
+        # Traiter les champs qui peuvent être des listes
+        fields_to_check = ['section_number', 'narrative', 'rules']
+        for field in fields_to_check:
+            if field in values:
+                if isinstance(values[field], list):
+                    logger.debug("Found list for field {}: {}", field, values[field])
+                    if not values[field]:
+                        values[field] = None
+                    else:
+                        values[field] = values[field][-1]  # Prendre le dernier élément
+                    logger.debug("Updated {} to: {}", field, values[field])
+                elif isinstance(values[field], dict):
+                    # Si c'est un dictionnaire, on le convertit en modèle
+                    logger.debug("Found dict for field {}: {}", field, values[field])
+                    if field == 'narrative':
+                        values[field] = NarratorModel(**values[field])
+                    elif field == 'rules':
+                        values[field] = RulesModel(**values[field])
+                    logger.debug("Converted {} to model: {}", field, values[field])
+        
+        # Vérifier la cohérence des sections après le traitement des listes
+        narrative = values.get('narrative')
+        rules = values.get('rules')
+        section_number = values.get('section_number')
+        
+        if narrative and hasattr(narrative, 'section_number'):
+            if section_number and narrative.section_number != section_number:
+                logger.error("Section number mismatch in input: state={}, narrative={}", 
+                           section_number, narrative.section_number)
+                raise StateError(
+                    f"Section number mismatch: GameState ({section_number}) "
+                    f"does not match narrative ({narrative.section_number})"
+                )
+            # Si pas de section_number, prendre celui du narratif
+            if not section_number:
+                values['section_number'] = narrative.section_number
+                
+        if rules and hasattr(rules, 'section_number'):
+            if section_number and rules.section_number != section_number:
+                logger.error("Section number mismatch in input: state={}, rules={}", 
+                           section_number, rules.section_number)
+                raise StateError(
+                    f"Section number mismatch: GameState ({section_number}) "
+                    f"does not match rules ({rules.section_number})"
+                )
+            # Si pas de section_number, prendre celui des règles
+            if not section_number:
+                values['section_number'] = rules.section_number
+        
+        logger.debug("Final values after list processing: {}", values)
+        return values
+
     @model_validator(mode='after')
     def validate_state(self) -> 'GameState':
         """Validate the complete state."""
-        # Validate that section numbers match between GameState and its models
-        self.validate_section_numbers()
+        logger.debug("Validating final state. section_number={}, narrative={}, rules={}", 
+                    self.section_number, 
+                    self.narrative.section_number if self.narrative else None,
+                    self.rules.section_number if self.rules else None)
         return self
-
-    @property
-    def state(self) -> Dict[str, Any]:
-        """
-        Get the complete state as a dictionary.
-        
-        Uses model_dump with configuration for proper serialization:
-        - exclude_none: Remove None fields to reduce payload size
-        - by_alias: Use field aliases for consistent naming
-        - exclude_unset: Remove fields that weren't explicitly set
-        
-        Returns:
-            Dict[str, Any]: Serialized state with all necessary fields
-        """
-        return self.model_dump(
-            exclude_none=True,     # Exclure les champs None
-            by_alias=True,         # Utiliser les alias pour la sérialisation
-            exclude_unset=True,    # Exclure les champs non définis
-            exclude={              # Exclure les champs internes spécifiques
-                'session_id': False,  # Toujours inclure session_id
-                'game_id': False,     # Toujours inclure game_id
-                'error': False       # Toujours inclure error même si None
-            }
-        )
-
-    def validate_state(self) -> 'GameState':
-        """Validate the complete state."""
-        try:
-            # Vérifier que les numéros de section correspondent
-            self.validate_section_numbers()
-            logger.debug("Section numbers validated for state {}", self.session_id)
-            
-            # Vérifier que les modèles sont cohérents
-            if self.narrative and self.rules:
-                logger.debug("Validating narrative and rules consistency")
-                if self.narrative.section_number != self.rules.section_number:
-                    raise ValueError(
-                        f"Section numbers must match between narrative ({self.narrative.section_number}) "
-                        f"and rules ({self.rules.section_number})"
-                    )
-                    
-            # Vérifier que les décisions sont valides
-            if self.decision:
-                logger.debug("Validating decision model")
-                if self.decision.section_number != self.section_number:
-                    raise ValueError(
-                        f"Decision section number ({self.decision.section_number}) "
-                        f"does not match state section number ({self.section_number})"
-                    )
-                    
-            # Vérifier le format de l'erreur
-            if self.error and not isinstance(self.error, str):
-                logger.debug("Converting error to string: {}", self.error)
-                self.error = str(self.error)
-                    
-            logger.debug("State validation completed successfully")
-            return self
-            
-        except Exception as e:
-            logger.error("State validation failed: {}", str(e))
-            raise
-
-    @model_validator(mode='after')
-    def validate_section_numbers(self) -> 'GameState':
-        """Validate that section numbers match between GameState and its models."""
-        try:
-            if self.narrative and self.narrative.section_number != self.section_number:
-                logger.error("Section number mismatch: GameState={}, narrative={}", 
-                           self.section_number, self.narrative.section_number)
-                raise ValueError(
-                    f"Section numbers must match between GameState ({self.section_number}) "
-                    f"and narrative ({self.narrative.section_number})"
-                )
-            if self.rules and self.rules.section_number != self.section_number:
-                logger.error("Section number mismatch: GameState={}, rules={}", 
-                           self.section_number, self.rules.section_number)
-                raise ValueError(
-                    f"Section numbers must match between GameState ({self.section_number}) "
-                    f"and rules ({self.rules.section_number})"
-                )
-            return self
-        except Exception as e:
-            logger.error("Section number validation failed: {}", str(e))
-            raise
 
     @model_validator(mode='before')
     @classmethod
@@ -338,4 +321,28 @@ class GameState(GameStateInput, GameStateOutput):
             trace=None,
             character=None,
             decision=None
+        )
+
+    @property
+    def state(self) -> Dict[str, Any]:
+        """
+        Get the complete state as a dictionary.
+        
+        Uses model_dump with configuration for proper serialization:
+        - exclude_none: Remove None fields to reduce payload size
+        - by_alias: Use field aliases for consistent naming
+        - exclude_unset: Remove fields that weren't explicitly set
+        
+        Returns:
+            Dict[str, Any]: Serialized state with all necessary fields
+        """
+        return self.model_dump(
+            exclude_none=True,     # Exclure les champs None
+            by_alias=True,         # Utiliser les alias pour la sérialisation
+            exclude_unset=True,    # Exclure les champs non définis
+            exclude={              # Exclure les champs internes spécifiques
+                'session_id': False,  # Toujours inclure session_id
+                'game_id': False,     # Toujours inclure game_id
+                'error': False       # Toujours inclure error même si None
+            }
         )

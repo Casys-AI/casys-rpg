@@ -7,7 +7,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.13"
-pydantic = "2.10.4"
+pydantic = "^2"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.0"
 langchain = "0.3.13"
@@ -54,3 +54,13 @@ disallow_untyped_defs = true
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+[tool.pydantic]
+use_pydantic_v2 = true
+warn_deprecated = false

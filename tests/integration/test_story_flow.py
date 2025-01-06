@@ -224,3 +224,43 @@ async def test_full_story_sequence(game_instance, sample_character):
             
     # Verify story progression
     assert state.section_number != 1  # Story should have progressed
+
+@pytest.mark.asyncio
+async def test_next_section_update(game_instance, sample_character):
+    """Test que le next_section est bien utilisé pour mettre à jour le section_number."""
+    # Créer l'état initial
+    initial_state = GameState(
+        game_id="test_game",
+        session_id="test_session",
+        section_number=1,
+        player_input="start",
+        character=sample_character,
+        last_update=datetime.now(),
+        narrative=NarratorModel(
+            section_number=1,
+            content="Initial section"
+        ),
+        rules=RulesModel(
+            section_number=1,
+            choices=[
+                Choice(
+                    text="Go to section 2",
+                    type=ChoiceType.DIRECT,
+                    target_section=2
+                )
+            ]
+        )
+    )
+
+    # Simuler le choix de l'utilisateur
+    updated_state = await game_instance.process_turn(initial_state)
+    
+    # Vérifier que le next_section est bien utilisé
+    assert updated_state.section_number == 2
+    assert updated_state.narrative.section_number == 2
+    assert updated_state.rules.section_number == 2
+
+    # Vérifier que l'état initial n'est pas modifié
+    assert initial_state.section_number == 1
+    assert initial_state.narrative.section_number == 1
+    assert initial_state.rules.section_number == 1

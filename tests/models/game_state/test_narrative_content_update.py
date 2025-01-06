@@ -6,16 +6,21 @@ from datetime import datetime
 from models.game_state import GameState
 from models.narrator_model import NarratorModel, SourceType as NarratorSourceType
 from agents.factories.model_factory import ModelFactory
-from models.rules_model import RulesModel, SourceType as RulesSourceType
-from models.dice_model import DiceType
+from models.rules_model import RulesModel, DiceType, SourceType as RulesSourceType, Choice, ChoiceType
+from models.errors_model import StateError
 
-def test_narrative_content_initialization():
+def test_narrative_content_initialization(model_factory):
     """Test that narrative content is properly initialized in GameState."""
     # Create a GameState with default narrative
-    game_state = ModelFactory.create_game_state(
+    game_state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
-        section_number=1
+        section_number=1,
+        narrative=model_factory.create_narrator_model(
+            section_number=1,
+            content="initialized",
+            source_type=NarratorSourceType.RAW
+        )
     )
     
     # Verify that narrative is initialized
@@ -24,13 +29,18 @@ def test_narrative_content_initialization():
     assert game_state.narrative.source_type == NarratorSourceType.RAW
     assert game_state.narrative.section_number == game_state.section_number
 
-def test_narrative_content_update():
+def test_narrative_content_update(model_factory):
     """Test that narrative content can be updated in GameState."""
-    # Create initial GameState
-    initial_state = ModelFactory.create_game_state(
+    # Create initial GameState with narrative
+    initial_state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
-        section_number=1
+        section_number=1,
+        narrative=model_factory.create_narrator_model(
+            section_number=1,
+            content="initial content",
+            source_type=NarratorSourceType.RAW
+        )
     )
     
     # Create updated narrative model
@@ -59,16 +69,16 @@ def test_narrative_content_update():
     assert updated_state.narrative != initial_state.narrative
     assert updated_state.narrative.section_number == updated_state.section_number
 
-def test_narrative_content_preservation():
+def test_narrative_content_preservation(model_factory):
     """Test that narrative content is preserved when updating other state components."""
     # Create initial state with narrative content
-    narrative = NarratorModel(
+    narrative = model_factory.create_narrator_model(
         section_number=1,
         content="Initial narrative content",
         source_type=NarratorSourceType.PROCESSED
     )
     
-    initial_state = ModelFactory.create_game_state(
+    initial_state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
         section_number=1,
@@ -118,85 +128,136 @@ def test_narrative_content_preservation():
     assert updated_state.narrative.section_number == updated_state.section_number
     assert updated_state.section_number == 2
 
-def test_narrative_content_validation():
+def test_narrative_content_validation(model_factory):
     """Test that GameState synchronizes its section_number with NarratorModel."""
-    # Create a NarratorModel with section 2
-    narrative = NarratorModel(
+    # Créer un état avec des sections cohérentes
+    initial_state = model_factory.create_game_state(
+        game_id="test_game",
+        session_id="test_session",
+        section_number=1,
+        narrative=model_factory.create_narrator_model(section_number=1),
+        rules=model_factory.create_rules_model(section_number=1)
+    )
+    
+    # Tenter de mettre à jour avec une section incohérente
+    new_narrative = model_factory.create_narrator_model(
         section_number=2,
         content="Test content",
         source_type=NarratorSourceType.RAW
     )
     
-    # GameState devrait synchroniser son section_number avec celui du NarratorModel
-    state = GameState(
-        game_id="test_game",
-        session_id="test_session",
-        section_number=1,  # Sera synchronisé avec narrative.section_number
-        narrative=narrative
-    )
+    # La mise à jour devrait échouer
+    with pytest.raises(StateError, match="Section number mismatch"):
+        initial_state.with_updates(narrative=new_narrative)
     
-    # Vérifier que le GameState a bien synchronisé son section_number
-    assert state.section_number == narrative.section_number == 2
-    
-    # Vérifier que le RulesModel est aussi synchronisé si présent
-    rules = RulesModel(
+    # Mais la mise à jour devrait fonctionner si on met à jour tout en même temps
+    new_rules = model_factory.create_rules_model(section_number=2)
+    updated_state = initial_state.with_updates(
         section_number=2,
-        dice_type=DiceType.D20,
-        source_type=RulesSourceType.RAW
+        narrative=new_narrative,
+        rules=new_rules
     )
-    state.rules = rules
     
     # Tout doit être synchronisé
-    assert state.section_number == state.narrative.section_number == state.rules.section_number == 2
+    assert updated_state.section_number == 2
+    assert updated_state.narrative.section_number == 2
+    assert updated_state.rules.section_number == 2
+    
+    # L'état initial ne doit pas être modifié
+    assert initial_state.section_number == 1
+    assert initial_state.narrative.section_number == 1
+    assert initial_state.rules.section_number == 1
 
-def test_narrative_content_merge():
-    """Test that narrative content is preserved during state merges."""
-    # Create first state with meaningful narrative
-    narrative1 = NarratorModel(
-        section_number=1,
-        content="Important narrative content",
-        source_type=NarratorSourceType.PROCESSED,
-        timestamp=datetime.now(),
-        last_update=datetime.now()
-    )
-    state1 = ModelFactory.create_game_state(
+def test_narrative_content_merge(model_factory):
+    """Test que le contenu narratif est préservé lors des mises à jour internes."""
+    # Créer un état initial avec un contenu narratif important
+    initial_state = model_factory.create_game_state(
         game_id="test_game",
         session_id="test_session",
         section_number=1,
-        narrative=narrative1
+        narrative=model_factory.create_narrator_model(
+            section_number=1,
+            content="Important narrative content",
+            source_type=NarratorSourceType.PROCESSED
+        )
     )
     
-    # Create second state with initialized narrative
-    narrative2 = NarratorModel(
-        section_number=1,
-        content="initialized",
-        source_type=NarratorSourceType.RAW,
-        timestamp=datetime.now(),
-        last_update=datetime.now()
-    )
-    state2 = ModelFactory.create_game_state(
-        game_id="test_game2",
-        session_id="test_session2",
-        section_number=1,
-        narrative=narrative2
+    # Mettre à jour l'état avec de nouvelles règles
+    updated_state = initial_state.with_updates(
+        rules=model_factory.create_rules_model(
+            section_number=1,
+            dice_type=DiceType.COMBAT
+        )
     )
     
-    # Create rules for state2
-    rules2 = RulesModel(
-        section_number=1,
-        dice_type=DiceType.NONE,
-        needs_dice=False,
-        needs_user_response=True,
-        source_type=RulesSourceType.PROCESSED
-    )
-    state2 = state2.with_updates(rules=rules2)
+    # Le contenu narratif devrait être préservé
+    assert updated_state.narrative.content == "Important narrative content"
+    assert updated_state.narrative.source_type == NarratorSourceType.PROCESSED
     
-    # Merge states
-    merged_state = state1 + state2
+    # Les IDs devraient être préservés
+    assert updated_state.game_id == "test_game"
+    assert updated_state.session_id == "test_session"
     
-    # Verify that important narrative content is preserved
-    assert merged_state.narrative.content == "Important narrative content"
-    assert merged_state.narrative.source_type == NarratorSourceType.PROCESSED
-    assert merged_state.rules == rules2  # Rules from state2 should be present
+    # Les sections devraient rester cohérentes
+    assert updated_state.section_number == updated_state.narrative.section_number == 1
+    
+    # L'état original ne devrait pas être modifié
+    assert initial_state.narrative.content == "Important narrative content"
+    assert initial_state.narrative.source_type == NarratorSourceType.PROCESSED
 
-```
+def test_narrative_content_choice_update(model_factory):
+    """Test que le contenu narratif est correctement mis à jour lors d'un choix menant à une nouvelle section."""
+    # Créer l'état initial avec un choix vers section 2
+    initial_state = model_factory.create_game_state(
+        game_id="test_game",
+        session_id="test_session",
+        section_number=1,
+        narrative=model_factory.create_narrator_model(
+            section_number=1,
+            content="Initial section content",
+            source_type=NarratorSourceType.PROCESSED
+        ),
+        rules=model_factory.create_rules_model(
+            section_number=1,
+            choices=[
+                Choice(
+                    text="Go to section 2",
+                    type=ChoiceType.DIRECT,
+                    target_section=2
+                )
+            ]
+        )
+    )
+    
+    # Créer le nouveau contenu narratif pour la section 2
+    new_narrative = model_factory.create_narrator_model(
+        section_number=2,
+        content="Section 2 content after choice",
+        source_type=NarratorSourceType.PROCESSED
+    )
+    
+    # Créer les nouvelles règles pour la section 2
+    new_rules = model_factory.create_rules_model(section_number=2)
+    
+    # Mettre à jour l'état avec la nouvelle section
+    updated_state = initial_state.with_updates(
+        section_number=2,
+        narrative=new_narrative,
+        rules=new_rules
+    )
+    
+    # Vérifier la synchronisation des sections
+    assert updated_state.section_number == 2
+    assert updated_state.narrative.section_number == 2
+    assert updated_state.rules.section_number == 2
+    
+    # Vérifier le contenu narratif
+    assert updated_state.narrative.content == "Section 2 content after choice"
+    assert updated_state.narrative.source_type == NarratorSourceType.PROCESSED
+    
+    # Vérifier que l'état initial n'est pas modifié
+    assert initial_state.section_number == 1
+    assert initial_state.narrative.section_number == 1
+    assert initial_state.narrative.content == "Initial section content"
+    assert len(initial_state.rules.choices) == 1
+    assert initial_state.rules.choices[0].target_section == 2

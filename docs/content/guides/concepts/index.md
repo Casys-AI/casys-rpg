@@ -1,104 +1,31 @@
-# CASYS RPG Concepts
+# Game Concepts
 
 !!! abstract "Overview"
-    Discover the core concepts behind CASYS RPG, an innovative AI-powered game book engine that combines dynamic storytelling with advanced game mechanics.
+    CASYS RPG is a next-generation role-playing game system powered by AI agents. It combines dynamic storytelling with sophisticated game mechanics to create unique and engaging player experiences.
 
-## What is CASYS RPG?
+## Core Documentation
 
-CASYS RPG is a next-generation interactive storytelling engine that leverages artificial intelligence to create dynamic, personalized gaming experiences. It combines the depth of traditional RPGs with the flexibility of modern AI systems.
+### [Core Features](core-features.md)
+The fundamental capabilities of CASYS RPG:
+- AI-powered storytelling
+- Multi-agent architecture
+- Real-time game mechanics
 
-## Key Concepts
+### [Game Mechanics](game-mechanics.md)
+The core game systems and rules:
+- Rules interpretation
+- Decision making
+- State management
 
-=== "Multi-Agent System"
-    The heart of CASYS RPG is its multi-agent architecture:
+### [Architecture Overview](architecture-overview.md)
+System architecture and design:
+- Component organization
+- Data flow
+- Integration patterns
 
-    * **StoryGraph Agent**
-        * Controls narrative flow
-        * Manages story transitions
-        * Ensures narrative coherence
+## Advanced Topics
 
-    * **Rules Agent**
-        * Interprets game rules
-        * Manages game mechanics
-        * Ensures fair gameplay
-
-    * **Decision Agent**
-        * Processes player choices
-        * Evaluates consequences
-        * Maintains game logic
-
-    * **Narrator Agent**
-        * Generates narrative content
-        * Adapts writing style
-        * Maintains consistency
-
-    * **Trace Agent**
-        * Tracks player actions
-        * Records game history
-        * Manages statistics
-
-=== "Game Mechanics"
-    Core gameplay elements:
-
-    * **State Management**
-        * Dynamic game states
-        * Context preservation
-        * Action tracking
-
-    * **Decision System**
-        * Choice generation
-        * Consequence handling
-        * Narrative branching
-
-    * **Character System**
-        * Attribute management
-        * Skill progression
-        * Inventory tracking
-
-=== "AI Integration"
-    AI capabilities:
-
-    * **Natural Language Processing**
-        * Context understanding
-        * Intent recognition
-        * Response generation
-
-    * **Dynamic Adaptation**
-        * Story adjustment
-        * Difficulty scaling
-        * Content personalization
-
-## System Philosophy
-
-CASYS RPG is built on several key principles:
-
-1. **Player Agency**
-    * Meaningful choices
-    * Real consequences
-    * Personal narratives
-
-2. **Dynamic Storytelling**
-    * Adaptive narratives
-    * Contextual responses
-    * Coherent progression
-
-3. **Technical Excellence**
-    * Clean architecture
-    * Modular design
-    * Scalable systems
-
-## Getting Started
-
-To start working with CASYS RPG:
-
-1. Check out our [Getting Started Guide](../getting-started/index.md)
-2. Explore [Core Features](core-features.md)
-3. Learn about [Game Mechanics](game-mechanics.md)
-4. Understand the [Architecture Overview](architecture-overview.md)
-
-## Next Steps
-
-- Dive into [Core Features](core-features.md)
-- Explore [Game Mechanics](game-mechanics.md)
-- Learn about [Architecture](architecture-overview.md)
-- Try our [Tutorials](../tutorials/index.md)
+Looking to dive deeper? Check out our [Advanced Guides](../advanced/index.md):
+- [AI Integration](../advanced/ai-integration.md)
+- [Custom Agents](../advanced/custom-agents.md)
+- [State Management](../advanced/state-management.md)

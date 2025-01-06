@@ -1,157 +1,123 @@
 # Core Features
 
-!!! abstract "Overview"
-    Explore the core features that make CASYS RPG a powerful and flexible game engine.
+!!! abstract "CASYS RPG Overview"
+    An advanced role-playing game system powered by AI agents, offering dynamic storytelling and sophisticated game mechanics.
 
-## AI-Powered Storytelling
+    ```mermaid
+    graph TD
+        subgraph "Game Flow"
+            A[Player Input] --> B[Story Evolution]
+            B --> C[Game State Update]
+            C --> D[Narrative Response]
+            D --> A
+        end
+        
+        subgraph "AI Processing"
+            E[Story Graph]
+            F[Rules Engine]
+            G[Decision Making]
+            
+            E --> F
+            F --> G
+            G --> E
+            
+            B --> E
+            B --> F
+            B --> G
+        end
+    ```
 
-### Dynamic Narratives
-```mermaid
-graph TD
-    PI[Player Input] --> CA[Context Analysis]
-    CA --> SG[Story Generation]
-    SG --> NA[Narrative Adaptation]
-    NA --> PO[Player Output]
-    
-    subgraph Context
-        PC[Player Context]
-        GS[Game State]
-        NH[Narrative History]
-    end
-    
-    PC --> CA
-    GS --> CA
-    NH --> CA
-```
+## Dynamic Storytelling
 
-* **Adaptive Story Progression**
-    * Dynamic plot development
-    * Contextual branching
-    * Player-driven narratives
+!!! tip "Adaptive Narrative System"
+    === "Story Evolution"
+        - **Dynamic Plot Adaptation** through StoryGraph
+        - **Contextual Responses** based on player choices
+        - **Persistent World State** tracking
+        
+        ```mermaid
+        graph LR
+            A[Player Choice] --> B[Context Analysis]
+            B --> C[Story Adaptation]
+            C --> D[World Update]
+            D --> E[Narrative Response]
+        ```
 
-* **Intelligent Response System**
-    * Natural language understanding
-    * Context-aware responses
-    * Emotional intelligence
+    === "AI Agents"
+        Each agent specializes in a specific aspect of the game:
 
-* **Narrative Consistency**
-    * Story coherence
-    * Character consistency
-    * World-building integrity
+        - **StoryGraph**: Narrative flow orchestration
+        - **NarratorAgent**: Content generation and presentation
+        - **TraceAgent**: History and continuity management
 
-## Game Systems
+## Intelligent Game Mechanics
 
-### Character Management
-```mermaid
-graph LR
-    subgraph Character
-        AT[Attributes]
-        SK[Skills]
-        IN[Inventory]
-    end
-    
-    subgraph Progression
-        XP[Experience]
-        LV[Levels]
-        AC[Achievements]
-    end
-    
-    Character --> Progression
-```
+!!! example "Advanced Rule Processing"
+    === "Rules Engine"
+        - **Real-time Rule Interpretation** using GPT-4o-mini
+        - **Contextual Dice System** for dynamic difficulty
+        - **Adaptive Challenge Scaling**
 
-* **Character Development**
-    * Attribute system
-    * Skill progression
-    * Equipment management
+        ```python
+        # Example Rule Processing
+        async def process_rule(context: GameContext) -> RuleResult:
+            # Dynamic rule interpretation based on context
+            interpretation = await rules_agent.interpret(context)
+            # Contextual difficulty adjustment
+            difficulty = calculate_difficulty(context, interpretation)
+            return apply_rules(interpretation, difficulty)
+        ```
 
-* **Progress Tracking**
-    * Experience points
-    * Level progression
-    * Achievement system
+    === "Decision System"
+        - **Complex Choice Resolution**
+        - **Consequence Tracking**
+        - **Strategic Depth Analysis**
 
-### Decision System
+## Technical Excellence
 
-* **Choice Architecture**
-    * Meaningful decisions
-    * Multiple paths
-    * Consequence tracking
+!!! info "Core Technologies"
+    === "Backend Features"
+        - **Async Processing**: High-performance game logic
+        - **State Management**: Immutable game state with Pydantic
+        - **WebSocket Communication**: Real-time updates
+        
+        ```mermaid
+        graph TD
+            subgraph "State Management"
+                A[Game State] --> B[Validation]
+                B --> C[Processing]
+                C --> D[Cache]
+                D --> E[New State]
+            end
+        ```
 
-* **State Management**
-    * Game state tracking
-    * Context preservation
-    * History management
-
-## Technical Features
-
-### Multi-Agent Architecture
-```mermaid
-graph TD
-    subgraph Agents
-        SA[Story Agent]
-        RA[Rules Agent]
-        DA[Decision Agent]
-        NA[Narrator Agent]
-        TA[Trace Agent]
-    end
-    
-    subgraph Coordination
-        AM[Agent Manager]
-        SM[State Manager]
-    end
-    
-    Agents --> Coordination
-```
-
-* **Agent Specialization**
-    * Focused responsibilities
-    * Clear interfaces
-    * Efficient coordination
-
-* **System Integration**
-    * Clean architecture
-    * Modular design
-    * Easy extension
-
-### Real-Time Updates
-
-* **WebSocket Communication**
-    * Instant updates
-    * Bidirectional communication
-    * State synchronization
-
-* **Event System**
-    * Event-driven architecture
-    * Real-time notifications
-    * State broadcasts
+    === "Architecture Highlights"
+        - **Multi-Agent System**: Specialized AI processing
+        - **Event-Driven Design**: Reactive game mechanics
+        - **Modular Components**: Extensible system
 
 ## Performance Features
 
-### Optimization
+!!! success "Optimization Systems"
+    === "Caching"
+        - **Memory Cache**: Fast access to game rules
+        - **State Cache**: Quick game state retrieval
+        - **Context Preservation**: Efficient history tracking
 
-* **Caching System**
-    * State caching
-    * Response caching
-    * Resource optimization
+    === "Processing"
+        - **Async Operations**: Non-blocking game flow
+        - **Batch Processing**: Efficient updates
+        - **Smart Resource Management**
 
-* **Async Processing**
-    * Non-blocking operations
-    * Parallel processing
-    * Efficient resource use
+## Development Benefits
 
-### Scalability
+!!! note "Key Advantages"
+    === "For Players"
+        - **Dynamic Stories**: Each playthrough is unique
+        - **Intelligent Responses**: Contextual game reactions
+        - **Deep Gameplay**: Complex but intuitive mechanics
 
-* **Modular Design**
-    * Component isolation
-    * Clear interfaces
-    * Easy extension
-
-* **Resource Management**
-    * Memory efficiency
-    * CPU optimization
-    * I/O management
-
-## Next Steps
-
-- Learn about [Game Mechanics](game-mechanics.md)
-- Explore the [Architecture Overview](architecture-overview.md)
-- Try [Advanced Features](../advanced/index.md)
+    === "For Developers"
+        - **Modular Design**: Easy to extend
+        - **Clear Architecture**: Well-organized components
+        - **Robust Testing**: Comprehensive test coverage

@@ -23,6 +23,7 @@ __all__ = [
     'WorkflowManagerProtocol',
     # Implementations
     'WorkflowManager',
+
 ]
 
 def get_manager(manager_type: str):

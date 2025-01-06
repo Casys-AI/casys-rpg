@@ -148,8 +148,8 @@ class AgentManager(AgentManagerProtocol):
             workflow = await self.get_story_workflow()
             logger.debug("Story workflow retrieved")
 
-            # 5. Préparer un thread_config basé sur le session_id
-            thread_config = {"configurable": {"thread_id": str(initial_state.session_id)}}
+            # 5. Préparer un thread_config basé sur le game_id
+            thread_config = {"configurable": {"thread_id": str(initial_state.game_id)}}
             logger.debug("Thread config prepared: {}", thread_config)
 
             # 6. Appeler le workflow en "one-shot"
@@ -277,7 +277,7 @@ class AgentManager(AgentManagerProtocol):
             if not state_dict.get("game_id"):
                 state_dict["game_id"] = state.game_id
 
-            thread_config = {"configurable": {"thread_id": str(state.session_id)}}
+            thread_config = {"configurable": {"thread_id": str(state.game_id)}}
 
             # 6. Lancer le workflow en one-shot
             try:
@@ -299,12 +299,12 @@ class AgentManager(AgentManagerProtocol):
 
             # 7. Analyser le résultat final
             if isinstance(result, dict):
-                # Si on a “next_section”, on peut créer un nouvel état ou continuer
-                if ("decision" in result
-                    and result["decision"]
-                    and "next_section" in result["decision"]
-                    and result["decision"]["next_section"] is not None):
-                    next_section = result["decision"]["next_section"]
+                logger.info(f"Analyzing result: {result}")
+                # Si on a un decision avec next_section, on peut créer un nouvel état
+                if (result.get("decision") and 
+                    hasattr(result["decision"], "next_section") and 
+                    result["decision"].next_section is not None):
+                    next_section = result["decision"].next_section
                     logger.info("Moving to next section: current={} -> next={}",
                                 state.section_number, next_section)
                     # Créer un nouvel état si besoin
