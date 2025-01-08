@@ -73,8 +73,7 @@ class AgentManagerProtocol(Protocol):
         ...
 
     async def process_game_state(
-        self, 
-        state: Optional[GameState] = None, 
+        self,  
         user_input: Optional[str] = None
     ) -> GameState:
         """Process game state through the workflow.

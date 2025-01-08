@@ -109,7 +109,7 @@ class StateManager(StateManagerProtocol):
             return "None"
         return f"{content[:max_length]}..." if len(content) > max_length else content
 
-    def _validate_format(self, state: GameState) -> bool:
+    def _validate_format(self, state: GameState) -> bool: #should be in a model or game state
         """Validate state format.
         
         Args:
@@ -125,10 +125,6 @@ class StateManager(StateManagerProtocol):
             # Vérifier les champs requis
             if not state.session_id:
                 logger.error("Missing session_id")
-                return False
-                
-            if state.section_number is None:
-                logger.error("Missing section_number")
                 return False
                 
             # Vérifier la cohérence des données
@@ -148,7 +144,7 @@ class StateManager(StateManagerProtocol):
             logger.error("Error validating format: {}", str(e))
             return False
 
-    async def validate_state(
+    async def validate_state( #should be in game state, not in a business file
         self, 
         state_data: Union[Dict[str, Any], GameState]
     ) -> GameState:
@@ -191,9 +187,9 @@ class StateManager(StateManagerProtocol):
             raise StateError(f"Failed to validate state: {str(e)}")
 
     async def create_initial_state(
-        self, 
-        input_data: Optional[Union[Dict[str, Any], GameState]] = None
-    ) -> GameState:
+            self, 
+            input_data: Optional[Union[Dict[str, Any], GameState]] = None
+        ) -> GameState:
         """Create and initialize a new game state.
         
         This method handles:
@@ -218,43 +214,66 @@ class StateManager(StateManagerProtocol):
             if not self._game_id:
                 await self.initialize()
 
-            # 2. Extraire ou générer les IDs
+            # 2. Extraire les IDs et section_number
             session_id = None
-            game_id = self._game_id
+            game_id = None
+            section_number = None
+            character = None
             
             if isinstance(input_data, GameState):
+                # Préserver les IDs et section_number de l'état précédent
                 session_id = input_data.session_id
-                input_data = input_data.model_dump()
+                game_id = input_data.game_id
+                section_number = input_data.section_number
+                character = input_data.character
             elif isinstance(input_data, dict):
                 session_id = input_data.get("session_id")
+                game_id = input_data.get("game_id")
+                section_number = input_data.get("section_number")
+                if "character" in input_data:
+                    character = input_data["character"]
             
+            # 3. Utiliser les valeurs par défaut si nécessaire
+            if not game_id:
+                game_id = self._game_id
             if not session_id:
                 session_id = self.generate_session_id()
-
-            # 3. Créer le personnage initial via CharacterManager
-            initial_character = CharacterModel(
-                stats=CharacterStats(
-                    endurance=20,
-                    chance=20,
-                    skill=20
+            if section_number is None:
+                section_number = 1  # Section par défaut
+                
+            # 4. Créer ou réutiliser le personnage
+            if not character:
+                character = CharacterModel(
+                    id="current",
+                    stats=CharacterStats(
+                        endurance=20,
+                        chance=20,
+                        skill=20
+                    )
                 )
-            )
-            self.character_manager.save_character(initial_character)
+                await self.character_manager.save_character(character)
             
-            # 4. Créer l'état initial avec ModelFactory
+            # 5. Créer l'état initial avec ModelFactory
             initial_state = ModelFactory.create_game_state(
                 game_id=game_id,
                 session_id=session_id,
-                section_number=1,
-                character_id="current",  # On utilise "current" comme ID
+                section_number=section_number,
+                character=character,
                 timestamp=self.current_timestamp
             )
             
-            # 5. Fusionner avec input_data si présent
+            # 6. Mettre à jour avec le reste des données si présentes
             if input_data:
-                initial_state = initial_state.with_updates(**input_data)
+                # Exclure les champs qu'on a déjà gérés
+                if isinstance(input_data, GameState):
+                    data_dict = input_data.model_dump(exclude={"game_id", "session_id", "section_number", "character"})
+                    initial_state = initial_state.with_updates(**data_dict)
+                elif isinstance(input_data, dict):
+                    data_dict = {k: v for k, v in input_data.items() 
+                               if k not in ["game_id", "session_id", "section_number", "character"]}
+                    initial_state = initial_state.with_updates(**data_dict)
 
-            # 6. Valider et sauvegarder
+            # 7. Valider et sauvegarder
             validated_state = await self.validate_state(initial_state)
             saved_state = await self.save_state(validated_state)
             
@@ -290,7 +309,6 @@ class StateManager(StateManagerProtocol):
                     error_message=error_message,
                     session_id=base_state.session_id,
                     game_id=base_state.game_id,
-                    section_number=base_state.section_number,
                     current_state=base_state
                 )
             else:
@@ -404,7 +422,7 @@ class StateManager(StateManagerProtocol):
             logger.error("Error loading state: {}", str(e))
             raise StateError(f"Failed to load state: {str(e)}")
 
-    async def get_section_history(self) -> List[int]:
+    async def get_section_history(self) -> List[int]: #no test
         """Get list of all saved section numbers for current game."""
         try:
             # Récupérer toutes les sections sauvegardées pour ce game_id
@@ -423,7 +441,7 @@ class StateManager(StateManagerProtocol):
             logger.error("Error getting section history: {}", str(e))
             raise StateError(f"Failed to get section history: {str(e)}")
 
-    async def clear_state(self) -> None:
+    async def clear_state(self) -> None: #no test
         """Clear current state and cache."""
         try:
             logger.info("Clearing game state")
@@ -440,7 +458,7 @@ class StateManager(StateManagerProtocol):
             logger.error("Error clearing state: {}", str(e))
             raise StateError(f"Failed to clear state: {str(e)}")
 
-    async def switch_game(self, new_game_id: str) -> None:
+    async def switch_game(self, new_game_id: str) -> None: #no test
         """Switch to a different game.
         
         Args:

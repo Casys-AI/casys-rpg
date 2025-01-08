@@ -58,12 +58,18 @@ class GameStateBase(BaseModel):
 
 class GameStateInput(GameStateBase):
     """Input state for the game workflow."""
-    section_number: Annotated[int, keep_if_not_empty] = Field(default=1)  # Premier cycle par défaut
+    section_number: Annotated[Optional[int], take_last_value] = Field(default=1)  # Premier cycle par défaut
     player_input: Annotated[Optional[str], keep_if_not_empty] = None
 
-    @field_validator('section_number')
-    def validate_section_number(cls, v):
+    @field_validator('section_number', mode='before')
+    @classmethod
+    def validate_section_number(cls, v: Optional[int]) -> int:
         """Validate section number."""
+        # Si None, utiliser la valeur par défaut
+        if v is None:
+            return 1
+            
+        # Valider que c'est positif
         if v < 1:
             raise StateError("Section number must be positive")
         return v
@@ -79,10 +85,6 @@ class GameStateOutput(GameStateBase):
     
     # Error handling
     error: Annotated[Optional[str], first_not_none] = None
-    
-    # Game state
-    section_number: int = Field(default=1)
-    player_input: Optional[str] = None
     
     @field_validator('error', mode='before')
     @classmethod
@@ -115,8 +117,13 @@ class GameState(GameStateInput, GameStateOutput):
 
     @field_validator('section_number', mode='before')
     @classmethod
-    def validate_section_number(cls, v: int) -> int:
+    def validate_section_number(cls, v: Optional[int]) -> int:
         """Validate section number."""
+        # Si None, utiliser la valeur par défaut
+        if v is None:
+            return 1
+            
+        # Valider que c'est positif
         if v < 1:
             raise StateError("Section number must be positive")
         return v
@@ -125,26 +132,22 @@ class GameState(GameStateInput, GameStateOutput):
     @classmethod
     def handle_langgraph_lists(cls, values):
         """Handle lists that may be accumulated by LangGraph."""
-        logger.debug("Processing LangGraph lists. Initial values: {}", values)
         # Traiter les champs qui peuvent être des listes
         fields_to_check = ['section_number', 'narrative', 'rules']
         for field in fields_to_check:
             if field in values:
                 if isinstance(values[field], list):
-                    logger.debug("Found list for field {}: {}", field, values[field])
                     if not values[field]:
                         values[field] = None
                     else:
                         values[field] = values[field][-1]  # Prendre le dernier élément
-                    logger.debug("Updated {} to: {}", field, values[field])
                 elif isinstance(values[field], dict):
                     # Si c'est un dictionnaire, on le convertit en modèle
-                    logger.debug("Found dict for field {}: {}", field, values[field])
                     if field == 'narrative':
                         values[field] = NarratorModel(**values[field])
                     elif field == 'rules':
                         values[field] = RulesModel(**values[field])
-                    logger.debug("Converted {} to model: {}", field, values[field])
+                    
         
         # Vérifier la cohérence des sections après le traitement des listes
         narrative = values.get('narrative')
@@ -152,39 +155,24 @@ class GameState(GameStateInput, GameStateOutput):
         section_number = values.get('section_number')
         
         if narrative and hasattr(narrative, 'section_number'):
-            if section_number and narrative.section_number != section_number:
-                logger.error("Section number mismatch in input: state={}, narrative={}", 
-                           section_number, narrative.section_number)
-                raise StateError(
-                    f"Section number mismatch: GameState ({section_number}) "
-                    f"does not match narrative ({narrative.section_number})"
-                )
             # Si pas de section_number, prendre celui du narratif
             if not section_number:
                 values['section_number'] = narrative.section_number
                 
         if rules and hasattr(rules, 'section_number'):
-            if section_number and rules.section_number != section_number:
-                logger.error("Section number mismatch in input: state={}, rules={}", 
-                           section_number, rules.section_number)
-                raise StateError(
-                    f"Section number mismatch: GameState ({section_number}) "
-                    f"does not match rules ({rules.section_number})"
-                )
             # Si pas de section_number, prendre celui des règles
             if not section_number:
                 values['section_number'] = rules.section_number
+                
+        # Si toujours pas de section_number, utiliser la valeur par défaut
+        if not values.get('section_number'):
+            values['section_number'] = 1
         
-        logger.debug("Final values after list processing: {}", values)
         return values
 
     @model_validator(mode='after')
     def validate_state(self) -> 'GameState':
         """Validate the complete state."""
-        logger.debug("Validating final state. section_number={}, narrative={}, rules={}", 
-                    self.section_number, 
-                    self.narrative.section_number if self.narrative else None,
-                    self.rules.section_number if self.rules else None)
         return self
 
     @model_validator(mode='before')

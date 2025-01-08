@@ -31,7 +31,7 @@ from managers.protocols.state_manager_protocol import StateManagerProtocol
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.prebuilt import ToolExecutor
-from langgraph.types import Command, interrupt
+from langgraph.types import Command, interrupt  
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.errors import GraphInterrupt
 
@@ -194,11 +194,30 @@ class StoryGraph(StoryGraphProtocol):
                         error_state.narrative.content if error_state.narrative else "None")
             return error_state
 
+
     async def _process_decision(self, input_data: GameState) -> GameState:
         """Process decision node."""
         try:
-            logger.info("Processing decision for section {}", input_data.section_number)
+            logger.info("[DECISION] Processing decision for section {} (cycle {})", 
+                       input_data.section_number if input_data else None,
+                       "initial" if not input_data.player_input else "with_input")
+            logger.debug("[DECISION] Input type={}, player_input={}", 
+                        type(input_data).__name__, 
+                        input_data.player_input if isinstance(input_data, GameState) else None)
             
+            # Si c'est une Command, extraire l'input du dictionnaire
+            if isinstance(input_data, Command):
+                logger.debug("[DECISION] Received Command with resume={} (type={})", 
+                           input_data.resume, type(input_data.resume))
+                
+                if isinstance(input_data.resume, dict) and "player_input" in input_data.resume:
+                    player_input = input_data.resume["player_input"]
+                    logger.debug("[DECISION] Extracted player_input: {}", player_input)
+                    input_data = input_data.with_updates(player_input=player_input)
+                else:
+                    logger.error("Invalid Command format or missing player_input")
+                    raise GameError("Invalid Command format")
+
             if not input_data:
                 raise GameError("No input data available for decision processing")
 
@@ -206,38 +225,51 @@ class StoryGraph(StoryGraphProtocol):
                 logger.debug("No decision agent available, returning input state")
                 return input_data
 
+            # Debug player input
+            logger.debug("[DECISION] Current player_input value: {}", input_data.player_input)
+            logger.debug("[DECISION] Input data rules: needs_user_response={}, has_player_input={}", 
+                        input_data.rules.needs_user_response if input_data.rules else None,
+                        bool(input_data.player_input))
+
             # Si on a besoin d'une réponse utilisateur et qu'on n'en a pas
             if input_data.rules and input_data.rules.needs_user_response and not input_data.player_input:
                 logger.info("Waiting for user input in section {}", input_data.section_number)
-                raise interrupt("Waiting for user input")
+                # Utiliser interrupt pour pauser le workflow et demander une entrée humaine
+                response = interrupt("Waiting for user input")
+                logger.debug("[DECISION] Received interrupt response: {} (type={})", response, type(response))
+                
+                # Extraire le player_input si c'est un dictionnaire
+                if isinstance(response, dict) and "player_input" in response:
+                    user_input = response["player_input"]
+                    logger.debug("[DECISION] Extracted user_input from dict: {}", user_input)
+                else:
+                    user_input = response
+                    logger.debug("[DECISION] Using response directly as user_input: {}", user_input)
+                    
+                # Mettre à jour l'état avec l'input utilisateur
+                input_data = input_data.with_updates(player_input=user_input)
 
-            # Processus de décision
+            # Processus de décision si on a un player_input
             if input_data.player_input:
-                logger.debug("Processing user input: {}", input_data.player_input)
-                async for result in self.decision_agent.ainvoke({"state": input_data}):
-                    if "decision" in result:
-                        decision = result["decision"]
-                        if isinstance(decision, DecisionError):
-                            logger.error("Decision error: {}", decision.message)
-                            # Utiliser with_updates pour préserver l'état
-                            return input_data.with_updates(
-                                error=decision.message,
-                                decision=None  # Reset decision en cas d'erreur
-                            )
+                logger.info("[DECISION] Processing decision with input: {}", input_data.player_input)
+                # Appeler le decision agent avec ainvoke
+                async for decision_output in self.decision_agent.ainvoke({"state": input_data}):
+                    decision = decision_output.get("decision")
+                    logger.debug("[DECISION] Decision result: {}", decision)
 
-                        # Validation de la décision
-                        if (not hasattr(decision, 'next_section') or decision.next_section is None) and not hasattr(decision, 'awaiting_action'):
-                            logger.error("Decision missing next_section")
-                            return input_data.with_updates(
-                                error="Decision missing next_section or awaiting_action",
-                                decision=None
-                            )
+                    if isinstance(decision, DecisionError):
+                        logger.error("Decision error: {}", decision.message)
+                        return input_data.with_updates(error=decision.message, decision=None)  # Reset decision en cas d'erreur
 
-                        logger.info("Decision processed: current_section={}, next_section={}", 
-                                  input_data.section_number, decision.next_section)
-                        
-                        # Utiliser with_updates pour préserver l'état
-                        return input_data.with_updates(decision=decision)
+                    if (not hasattr(decision, 'next_section') or decision.next_section is None) and not hasattr(decision, 'awaiting_action'):
+                        logger.error("Decision missing next_section or awaiting_action")
+                        return input_data.with_updates(error="Decision missing next_section or awaiting_action", decision=None)
+
+                    logger.info("Decision processed: current_section={}, next_section={}", 
+                            input_data.section_number, decision.next_section)
+                    
+                    # Retourner un état avec la décision mise à jour
+                    return input_data.with_updates(decision=decision)
 
             logger.debug("No user input to process")
             return input_data
@@ -248,11 +280,8 @@ class StoryGraph(StoryGraphProtocol):
 
         except Exception as e:
             logger.exception("Error processing decision: {}", str(e))
-            # Utiliser with_updates pour préserver l'état
-            return input_data.with_updates(
-                error=str(e),
-                decision=None
-            )
+            # Retourner un état avec l'erreur
+            return input_data.with_updates(error=str(e), decision=None)
 
     async def _process_trace(self, input_data: GameState) -> GameState:
         """Process trace for the current state."""

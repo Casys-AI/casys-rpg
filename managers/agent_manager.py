@@ -5,7 +5,6 @@ Agent Manager implementation.
 from typing import (
     Any, Optional, Dict, List, Union, Type, TypeVar, Generic)
 from loguru import logger
-from fastapi import Depends
 from langgraph.types import Command
 from langgraph.errors import GraphInterrupt
 
@@ -27,8 +26,6 @@ from agents.protocols.trace_agent_protocol import TraceAgentProtocol
 from agents.protocols.base_agent_protocol import BaseAgentProtocol
 
 from agents.factories.game_factory import GameFactory
-from models.types.agent_types import GameAgents
-from models.types.manager_types import GameManagers
 from config.agents.agent_config_base import AgentConfigBase
 
 from models.game_state import GameState
@@ -117,224 +114,146 @@ class AgentManager(AgentManagerProtocol):
     # -------------------------------------------------------------------------
     # 1) INITIALISATION DU JEU
     # -------------------------------------------------------------------------
-    async def initialize_game(self) -> GameState:
-        """
-        Initialise un nouveau jeu : crée un état initial, puis lance le workflow
-        une première fois pour la "section 1" ou autre.
+    async def initialize_game(
+        self,
+        session_id: Optional[str] = None,
+        game_id: Optional[str] = None,
+        section_number: Optional[int] = None
+    ) -> GameState:
+        """Initialize a new game state and run initial workflow.
+        
+        Args:
+            session_id: Optional session ID (will be generated if not provided)
+            game_id: Optional game ID (will be generated if not provided)
+            section_number: Optional starting section number (default from GameState)
+            
+        Returns:
+            GameState: Initialized game state
         """
         try:
-            logger.info("Initializing new game")
-            state_dict = None
-
-            # 1. Créer un état initial
-            initial_state = await self.managers['state_manager'].create_initial_state()
-            logger.debug("Initial state created, narrative content: {}", 
-                        initial_state.narrative.content if initial_state.narrative else "None")
-            # Exemple : session_id, game_id, section_number=1, etc.
-
-            # 2. Convertir en dict complet
-            state_dict = initial_state.model_dump(exclude_unset=False)
-            logger.debug("State converted to dict, narrative content: {}", 
-                        state_dict.get('narrative', {}).get('content') if state_dict.get('narrative') else "None")
-
-            # 3. Vérifier session_id / game_id
-            if not state_dict.get("session_id"):
-                state_dict["session_id"] = initial_state.session_id
-            if not state_dict.get("game_id"):
-                state_dict["game_id"] = initial_state.game_id
-            logger.debug("State dict after ID verification: {}", state_dict)
-
-            # 4. Récupérer ou compiler le workflow
-            workflow = await self.get_story_workflow()
-            logger.debug("Story workflow retrieved")
-
-            # 5. Préparer un thread_config basé sur le game_id
-            thread_config = {"configurable": {"thread_id": str(initial_state.game_id)}}
-            logger.debug("Thread config prepared: {}", thread_config)
-
-            # 6. Appeler le workflow en "one-shot"
-            logger.debug("Invoking workflow with state dict: {}", state_dict)
-            result = await workflow.ainvoke(state_dict, thread_config)
-            logger.debug("Workflow result received: {}", result)
-
-            # 7. Analyser le résultat
-            if isinstance(result, dict):
-                # Extraire le contenu des différents modèles pour le logging
-                narrative_content = None
-                rules_summary = None
-                decision_next = None
-                trace_details = None
-
-                # Narrative
-                narrative = result.get('narrative')
-                if isinstance(narrative, dict):
-                    narrative_content = narrative.get('content')
-                elif hasattr(narrative, 'content'):
-                    narrative_content = narrative.content
+            # 1. Créer l'état initial
+            initial_data = {}
+            if session_id:
+                initial_data['session_id'] = session_id
+            if game_id:
+                initial_data['game_id'] = game_id
+            if section_number:
+                initial_data['section_number'] = section_number
                 
-                if narrative_content:
-                    narrative_content = (narrative_content[:100] + "...") if len(narrative_content) > 100 else narrative_content
-                
-                logger.debug("Result is dict, narrative content: {}", narrative_content)
-                
-                # Rules
-                rules = result.get('rules')
-                if isinstance(rules, dict):
-                    rules_summary = rules.get('rules_summary')
-                elif hasattr(rules, 'rules_summary'):
-                    rules_summary = rules.rules_summary
-
-                # Decision
-                decision = result.get('decision')
-                if isinstance(decision, dict):
-                    decision_next = decision.get('next_section')
-                elif hasattr(decision, 'next_section'):
-                    decision_next = decision.next_section
-
-                # Trace
-                trace = result.get('trace')
-                if isinstance(trace, dict):
-                    trace_details = trace.get('details')
-                elif hasattr(trace, 'details'):
-                    trace_details = trace.details
-                
-                logger.debug("Result analysis:")
-                logger.debug(" - Narrative content: {}", narrative_content)
-                logger.debug(" - Rules summary: {}", rules_summary)
-                logger.debug(" - Decision next section: {}", decision_next)
-                logger.debug(" - Trace details: {}", trace_details)
-                
-                # Préserver les IDs si besoin
-                if not result.get("session_id"):
-                    result["session_id"] = initial_state.session_id
-                if not result.get("game_id"):
-                    result["game_id"] = initial_state.game_id
-
-                # Construire un nouvel état
-                new_state = GameState(**result)
-                logger.debug("New state created from result:")
-                logger.debug(" - Narrative: {}", 
-                           (new_state.narrative.content[:100] + "...") if new_state.narrative and len(new_state.narrative.content) > 100 else new_state.narrative.content if new_state.narrative else "None")
-                logger.debug(" - Rules: {}", new_state.rules.rules_summary if new_state.rules else "None")
-                logger.debug(" - Decision: {}", new_state.decision.next_section if new_state.decision else "None")
-                logger.debug(" - Trace: {}", new_state.trace.details if new_state.trace else "None")
-                
-                # Sauvegarder le nouvel état
-                await self.managers['state_manager'].save_state(new_state)
-                logger.debug("New state saved, narrative content: {}", 
-                           (new_state.narrative.content[:100] + "...") if new_state.narrative and len(new_state.narrative.content) > 100 else new_state.narrative.content if new_state.narrative else "None")
-                
-                logger.info("Game initialization completed successfully")
-                return new_state
-
-            logger.error("Invalid workflow result type: {}", type(result))
-            raise GameError("Invalid workflow result")
-
+            state = await self.managers['state_manager'].create_initial_state(initial_data)
+            
+            # 2. Lancer le workflow initial
+            return await self._handle_game_workflow(state)
+            
         except Exception as e:
-            logger.error("Error initializing game. Input data: {}, Error: {}", state_dict, str(e))
-            raise GameError(
-                f"Failed to process game state: {str(e)}",
-                original_exception=e
-            ) from e
+            logger.error("Failed to initialize game: {}", str(e))
+            raise GameError(f"Failed to initialize game: {str(e)}") from e
 
     # -------------------------------------------------------------------------
     # 2) TRAITEMENT DE L’ETAT DU JEU + GESTION DE L’INTERRUPTION
     # -------------------------------------------------------------------------
     async def process_game_state(
         self,
-        state: Optional[GameState] = None,
         user_input: Optional[str] = None
-    ) -> GameState:
-        """
-        Gère la suite du jeu : on relance le workflow avec l’état courant (et l’input éventuel).
-        Peut lever GraphInterrupt si on attend encore l’utilisateur.
+    ) -> Optional[GameState]:
+        """Process game state and handle workflow.
+        
+        Args:
+            user_input: User input to process (optional)
+            
+        Raises:
+            GameError: If state processing fails
+            GraphInterrupt: If waiting for user input
         """
         try:
-            logger.info("Starting game state processing")
-
-            if not self.story_graph:
-                logger.error("Story graph not initialized")
-                raise GameError("Story graph not initialized")
-
-            # 1. Charger l’état courant si non fourni
+            # Récupérer l'état actuel
+            state = await self.get_state()
             if not state:
-                state = await self.get_state()
-                if not state:
-                    raise GameError("No valid state available")
-
-            # 2. Récupérer le workflow
-            workflow = await self.get_story_workflow()
-
-            # 3. Mettre à jour l’état avec l’éventuel input
-            input_data = state.with_updates(player_input=user_input)
-
-            # 4. Convertir en dict (pour ainvoke)
-            state_dict = input_data.model_dump(exclude_unset=False)
-
-            # 5. Double vérification IDs
-            if not state_dict.get("session_id"):
-                state_dict["session_id"] = state.session_id
-            if not state_dict.get("game_id"):
-                state_dict["game_id"] = state.game_id
-
-            thread_config = {"configurable": {"thread_id": str(state.game_id)}}
-
-            # 6. Lancer le workflow en one-shot
-            try:
-                result = await workflow.ainvoke(state_dict, thread_config)
-            except GraphInterrupt as gi:
-                logger.info("Workflow interrupted: {}", gi)
-                # Cas où on n’a pas encore la réponse utilisateur
-                if not user_input:
-                    # Mettre à jour l’état pour indiquer qu’on attend un input
-                    awaiting = state.with_updates(awaiting_input=True)
-                    await self.managers['state_manager'].save_state(awaiting)
-                    logger.info("Saved state waiting for user input -> raising GraphInterrupt")
-                    # On propage l’exception, l’appelant saura qu’il doit reprendre plus tard
-                    raise gi
-
-                # Sinon, si l’utilisateur vient d’envoyer son input, on “reprend”
-                logger.info("Resuming workflow with user_input={}", user_input)
-                result = await workflow.ainvoke(Command(resume=user_input), thread_config)
-
-            # 7. Analyser le résultat final
-            if isinstance(result, dict):
-                logger.info(f"Analyzing result: {result}")
-                # Si on a un decision avec next_section, on peut créer un nouvel état
-                if (result.get("decision") and 
-                    hasattr(result["decision"], "next_section") and 
-                    result["decision"].next_section is not None):
-                    next_section = result["decision"].next_section
-                    logger.info("Moving to next section: current={} -> next={}",
-                                state.section_number, next_section)
-                    # Créer un nouvel état si besoin
-                    new_state = GameState(
-                        session_id=state.session_id,
-                        game_id=state.game_id,
-                        section_number=next_section,
-                        player_input=None
-                    )
-                    await self.managers['state_manager'].save_state(new_state)
-                    logger.info("Created new state for next section")
-                    return new_state
-
-                # Sinon, juste mettre à jour l’état actuel
-                new_state = state.with_updates(**result)
-                await self.managers['state_manager'].save_state(new_state)
-                logger.info("Game state processed successfully")
-                return new_state
-
-            logger.error("No valid result from workflow")
-            raise GameError("No valid result")
-
+                raise GameError("No state available")
+                
+            # Lancer le workflow avec l'état courant
+            return await self._handle_game_workflow(state, user_input)
+                
         except GraphInterrupt as gi:
-            logger.info("Workflow interrupted again: {}", gi)
-            # On propage pour que l’appelant sache qu’on est en attente
-            raise gi
-
+            logger.info("Workflow interrupted: {}", str(gi))
+            raise
+            
         except Exception as e:
             logger.error("Error processing game state: {}", str(e))
             raise GameError(f"Failed to process game state: {str(e)}") from e
+
+
+    async def _handle_game_workflow(
+            self, 
+            state: GameState, 
+            user_input: Optional[str] = None
+        ) -> GameState:
+        """Handle game workflow including state updates and transitions."""
+        workflow = await self.get_story_workflow()
+        thread_config = {"configurable": {"thread_id": str(state.game_id)}}
+
+        try:
+            # Préparer l'état avec `player_input` si fourni
+            input_data = state.with_updates(player_input=user_input) if user_input else state
+            logger.info("Processing state: {}", input_data)
+            state_dict = input_data.model_dump(exclude_unset=False)
+            logger.debug("[WORKFLOW] Initial state_dict: player_input={}, thread_id={}", 
+                        state_dict.get("player_input"), thread_config["configurable"]["thread_id"])
+
+            # Lancer le workflow avec la commande appropriée
+            if user_input:
+                logger.info("Resuming workflow with user_input={}", user_input)
+                command_data = {"player_input": user_input}
+                logger.debug("[WORKFLOW] Command data: {} (type={})", command_data, type(command_data))
+                logger.debug("[WORKFLOW] Sending Command(resume={}) with thread_id={}", 
+                            command_data, thread_config["configurable"]["thread_id"])
+                command = Command(resume=command_data)
+                await workflow.ainvoke(command, thread_config)
+            else:
+                logger.debug("[WORKFLOW] Starting new workflow with thread_id={}", 
+                            thread_config["configurable"]["thread_id"])
+                await workflow.ainvoke(state_dict, thread_config)
+
+            # Récupérer l'état mis à jour après l'invocation sans 'await'
+            state_snapshot = workflow.get_state(thread_config)
+            logger.debug("StateSnapshot retrieved: player_input={}", state_snapshot.values.get('player_input'))
+
+            # Extraire les valeurs du StateSnapshot et créer un nouvel GameState
+            updated_values = state_snapshot.values
+            updated_state = GameState(**updated_values)
+            logger.info("Updated GameState: section_number={}, player_input={}", 
+                        updated_state.section_number, updated_state.player_input)
+
+            # Gestion de la transition de section si nécessaire
+            if updated_state.section_number != state.section_number:
+                next_section = updated_state.section_number
+                logger.info("Moving to next section: current={} -> next={}", 
+                            state.section_number, next_section)
+
+                # Créer un nouvel état avec la nouvelle section
+                new_state_data = updated_state.model_dump()
+                return await self.managers['state_manager'].create_initial_state(new_state_data)
+
+            # Sauvegarder l'état mis à jour
+            await self.managers['state_manager'].save_state(updated_state)
+            return updated_state
+
+        except GraphInterrupt as gi:
+            if not user_input:
+                # Sauvegarder l'état en attente
+                awaiting = state.with_updates(awaiting_input=True)
+                await self.managers['state_manager'].save_state(awaiting)
+                logger.info("Saved state waiting for user input -> raising GraphInterrupt")
+                raise gi
+
+            # Si un input était déjà fourni mais qu'une interruption survient
+            logger.warning("Got GraphInterrupt with user_input")
+            raise GameError("Unexpected workflow interruption")
+
+
+
+
+
 
     async def get_story_workflow(self) -> Any:
         """Get the compiled story workflow.

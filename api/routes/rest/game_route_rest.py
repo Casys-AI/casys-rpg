@@ -20,10 +20,22 @@ async def initialize_game(
 ) -> GameResponse:
     """
     Initialize a new game session.
+
+    Args:
+        init_request: Optional initialization parameters
+        agent_mgr: Agent manager instance
+
+    Returns:
+        GameResponse: Initialized game state and metadata
     """
     try:
-        # Pour l'instant on n'utilise pas init_request
-        game_state = await agent_mgr.initialize_game()
+        # Extraire les paramètres de init_request si présents
+        game_state = await agent_mgr.initialize_game(
+            session_id=getattr(init_request, 'session_id', None),
+            game_id=getattr(init_request, 'game_id', None),
+            section_number=getattr(init_request, 'section_number', None)
+        )
+        
         state_dict = from_game_state(game_state)
         return GameResponse(
             success=True,
