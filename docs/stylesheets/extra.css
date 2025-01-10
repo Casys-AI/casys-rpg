@@ -10,7 +10,7 @@
 .md-tabs {
     transition: transform 0.3s ease, opacity 0.3s ease;
     transform-origin: top;
-    background: transparent;
+    background-color: var(--md-default-bg-color) !important;
     top: 2rem;
 }
 
@@ -142,7 +142,15 @@
     right: 50%;
     margin-left: -50vw;
     margin-right: -50vw;
-    background: linear-gradient(135deg, #7e57c2 0%, #4a1d3d 60%, var(--md-default-bg-color) 100%);
+}
+
+[data-md-color-scheme="slate"] .hero-section {
+    background: linear-gradient(135deg, #120b17 0%, var(--md-default-bg-color) 8%, var(--md-default-bg-color) 100%);
+}
+
+[data-md-color-scheme="default"] .hero-section {
+    background: linear-gradient(135deg, #e8e0f7 0%, #b8a2e3 40%, var(--md-default-bg-color) 100%);
+    color: #5c35a4;
 }
 
 .hero-section::before {
@@ -156,9 +164,8 @@
     z-index: 1;
 }
 
-[data-md-color-scheme="default"] .hero-section {
-    background: linear-gradient(135deg, #e8e0f7 0%, #b8a2e3 40%, var(--md-default-bg-color) 100%);
-    color: #5c35a4;
+[data-md-color-scheme="slate"] .hero-section::before {
+    background: radial-gradient(circle at 20% 150%, rgba(126, 87, 194, 0.4) 0%, rgba(74, 29, 61, 0.1) 70%);
 }
 
 [data-md-color-scheme="default"] .hero-section::before {

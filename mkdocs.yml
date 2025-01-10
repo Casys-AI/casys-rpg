@@ -156,5 +156,5 @@ extra:
       link: https://linkedin.com/in/yourusername
 
 extra_css:
-  - stylesheets/extra.css
+  - assets/stylesheets/main.css
   - https://fonts.googleapis.com/icon?family=Material+Icons

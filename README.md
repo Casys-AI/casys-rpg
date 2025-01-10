@@ -1,7 +1,7 @@
-# 🎲 Casys RPG - Interactive Game Book Engine
+# 🧠 CASYS - Complex Adaptive Systems of AI
 
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit](https://img.shields.io/badge/streamlit-1.28.0-FF4B4B.svg)](https://streamlit.io)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-00A36C.svg)](https://openai.com/)
 [![Coverage](https://img.shields.io/badge/coverage-54%25-yellow.svg)](https://coverage.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -10,289 +10,164 @@
 
 <div align="center">
 
-🎮 A modern AI-powered engine for interactive game books, leveraging LLM agents for intelligent rule management and decision-making.
+🤖 A neurosymbolic framework orchestrating LLMs and rule-based agents through formalized graph-based cognitive workflows.
 
-[Features](#features) •
+[Documentation](https://www.casys.ai) •
 [Quick Start](#quick-start) •
-[Architecture](#architecture) •
-[Documentation](#documentation) •
 [Contributing](#contributing)
 
 </div>
 
 ---
 
-## ✨ Features
-
-### 🤖 Agent System
-- **NarratorAgent**: 
-  - Content formatting and presentation
-  - Dynamic text adaptation
-  - Context-aware descriptions
-  - Markdown support
-
-- **RulesAgent**: 
-  - RAG-based rule analysis
-  - FAISS vector indexing
-  - Condition validation
-  - Semantic rule search
-
-- **DecisionAgent**: 
-  - Choice validation
-  - State transitions
-  - Action management
-  - Context-aware decisions
-
-- **TraceAgent**: 
-  - Complete history tracking
-  - Statistics management
-  - Save/load functionality
-  - Analytics support
-
-### 🎲 Game Mechanics
-- **Dynamic Dice System**:
-  - Multiple dice types (d4, d6, d8, d10, d12, d20)
-  - Context-aware roll requirements
-  - Combat and chance rolls
-  - Result validation
-
-- **Character Management**:
-  - Core stats (Skill, Stamina, Luck)
-  - Inventory system
-  - Equipment tracking
-  - Resource management
-
-### 🔄 State & Events
-- **EventBus**:
-  - Asynchronous communication
-  - Event-driven architecture
-  - State synchronization
-  - Action coordination
-
-- **Game State**:
-  - Persistent storage
-  - Automatic backups
-  - History tracking
-  - Recovery options
-
-### 🎨 Frontend
-- **Current UI (Streamlit)**:
-  - Responsive design
-  - Dark/light themes
-  - Interactive components
-  - Real-time updates
-
-- **Future UI (Qwik)**:
-  - Enhanced reactivity
-  - Modern components
-  - Better performance
-  - Improved UX
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.8+
-- pip
-- OpenAI API key
-- Git
-
-### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Casys-AI/casys-rpg.git
-   cd casys-rpg
-   ```
-
-2. **Set up virtual environment**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # Linux/Mac
-   .venv\Scripts\activate     # Windows
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-5. **Run the application**:
-   ```bash
-   streamlit run app.py
-   ```
-
-## 🏗 Architecture
-
-### Core Components
-
-```
-casys-rpg/
-├── agents/                 # AI Agents
-│   ├── base_agent.py      # Base agent class
-│   ├── narrator_agent.py  # Content management
-│   ├── rules_agent.py     # Rule processing
-│   ├── decision_agent.py  # Choice handling
-│   ├── trace_agent.py     # History tracking
-│   └── story_graph.py     # Flow coordination
-├── managers/              # System Managers
-│   ├── cache_manager.py   # Content caching
-│   ├── game_managers.py   # Game coordination
-│   └── stats_manager.py   # Statistics
-├── data/                  # Game Data
-│   ├── sections/         # Story content
-│   ├── rules/           # Game rules
-│   └── trace/           # Game history
-├── frontend/             # UI Components
-│   └── src/             # Frontend source
-├── tests/               # Test Suite
-│   ├── docs/           # Test documentation
-│   └── test_*.py       # Test files
-└── app.py              # Main application
-```
-
-### Agent Workflow
+## 🔄 System Overview
 
 ```mermaid
 graph TD
-    A[Initial State] --> B[NarratorAgent]
-    B --> C[RulesAgent]
-    C --> D{Decision Required?}
-    D -->|Yes| E[DecisionAgent]
-    D -->|No| F[TraceAgent]
-    E --> F
-    F --> G{Player Action?}
-    G -->|Yes| A
-    G -->|No| H[End]
+    subgraph "Game Flow"
+        A[Player Input] --> B[Story Evolution]
+        B --> C[Game State Update]
+        C --> D[Narrative Response]
+        D --> A
+    end
+
+    subgraph "AI Processing"
+        E[Story Graph]
+        F[Rules Engine]
+        G[Decision Making]
+
+        E --> F
+        F --> G
+        G --> E
+
+        B --> E
+        B --> F
+        B --> G
+    end
 ```
 
-### State Management
+## ✨ Structure and Orchestration
 
-```python
-GameState = {
-    "section": {
-        "number": int,
-        "content": str,
-        "choices": List[str]
-    },
-    "rules": {
-        "needs_dice": bool,
-        "dice_type": str,
-        "conditions": List[str],
-        "next_sections": List[int]
-    },
-    "player": {
-        "stats": Dict[str, int],
-        "inventory": List[str],
-        "history": List[Dict]
-    }
-}
-```
+## 🛠 System Requirements
 
-## 📚 Documentation
+### Python Compatibility
+- **Recommended**: Python 3.11 or 3.12
+- **Note**: While the project can run on Python 3.13, you might encounter some dependency installation issues with poetry. In this case, it's recommended to:
+  1. Use pip for installing numpy and other compiled packages
+  2. Use the provided `freeze-requirements.txt` for consistent dependency management
+  3. Consider using Python 3.11 or 3.12 for the best development experience
 
-### Configuration
+### Dependencies
+The project uses several key dependencies:
+- FastAPI for the web framework
+- Langchain & Langgraph for AI orchestration
+- OpenAI for LLM integration
+- Numpy for numerical operations
 
-The `.env` file controls various aspects:
-```env
-# API Configuration
-OPENAI_API_KEY=your_key_here
-OPENAI_MODEL=gpt-4o-mini
+<div align="center">
 
-# Application Settings
-DEBUG=False
-LOG_LEVEL=INFO
-CACHE_ENABLED=True
+### 🔄 Logical Structure
+| Feature | Description |
+|---------|-------------|
+| Graph-based | Representation of critical steps |
+| Node System | Embodying logic and processing |
+| Auto-generation | From structured knowledge |
+| Dual Support | Narrative and technical nodes |
+| Integration | With existing documentation |
 
-# Data Paths
-DATA_DIR=data
-SECTIONS_DIR=data/sections
-RULES_DIR=data/rules
-```
+### 🤖 Agent Orchestration
+| Feature | Description |
+|---------|-------------|
+| Contextual | Invocation of appropriate agents |
+| State Sharing | For decision coherence |
+| Hybrid Approach | Blend of symbolic and neural |
+| Real-time | Agent coordination |
+| Extensible | Agent architecture |
 
-### Testing
+</div>
 
-Run the test suite:
+## 🎯 Core Features
+
+<div align="center">
+
+### 📊 Graphical Workflows
+| Component | Purpose |
+|-----------|----------|
+| Rules | Business rules and conditions |
+| LLM | Interaction points |
+| Input | User input handlers |
+| State | Transitions and tracking |
+| History | Decision tracking |
+
+### 💾 State Management
+| Feature | Implementation |
+|---------|----------------|
+| State | Immutable with Pydantic v2 |
+| Actions | Complete traceability |
+| Events | Asynchronous handling |
+| Cache | In-memory optimization |
+| History | Decision tracking |
+
+</div>
+
+## 🚀 Applications
+
+<div class="grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px;">
+
+<div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+
+### 📚 Interactive Storytelling
+- Nodes describe key moments
+- LLM narrator for descriptions
+- Decision agent guidance
+- Player-driven choices
+
+</div>
+
+<div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+
+### 🔧 Industrial Diagnostics
+- Rule-based verification
+- LLM log interpretation
+- Automated routing
+- Compliance tracking
+
+</div>
+
+<div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+
+### 🌲 Branching Processes
+- Training programs
+- Security audits
+- Intelligent checklists
+- Process automation
+
+</div>
+
+</div>
+
+## 🛠 Quick Start
+
 ```bash
-# Run all tests
-pytest
+# Clone the repository
+git clone https://github.com/Casys-AI/casys-rpg.git
+cd casys-rpg
 
-# Run with coverage
-pytest --cov=. --cov-report=term-missing
+# Install dependencies
+pip install -r requirements.txt
 
-# Run specific test
-pytest tests/test_rules_agent.py
+# Run the demo RPG application
+python -m casys_rpg
 ```
-
-Current coverage by module:
-- base_agent: 80%
-- decision_agent: 75%
-- narrator_agent: 53%
-- rules_agent: 48%
-- story_graph: 44%
-- trace_agent: 68%
-
-### Development Guidelines
-
-1. **Code Style**:
-   - Follow Black formatting
-   - Use type hints
-   - Document all functions
-   - Write comprehensive tests
-
-2. **Git Workflow**:
-   - Feature branches
-   - Descriptive commits
-   - PR reviews
-   - Version tags
-
-3. **Documentation**:
-   - Update README
-   - Maintain test docs
-   - Comment complex logic
-   - Keep API docs current
-
-## 🔄 Roadmap
-
-### Completed
-- [x] Core agent system
-- [x] Basic game mechanics
-- [x] Streamlit interface
-- [x] Test documentation
-- [x] State management
-
-### In Progress
-- [-] FastAPI backend
-- [-] Qwik frontend
-- [ ] Enhanced RAG
-- [ ] Combat system
-
-### Planned
-- [ ] Multi-language support
-- [ ] Custom rule editor
-- [ ] Advanced analytics
-- [ ] Mobile optimization
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+We welcome contributions! Please check our [Contributing Guide](https://www.casys.ai/contributing) for guidelines.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+## 📖 Documentation
+
+For detailed documentation, visit [www.casys.ai](https://www.casys.ai)
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-Made with ❤️ by the Casys AI Team
-</div>

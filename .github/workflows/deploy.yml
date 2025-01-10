@@ -26,12 +26,23 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.11'
           
-      - name: Install MkDocs
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs mkdocs-material
+          pip install -r freeze-requirements.txt
+          pip install libsass==0.23.0
+          
+      - name: Verify critical dependencies
+        run: |
+          python -c "import numpy; print(f'Numpy version: {numpy.__version__}')"
+          python -c "import langchain; print(f'Langchain version: {langchain.__version__}')"
+          python -c "import sass; print(f'Libsass version: {sass.__version__}')"
+
+      - name: Build SASS
+        run: |
+          python -c "import sass; sass.compile(dirname=('docs/assets/stylesheets', 'docs/assets/stylesheets'))"
           
       - name: Build site
         run: mkdocs build

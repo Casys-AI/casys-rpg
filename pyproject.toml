@@ -6,26 +6,27 @@ authors = ["Your Name <your.email@example.com>"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.10"
 pydantic = "^2"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.0"
 langchain = "0.3.13"
+langchain-core = "0.3.28"
 langgraph = "0.2.60"
 fastapi = "0.115.6"
 uvicorn = "0.34.0"
 loguru = "^0.7.3"
 mkdocs = "^1.6.1"
-mkdocs-material = {extras = ["imaging"], version = "^9.5.49"}
+mkdocs-material = {extras = ["imaging"], version = "^9.4.14"}
 mkdocs-git-revision-date-localized-plugin = "^1.2.4"
 mkdocs-minify-plugin = "^0.8.0"
 openai = "1.58.1"
 websockets = "12.0"
-numpy = "2.2.1"
-langchain-core = "0.3.28"
+numpy = "1.26.4"
 langsmith = "0.2.4"
 tenacity = "9.0.0"
 packaging = "24.2"
+libsass = "0.23.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "24.10.0"
