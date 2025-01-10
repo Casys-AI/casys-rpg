@@ -1,0 +1,49 @@
+name: Deploy MkDocs to GitHub Pages
+
+on:
+  push:
+    branches: ['main']  # ou 'master' selon ta branche principale
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: https://www.casys.ai
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install MkDocs
+        run: |
+          python -m pip install --upgrade pip
+          pip install mkdocs mkdocs-material
+          
+      - name: Build site
+        run: mkdocs build
+        
+      - name: Copy CNAME
+        run: cp docs/static/CNAME site/
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
