@@ -42,20 +42,14 @@ def take_from_node(node_name: str):
         node_name: Nom du noeud source ('narrator' ou 'rules')
     """
     def _take_from_node(a: Any, b: Any) -> Any:
-        # Si b est None, garder a
-        if b is None:
-            return a
-            
         # Si b est une liste (cas LangGraph), prendre le dernier élément
         if isinstance(b, list):
             b = b[-1] if b else None
-            if b is None:
-                return a
                 
-        # Vérifier la source
-        if hasattr(b, 'source'):
-            if str(b.source).lower() == node_name.lower():
-                return b
+        # Vérifier la source, même si b est None
+        b_node = getattr(b, '__from_node__', None) if b is not None else None
+        if b_node == node_name:
+            return b  # Retourner b même si c'est None
         return a
         
     return _take_from_node
@@ -66,29 +60,42 @@ def merge(a: Any, b: Any) -> Any:
     Si la valeur vient du node responsable de ce champ, on la prend toujours,
     même si elle est None (car c'est intentionnel).
     
-    Pour le noeud decision, il prend :
-    - Le narrative mis à jour par le node_narrator (même si None)
-    - Les rules mis à jour par le node_rules (même si None)
-    - Les mises à jour du node_decision (même si None)
+    Pour le noeud decision, il :
+    - Fusionne les données des noeuds narrator et rules
+    - Garde ses propres attributs (next_section, player_input, etc.)
+    - Préserve les données fusionnées des autres noeuds
     """
     # Si b est une liste (cas LangGraph), prendre le dernier élément
     if isinstance(b, list):
         b = b[-1] if b else None
     
-    # Pour NarratorModel, toujours prendre la valeur si elle vient du node_narrator
-    if isinstance(b, NarratorModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_narrator'):
+    # Si b est None et qu'il n'y a pas de source, garder a
+    if b is None and not hasattr(b, '__from_node__'):
+        return a
+        
+    # Récupérer le nœud source
+    node_name = getattr(b, '__from_node__', None)
+    
+    # Si c'est node_decision, prendre directement la valeur
+    if node_name == 'node_decision':
         return b
         
-    # Pour RulesModel, toujours prendre la valeur si elle vient du node_rules
-    if isinstance(b, RulesModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_rules'):
-        return b
+    # Pour les autres nœuds, mettre à jour le DecisionModel existant
+    if isinstance(a, DecisionModel):
+        # Créer une copie du DecisionModel actuel
+        updated_decision = a.model_copy()
         
-    # Pour DecisionModel, toujours prendre la valeur si elle vient du node_decision
-    if isinstance(b, DecisionModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_decision'):
-        return b
+        # Mettre à jour avec les données du nœud source
+        if b is not None:
+            model_data = b.model_dump(exclude={'section_number', 'timestamp', 'last_update', 'source_type'})
+            updated_decision = updated_decision.model_copy(update=model_data)
+            
+        # Marquer comme venant du nœud decision
+        setattr(updated_decision, '__from_node__', 'node_decision')
+        return updated_decision
         
-    # Pour les autres cas, garder l'ancienne valeur si la nouvelle est None
-    return a if b is None else b
+    # Pour les autres cas, garder la valeur existante
+    return a
 
 class GameStateBase(BaseModel):
     """Base state model with common fields."""
@@ -133,9 +140,9 @@ class GameStateInput(GameStateBase):
 
 class GameStateOutput(GameStateBase):
     """Output state from the game workflow."""
-    narrative: Annotated[Optional[NarratorModel], merge] = None
-    rules: Annotated[Optional[RulesModel], merge] = None
-    decision: Annotated[Optional[DecisionModel], merge] = None
+    narrative: Annotated[Optional[NarratorModel], take_from_node('node_narrator')] = None
+    rules: Annotated[Optional[RulesModel], take_from_node('node_rules')] = None
+    decision: Annotated[Optional[DecisionModel], take_last_value] = None  # Pour gérer le fan-in
     trace: Annotated[Optional[TraceModel], merge] = None
     character: Annotated[Optional[CharacterModel], merge] = None
     
@@ -310,7 +317,8 @@ class GameState(GameStateInput, GameStateOutput):
     def with_updates(self, **updates) -> "GameState":
         """Create a new state with updates.
         
-        This method preserves both session_id and game_id when creating a new state.
+        This method preserves both session_id and game_id when creating a new state,
+        as well as the __from_node__ attribute for model instances.
         
         Args:
             **updates: Updates to apply to the state
@@ -320,6 +328,13 @@ class GameState(GameStateInput, GameStateOutput):
         """
         logger.debug("Creating new state with updates for session_id={}", self.session_id)
         logger.debug("Creating new state with updates for section_number={}", self.section_number)        
+        
+        # Préserver les attributs __from_node__ des modèles
+        for key, value in updates.items():
+            if isinstance(value, (NarratorModel, RulesModel, DecisionModel)):
+                current_value = getattr(self, key, None)
+                if current_value and hasattr(current_value, '__from_node__'):
+                    setattr(value, '__from_node__', getattr(current_value, '__from_node__'))
         
         # Utiliser la même configuration que la property state
         state_dict = self.model_dump(

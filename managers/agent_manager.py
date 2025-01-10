@@ -197,30 +197,9 @@ class AgentManager(AgentManagerProtocol):
             # Préparer l'état avec `player_input` si fourni
             state_dict = state.model_dump(exclude_unset=False, exclude_none=True)
             logger.debug("[WORKFLOW] State before modification: {}", state_dict)
-            
-            if user_input:
-                logger.debug("[WORKFLOW] Processing user_input: {}", user_input)
-                # Vérifier si decision n'existe pas OU est None
-                if 'decision' not in state_dict or state_dict['decision'] is None:
-                    logger.debug("[WORKFLOW] Creating new decision dict")
-                    # Créer un DecisionModel directement sans le convertir en dict
-                    state_dict['decision'] = DecisionModel(
-                        section_number=state.section_number,
-                        player_input=user_input
-                    )
-                else:
-                    logger.debug("[WORKFLOW] Existing decision dict: {}", state_dict['decision'])
-                    # Créer un nouveau DecisionModel avec les données existantes + le nouveau player_input
-                    existing_decision = state_dict['decision']
-                    state_dict['decision'] = DecisionModel(
-                        section_number=existing_decision.section_number,
-                        player_input=user_input
-                    )
-                    
-                logger.debug("[WORKFLOW] Updated decision dict: {}", state_dict['decision'])
 
             logger.debug("[WORKFLOW] Initial state_dict: player_input={}, thread_id={}", 
-                        state_dict['decision'].player_input if state_dict.get('decision') else None,
+                        state.decision.player_input if state.decision else None,
                         thread_config["configurable"]["thread_id"])
 
             # Lancer le workflow avec la commande appropriée

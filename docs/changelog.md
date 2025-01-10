@@ -86,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Removed verbose narrative content logging
     - Added focused debug logging for session_id and section_number
 
+- Optimized state management in GameState
+- Simplified model merging strategy using take_last_value for DecisionModel
+- Improved node data handling with take_from_node for NarratorModel and RulesModel
+
 - Refactoring des services pour utiliser des objets simples au lieu de classes
 - Optimisation de la gestion d'état avec useResource$ et useTask$
 - Amélioration de la gestion WebSocket
@@ -113,6 +117,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Character state persistence
 - Workflow state transitions
 - Error handling in character operations
+- Fixed state merging issues in parallel node execution
+- Corrected player_input handling in decision processing
+- Fixed None value handling in take_from_node function
 
 ### Architecture
 - Improved dependency injection patterns

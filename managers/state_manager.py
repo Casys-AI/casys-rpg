@@ -236,12 +236,20 @@ class StateManager(StateManagerProtocol):
             logger.debug("Existing state cleared")
             
             # 4. Créer le nouvel état avec les données préservées
+            section_number = preserved_data["section_number"]
             initial_state = ModelFactory.create_game_state(
                 session_id=preserved_data["session_id"],
                 game_id=preserved_data["game_id"],
-                section_number=preserved_data["section_number"],
+                section_number=section_number,
                 character=preserved_data["character"],
-                timestamp=self.current_timestamp
+                timestamp=self.current_timestamp,
+                # Créer les modèles initiaux avec le bon section_number
+                narrator=ModelFactory.create_narrator_model(section_number=section_number),
+                rules=ModelFactory.create_rules_model(section_number=section_number),
+                decision=ModelFactory.create_decision_model(
+                    section_number=section_number,
+                    player_input=None  # Initialiser explicitement player_input à None
+                )
             )
             logger.debug("New state created with preserved data")
             
