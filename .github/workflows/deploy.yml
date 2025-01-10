@@ -31,6 +31,7 @@ jobs:
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           
       - name: Install dependencies
         run: |
@@ -38,16 +39,16 @@ jobs:
           
       - name: Verify critical dependencies
         run: |
-          python -c "import numpy; print(f'Numpy version: {numpy.__version__}')"
-          python -c "import langchain; print(f'Langchain version: {langchain.__version__}')"
-          python -c "import sass; print(f'Libsass version: {sass.__version__}')"
+          poetry run python -c "import numpy; print(f'Numpy version: {numpy.__version__}')"
+          poetry run python -c "import langchain; print(f'Langchain version: {langchain.__version__}')"
+          poetry run python -c "import sass; print(f'Libsass version: {sass.__version__}')"
 
       - name: Build SASS
         run: |
-          python -c "import sass; sass.compile(dirname=('docs/assets/stylesheets', 'docs/assets/stylesheets'))"
+          poetry run python -c "import sass; sass.compile(dirname=('docs/assets/stylesheets', 'docs/assets/stylesheets'))"
           
       - name: Build site
-        run: mkdocs build
+        run: poetry run mkdocs build
         
       - name: Copy CNAME
         run: cp docs/static/CNAME site/
