@@ -9,19 +9,16 @@ Utilisations:
     - Initialisation cohérente des modèles
     - Point central pour la logique de création des modèles
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
-import uuid
-import logging
-
-logger = logging.getLogger(__name__)
+from enum import Enum
 
 from models.game_state import GameState
 from models.rules_model import RulesModel, DiceType, SourceType
 from models.narrator_model import NarratorModel
 from models.trace_model import TraceModel
-from models.decision_model import DecisionModel
-from models.character_model import CharacterModel, CharacterStats
+from models.decision_model import DecisionModel, ActionType, NextActionType
+from models.character_model import CharacterModel
 
 class ModelFactory:
     """Factory pour créer les modèles avec la logique métier."""
@@ -30,50 +27,71 @@ class ModelFactory:
     def create_game_state(
         game_id: Optional[str] = None,
         session_id: Optional[str] = None,
-        section_number: Optional[int] = None,
-        narrative: Optional[NarratorModel] = None,
-        rules: Optional[RulesModel] = None,
-        decision: Optional[DecisionModel] = None,
-        trace: Optional[TraceModel] = None,
-        **kwargs: Dict[str, Any]
+        player_input: Optional[str] = None,
+        **kwargs: Any
     ) -> GameState:
-        """Créer un GameState vide.
-        
-        Cette méthode crée un GameState avec les valeurs fournies ou None.
-        La génération des IDs est gérée par le StateManager.
+        """Créer un GameState.
         
         Args:
             game_id: ID du jeu (géré par StateManager)
             session_id: ID de session (géré par StateManager)
-            section_number: Numéro de section
-            narrative: Modèle narratif
-            rules: Modèle de règles
-            decision: Modèle de décision
-            trace: Modèle de trace
+            player_input: Input du joueur (None par défaut)
             **kwargs: Attributs supplémentaires
             
         Returns:
-            GameState: État de jeu vide
-            
-        Raises:
-            ValueError: Si section_number < 1
+            GameState: État de jeu
         """
-            
-        # Création du GameState vide
-        game_state = GameState(
+        return GameState(
             game_id=game_id,
             session_id=session_id,
-            section_number=section_number,
-            narrative=narrative,
-            rules=rules,
-            decision=decision,
-            trace=trace,
+            player_input=player_input,
             **kwargs
         )
-        
-        logger.debug("Created empty GameState")
-        
-        return game_state
     
-    # Les autres méthodes create_* ne sont plus nécessaires car nous utilisons
-    # directement les constructeurs des modèles existants
+    @staticmethod
+    def create_narrator_model(
+        section_number: int,
+        **kwargs: Any
+    ) -> NarratorModel:
+        """Create a fresh NarratorModel instance.
+        
+        Args:
+            section_number: Current section number
+            **kwargs: Additional fields to override defaults
+            
+        Returns:
+            NarratorModel: Fresh narrator model instance
+        """
+        return NarratorModel(section_number=section_number, **kwargs)
+    
+    @staticmethod
+    def create_rules_model(
+        section_number: int,
+        **kwargs: Any
+    ) -> RulesModel:
+        """Create a fresh RulesModel instance.
+        
+        Args:
+            section_number: Current section number
+            **kwargs: Additional fields to override defaults
+            
+        Returns:
+            RulesModel: Fresh rules model instance
+        """
+        return RulesModel(section_number=section_number, **kwargs)
+    
+    @staticmethod
+    def create_decision_model(
+        section_number: int,
+        **kwargs: Any
+    ) -> DecisionModel:
+        """Create a fresh DecisionModel instance.
+        
+        Args:
+            section_number: Current section number
+            **kwargs: Additional fields to override defaults
+            
+        Returns:
+            DecisionModel: Fresh decision model instance
+        """
+        return DecisionModel(section_number=section_number, **kwargs)

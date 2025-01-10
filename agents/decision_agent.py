@@ -14,6 +14,7 @@ from config.agents.decision_agent_config import DecisionAgentConfig
 from managers.protocols.decision_manager_protocol import DecisionManagerProtocol
 from agents.protocols import DecisionAgentProtocol
 from agents.protocols.rules_agent_protocol import RulesAgentProtocol
+from agents.factories.model_factory import ModelFactory
 from datetime import datetime
 from loguru import logger
 import json
@@ -72,21 +73,18 @@ class DecisionAgent(BaseAgent):
             # Appeler le LLM
             response = await self.llm.ainvoke(messages)
             
-            # Parser la réponse
-            try:
-                result = json.loads(response.content)
-                next_section = result.get("next_section")
-                if next_section is None:
-                    raise DecisionError("Missing next_section in LLM response")
-                    
-                return AnalysisResult(
-                    next_section=next_section,
-                    conditions=result.get("conditions", []),
-                    analysis=result.get("analysis", "")
-                )
+            # Parser la réponse en utilisant le DecisionManager
+            result = self.decision_manager.clean_llm_json_response(response.content)
+            
+            next_section = result.get("next_section")
+            if next_section is None:
+                raise DecisionError("Missing next_section in LLM response")
                 
-            except json.JSONDecodeError:
-                raise DecisionError("Invalid LLM response format")
+            return AnalysisResult(
+                next_section=next_section,
+                conditions=result.get("conditions", []),
+                analysis=result.get("analysis", "")
+            )
 
         except Exception as e:
             self._logger.error(f"Error analyzing response: {e}")
@@ -104,7 +102,7 @@ class DecisionAgent(BaseAgent):
             
             if not rules:
                 self._logger.error("No rules found for section {}", section_number)
-                return DecisionModel(
+                return ModelFactory.create_decision_model(
                     section_number=section_number,
                     error=f"Règles non trouvées pour la section {section_number}"
                 )
@@ -117,7 +115,7 @@ class DecisionAgent(BaseAgent):
             # Si un ordre est spécifié
             if next_action == NextActionType.USER_FIRST and not player_input:
                 self._logger.info("Waiting for user input first")
-                return DecisionModel(
+                return ModelFactory.create_decision_model(
                     section_number=section_number,
                     awaiting_action=ActionType.USER_INPUT,
                     choices=rules.choices,
@@ -125,7 +123,7 @@ class DecisionAgent(BaseAgent):
                 )
             elif next_action == NextActionType.DICE_FIRST:
                 self._logger.info("Waiting for dice roll first")
-                return DecisionModel(
+                return ModelFactory.create_decision_model(
                     section_number=section_number,
                     awaiting_action=ActionType.DICE_ROLL,
                     dice_type=rules.dice_type,
@@ -135,7 +133,7 @@ class DecisionAgent(BaseAgent):
             # Sinon vérifier ce qui manque
             if needs_dice:
                 self._logger.info("Dice roll needed")
-                return DecisionModel(
+                return ModelFactory.create_decision_model(
                     section_number=section_number,
                     awaiting_action=ActionType.DICE_ROLL,
                     dice_type=rules.dice_type,
@@ -153,7 +151,7 @@ class DecisionAgent(BaseAgent):
             self._logger.info("Analysis complete: current_section={}, next_section={}", 
                           section_number, analysis_result.next_section)
 
-            return DecisionModel(
+            return ModelFactory.create_decision_model(
                 section_number=section_number,
                 next_section=analysis_result.next_section,
                 analysis=analysis_result.analysis,
@@ -176,18 +174,19 @@ class DecisionAgent(BaseAgent):
             # Log plus détaillé
             self._logger.debug("Full state in decision: {}", state.model_dump())
             self._logger.info("Starting decision processing: session={}, game={}, section={}, input={}", 
-                     state.session_id, state.game_id, state.section_number, state.player_input)
+                     state.session_id, state.game_id, state.section_number, 
+                     state.decision.player_input if state.decision else None)
             
             # Process decision
             decision = await self._process_decision(
-                state.player_input,
+                state.decision.player_input if state.decision else None,
                 state.rules,
                 state.section_number
             )
             
             if isinstance(decision, DecisionError):
                 self._logger.error("Decision processing error: {}", decision.message)
-                error_decision = DecisionModel(
+                error_decision = ModelFactory.create_decision_model(
                     section_number=state.section_number,
                     next_section=state.section_number,  
                     error=decision.message
@@ -200,12 +199,11 @@ class DecisionAgent(BaseAgent):
                 
         except Exception as e:
             self._logger.exception("Error in ainvoke: {}", str(e))
-            error_decision = DecisionModel(
+            error_decision = ModelFactory.create_decision_model(
                 section_number=state.section_number,
-                next_section=state.section_number,  
                 error=str(e)
             )
             yield {"decision": error_decision}
 
-
+# Register DecisionAgent as implementing DecisionAgentProtocol
 DecisionAgentProtocol.register(DecisionAgent)

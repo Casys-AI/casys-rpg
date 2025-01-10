@@ -1,6 +1,6 @@
 from typing import Dict, Optional, Any, Annotated
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict, validator
 import uuid
 from config.logging_config import get_logger
 
@@ -25,20 +25,78 @@ def take_first_value(a: Any, b: Any) -> Any:
     """Take the first value for LangGraph fan-in."""
     return a if a is not None else b
 
-def keep_if_not_empty(a: str, b: str) -> str:
+def keep_if_not_empty(a: Any, b: Any) -> Any:
     """
-    Renvoie `b` seulement si b n'est pas vide, sinon garde `a`.
+    Renvoie `b` seulement si b n'est pas None et pas vide, sinon garde `a`.
     """
-    if b:
+    if b is not None and b != "":
         return b
-    else:
+    return a
+
+def take_from_node(node_name: str):
+    """
+    Prend la valeur seulement si elle vient du noeud spécifié.
+    Sinon garde l'ancienne valeur.
+    
+    Args:
+        node_name: Nom du noeud source ('narrator' ou 'rules')
+    """
+    def _take_from_node(a: Any, b: Any) -> Any:
+        # Si b est None, garder a
+        if b is None:
+            return a
+            
+        # Si b est une liste (cas LangGraph), prendre le dernier élément
+        if isinstance(b, list):
+            b = b[-1] if b else None
+            if b is None:
+                return a
+                
+        # Vérifier la source
+        if hasattr(b, 'source'):
+            if str(b.source).lower() == node_name.lower():
+                return b
         return a
+        
+    return _take_from_node
+
+def merge(a: Any, b: Any) -> Any:
+    """
+    Fusionne intelligemment les modèles en fonction de leur source.
+    Si la valeur vient du node responsable de ce champ, on la prend toujours,
+    même si elle est None (car c'est intentionnel).
+    
+    Pour le noeud decision, il prend :
+    - Le narrative mis à jour par le node_narrator (même si None)
+    - Les rules mis à jour par le node_rules (même si None)
+    - Les mises à jour du node_decision (même si None)
+    """
+    # Si b est une liste (cas LangGraph), prendre le dernier élément
+    if isinstance(b, list):
+        b = b[-1] if b else None
+    
+    # Pour NarratorModel, toujours prendre la valeur si elle vient du node_narrator
+    if isinstance(b, NarratorModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_narrator'):
+        return b
+        
+    # Pour RulesModel, toujours prendre la valeur si elle vient du node_rules
+    if isinstance(b, RulesModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_rules'):
+        return b
+        
+    # Pour DecisionModel, toujours prendre la valeur si elle vient du node_decision
+    if isinstance(b, DecisionModel) or (b is None and hasattr(a, '__from_node__') and a.__from_node__ == 'node_decision'):
+        return b
+        
+    # Pour les autres cas, garder l'ancienne valeur si la nouvelle est None
+    return a if b is None else b
 
 class GameStateBase(BaseModel):
     """Base state model with common fields."""
     session_id: Annotated[str, keep_if_not_empty]  # Le session_id doit être préservé
     game_id: Annotated[str, keep_if_not_empty]    # Le game_id doit être préservé
     metadata: Annotated[Optional[Dict[str, Any]], take_last_value] = None
+    should_continue: Annotated[bool, take_last_value] = Field(default=False)  # False par défaut
+
 
     @field_validator('game_id')
     def validate_game_id(cls, v: str) -> str:
@@ -59,7 +117,6 @@ class GameStateBase(BaseModel):
 class GameStateInput(GameStateBase):
     """Input state for the game workflow."""
     section_number: Annotated[Optional[int], take_last_value] = Field(default=1)  # Premier cycle par défaut
-    player_input: Annotated[Optional[str], keep_if_not_empty] = None
 
     @field_validator('section_number', mode='before')
     @classmethod
@@ -76,15 +133,14 @@ class GameStateInput(GameStateBase):
 
 class GameStateOutput(GameStateBase):
     """Output state from the game workflow."""
-    # Content models
-    narrative: Annotated[Optional[NarratorModel], first_not_none] = None
-    rules: Annotated[Optional[RulesModel], first_not_none] = None
-    decision: Annotated[Optional[DecisionModel], first_not_none] = None
-    trace: Annotated[Optional[TraceModel], first_not_none] = None
-    character: Annotated[Optional[CharacterModel], first_not_none] = None
+    narrative: Annotated[Optional[NarratorModel], merge] = None
+    rules: Annotated[Optional[RulesModel], merge] = None
+    decision: Annotated[Optional[DecisionModel], merge] = None
+    trace: Annotated[Optional[TraceModel], merge] = None
+    character: Annotated[Optional[CharacterModel], merge] = None
     
     # Error handling
-    error: Annotated[Optional[str], first_not_none] = None
+    error: Annotated[Optional[str], merge] = None
     
     @field_validator('error', mode='before')
     @classmethod
@@ -179,26 +235,24 @@ class GameState(GameStateInput, GameStateOutput):
     @classmethod
     def sync_section_numbers(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Synchronize section numbers between models.
-        Le section_number du GameState est synchronisé avec celui du NarratorModel.
-        Si un RulesModel est présent, son section_number est aussi synchronisé.
+        Le section_number du GameState est la source de vérité.
+        Les autres modèles doivent s'aligner sur lui.
         """
-        # Si on a un NarratorModel, synchroniser le section_number avec lui
+        section_number = values.get('section_number', 1)  # Default to 1 if not set
+        
+        # Si on a un NarratorModel, mettre à jour son section_number
         if 'narrative' in values and values['narrative']:
             if isinstance(values['narrative'], list):
-                # Prendre le dernier modèle
                 values['narrative'] = values['narrative'][-1]
             if hasattr(values['narrative'], 'section_number'):
-                values['section_number'] = values['narrative'].section_number
+                values['narrative'].section_number = section_number
 
-        # Si on a un RulesModel, synchroniser son section_number
+        # Si on a un RulesModel, mettre à jour son section_number
         if 'rules' in values and values['rules']:
             if isinstance(values['rules'], list):
-                # Prendre le dernier modèle
                 values['rules'] = values['rules'][-1]
-            if hasattr(values['rules'], 'model_dump'):
-                rules_data = values['rules'].model_dump()
-                rules_data['section_number'] = values.get('section_number', 1)
-                values['rules'] = rules_data
+            if hasattr(values['rules'], 'section_number'):
+                values['rules'].section_number = section_number
 
         return values
 
@@ -219,8 +273,7 @@ class GameState(GameStateInput, GameStateOutput):
         return GameStateInput(
             session_id=self.session_id,
             game_id=self.game_id,
-            section_number=self.section_number,
-            player_input=self.player_input
+            section_number=self.section_number
         )
         
     def to_output(self) -> GameStateOutput:
@@ -236,6 +289,24 @@ class GameState(GameStateInput, GameStateOutput):
             error=self.error
         )
 
+    def with_node_updates(self, node_name: str, **updates) -> "GameState":
+        """
+        Create a new state with updates, marking them as coming from a specific node.
+        
+        Args:
+            node_name: Name of the node ('node_narrator', 'node_rules', 'node_decision')
+            **updates: Updates to apply to the state
+            
+        Returns:
+            GameState: New state with marked updates
+        """
+        # Marquer chaque valeur avec sa source
+        for value in updates.values():
+            if value is not None:
+                setattr(value, '__from_node__', node_name)
+                
+        return self.with_updates(**updates)
+
     def with_updates(self, **updates) -> "GameState":
         """Create a new state with updates.
         
@@ -249,8 +320,18 @@ class GameState(GameStateInput, GameStateOutput):
         """
         logger.debug("Creating new state with updates for session_id={}", self.session_id)
         logger.debug("Creating new state with updates for section_number={}", self.section_number)        
-        # Garder les champs None pour préserver la structure
-        state_dict = self.model_dump(exclude_none=False)
+        
+        # Utiliser la même configuration que la property state
+        state_dict = self.model_dump(
+            exclude_none=False,     # Exclure les champs None comme dans state
+            by_alias=True,         # Cohérence avec state
+            exclude_unset=True,    # Exclure les champs non définis
+            exclude={              # Exclure les champs internes spécifiques
+                'session_id': False,  # Toujours inclure session_id
+                'game_id': False,     # Toujours inclure game_id
+                'error': False        # Toujours inclure error même si None
+            }
+        )
         
         # Préserver explicitement les IDs depuis l'instance
         session_id = self.session_id
@@ -263,8 +344,7 @@ class GameState(GameStateInput, GameStateOutput):
         state_dict['session_id'] = session_id
         state_dict['game_id'] = game_id
         
-        new_state = GameState(**state_dict)
-        return new_state
+        return GameState(**state_dict)
 
     def model_dump_json(self, **kwargs):
         """Override model_dump_json to handle datetime serialization."""
@@ -311,8 +391,40 @@ class GameState(GameStateInput, GameStateOutput):
             decision=None
         )
 
+    @classmethod
+    def create_empty_state(
+        cls,
+        session_id: str,
+        game_id: str,
+        section_number: int = 1,
+    ) -> 'GameState':
+        """Create a new empty state with all model fields set to None.
+        
+        This ensures that no old values are preserved when creating a new state.
+        Use this when you want to start fresh without any previous state.
+        
+        Args:
+            session_id: Session ID for the new state
+            game_id: Game ID for the new state
+            section_number: Section number (default: 1)
+            
+        Returns:
+            GameState: New empty state
+        """
+        return cls(
+            session_id=session_id,
+            game_id=game_id,
+            section_number=section_number,
+            narrative=None,
+            rules=None,
+            decision=None,
+            trace=None,
+            character=None,
+            error=None
+        )
+
     @property
-    def state(self) -> Dict[str, Any]:
+    def state(self) -> Dict[str, Any]: #for frontend
         """
         Get the complete state as a dictionary.
         

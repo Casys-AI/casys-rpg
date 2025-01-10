@@ -40,17 +40,29 @@ def setup_logging():
                 {
                     "sink": sys.stdout,
                     "format": "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-                    "level": LOG_LEVEL
+                    "level": "INFO",
+                    "backtrace": True,
+                    "diagnose": True
                 },
                 {
                     "sink": "logs/debug.log",
                     "format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-                    "level": LOG_LEVEL,
-                    "rotation": "1 day",
-                    "retention": "7 days",
-                    "mode": "a",  # Append mode
-                    "delay": True,  # Delay file creation until first write
-                    "enqueue": True  # Thread-safe writing
+                    "level": "DEBUG",
+                    "rotation": "5 minutes",  # Rotation toutes les 5 minutes
+                    "retention": 0,           # Ne garde pas les vieux fichiers
+                    "mode": "w",             # Mode écriture (écrase le fichier)
+                    "enqueue": True          # Thread-safe writing
+                },
+                {
+                    "sink": "logs/errors.log",
+                    "format": "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+                    "level": "ERROR",        # Seulement les erreurs
+                    "rotation": "1 MB",      # Rotation basée sur la taille
+                    "retention": 0,          # Ne garde pas les vieux fichiers
+                    "mode": "w",            # Mode écriture (écrase le fichier)
+                    "enqueue": True,        # Thread-safe writing
+                    "backtrace": True,      # Stack trace complet
+                    "diagnose": True        # Diagnostic amélioré
                 }
             ]
         }

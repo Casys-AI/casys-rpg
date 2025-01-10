@@ -18,6 +18,7 @@ from config.agents.rules_agent_config import RulesAgentConfig
 from config.logging_config import get_logger
 from managers.protocols.rules_manager_protocol import RulesManagerProtocol
 from agents.protocols.rules_agent_protocol import RulesAgentProtocol
+from agents.factories.model_factory import ModelFactory
 
 logger = get_logger('rules_agent')
 
@@ -152,12 +153,10 @@ class RulesAgent(BaseAgent):
                     rules_data['needs_dice'] = False
                     logger.debug("Forced needs_dice to False because dice_type is none")
                 
-                # Ajouter les champs supplémentaires
-                rules_data["section_number"] = section_number
-                rules_data["source"] = "llm_analysis"
-                rules_data["source_type"] = SourceType.PROCESSED
-                rules_data["last_update"] = datetime.now()
-                rules_data["error"] = None
+                # Force needs_user_response à True si on a des choix
+                if "choices" in rules_data and len(rules_data["choices"]) >= 1:
+                    rules_data['needs_user_response'] = True
+                    logger.debug("Forced needs_user_response to True because {} choices are present", len(rules_data["choices"]))
                 
                 # Convertir les choix en objets Choice
                 if "choices" in rules_data:
@@ -191,47 +190,35 @@ class RulesAgent(BaseAgent):
                     
                     logger.debug(f"Processed choices: {choices}")
                 
-                # Créer le modèle
-                model = RulesModel(**rules_data)
-                logger.debug(f"Created RulesModel: {model}")
-                return model
+                # Créer le modèle avec la factory
+                return ModelFactory.create_rules_model(
+                    section_number=section_number,
+                    needs_dice=rules_data.get("needs_dice"),
+                    needs_user_response=rules_data.get("needs_user_response"),
+                    dice_type=rules_data.get("dice_type"),
+                    conditions=rules_data.get("conditions"),
+                    choices=rules_data.get("choices"),
+                    rules_summary=rules_data.get("rules_summary"),
+                    source="llm_analysis",
+                    source_type=SourceType.PROCESSED
+                )
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON in LLM response: {e}")
                 logger.error(f"Response content: {response.content}")
-                # Créer un modèle par défaut en cas d'erreur
-                return RulesModel(
+                return ModelFactory.create_rules_model(
                     section_number=section_number,
-                    needs_dice=False,
-                    dice_type=DiceType.NONE,
-                    needs_user_response=True,
-                    next_action="user_first",
-                    conditions=[],
-                    choices=[],
-                    rules_summary=content,
                     error=f"Error parsing LLM response: {str(e)}",
-                    source="error",
-                    source_type=SourceType.ERROR,
-                    last_update=datetime.now()
+                    source_type=SourceType.ERROR
                 )
                 
         except Exception as e:
             logger.error(f"Error extracting rules with LLM: {e}")
             logger.error(f"Section content: {content}")
-            # Créer un modèle par défaut en cas d'erreur
-            return RulesModel(
+            return ModelFactory.create_rules_model(
                 section_number=section_number,
-                needs_dice=False,
-                dice_type=DiceType.NONE,
-                needs_user_response=True,
-                next_action="user_first",
-                conditions=[],
-                choices=[],
-                rules_summary=content,
                 error=f"Error in LLM analysis: {str(e)}",
-                source="error",
-                source_type=SourceType.ERROR,
-                last_update=datetime.now()
+                source_type=SourceType.ERROR
             )
 
     async def ainvoke(self, input_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:

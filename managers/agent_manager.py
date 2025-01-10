@@ -30,6 +30,7 @@ from config.agents.agent_config_base import AgentConfigBase
 
 from models.game_state import GameState
 from models.errors_model import GameError
+from models.decision_model import DecisionModel
 
 # Type alias for manager protocols
 ManagerProtocols = Union[
@@ -194,11 +195,33 @@ class AgentManager(AgentManagerProtocol):
 
         try:
             # Préparer l'état avec `player_input` si fourni
-            input_data = state.with_updates(player_input=user_input) if user_input else state
-            logger.info("Processing state: {}", input_data)
-            state_dict = input_data.model_dump(exclude_unset=False)
+            state_dict = state.model_dump(exclude_unset=False, exclude_none=True)
+            logger.debug("[WORKFLOW] State before modification: {}", state_dict)
+            
+            if user_input:
+                logger.debug("[WORKFLOW] Processing user_input: {}", user_input)
+                # Vérifier si decision n'existe pas OU est None
+                if 'decision' not in state_dict or state_dict['decision'] is None:
+                    logger.debug("[WORKFLOW] Creating new decision dict")
+                    # Créer un DecisionModel directement sans le convertir en dict
+                    state_dict['decision'] = DecisionModel(
+                        section_number=state.section_number,
+                        player_input=user_input
+                    )
+                else:
+                    logger.debug("[WORKFLOW] Existing decision dict: {}", state_dict['decision'])
+                    # Créer un nouveau DecisionModel avec les données existantes + le nouveau player_input
+                    existing_decision = state_dict['decision']
+                    state_dict['decision'] = DecisionModel(
+                        section_number=existing_decision.section_number,
+                        player_input=user_input
+                    )
+                    
+                logger.debug("[WORKFLOW] Updated decision dict: {}", state_dict['decision'])
+
             logger.debug("[WORKFLOW] Initial state_dict: player_input={}, thread_id={}", 
-                        state_dict.get("player_input"), thread_config["configurable"]["thread_id"])
+                        state_dict['decision'].player_input if state_dict.get('decision') else None,
+                        thread_config["configurable"]["thread_id"])
 
             # Lancer le workflow avec la commande appropriée
             if user_input:
@@ -209,35 +232,23 @@ class AgentManager(AgentManagerProtocol):
                             command_data, thread_config["configurable"]["thread_id"])
                 command = Command(resume=command_data)
                 await workflow.ainvoke(command, thread_config)
-            else:
+            else:   
                 logger.debug("[WORKFLOW] Starting new workflow with thread_id={}", 
                             thread_config["configurable"]["thread_id"])
                 await workflow.ainvoke(state_dict, thread_config)
 
             # Récupérer l'état mis à jour après l'invocation sans 'await'
             state_snapshot = workflow.get_state(thread_config)
-            logger.debug("StateSnapshot retrieved: player_input={}", state_snapshot.values.get('player_input'))
+            logger.debug("StateSnapshot retrieved: player_input={}", 
+                        state_snapshot.values['decision'].player_input if state_snapshot.values.get('decision') else None)
 
-            # Extraire les valeurs du StateSnapshot et créer un nouvel GameState
-            updated_values = state_snapshot.values
-            updated_state = GameState(**updated_values)
-            logger.info("Updated GameState: section_number={}, player_input={}", 
-                        updated_state.section_number, updated_state.player_input)
-
-            # Gestion de la transition de section si nécessaire
-            if updated_state.section_number != state.section_number:
-                next_section = updated_state.section_number
-                logger.info("Moving to next section: current={} -> next={}", 
-                            state.section_number, next_section)
-
-                # Créer un nouvel état avec la nouvelle section
-                new_state_data = updated_state.model_dump()
-                return await self.managers['state_manager'].create_initial_state(new_state_data)
+            # Créer un GameState à partir des valeurs du snapshot
+            updated_state = GameState(**state_snapshot.values)
 
             # Sauvegarder l'état mis à jour
             await self.managers['state_manager'].save_state(updated_state)
             return updated_state
-
+            
         except GraphInterrupt as gi:
             if not user_input:
                 # Sauvegarder l'état en attente
@@ -249,11 +260,6 @@ class AgentManager(AgentManagerProtocol):
             # Si un input était déjà fourni mais qu'une interruption survient
             logger.warning("Got GraphInterrupt with user_input")
             raise GameError("Unexpected workflow interruption")
-
-
-
-
-
 
     async def get_story_workflow(self) -> Any:
         """Get the compiled story workflow.

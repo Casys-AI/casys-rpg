@@ -21,7 +21,7 @@ You must return a JSON object with the following structure:
 {
     "needs_dice": true|false,        # If the user MUST roll dice to proceed (MUST be false if dice_type is none)
     "dice_type": "none"|"chance"|"combat",  # Type of dice roll required (if any)
-    "needs_user_response": true|false,  # Whether user input is needed
+    "needs_user_response": true|false,  # If user needs to make a choice to proceed
     "next_action": "user_first"|"dice_first"|null,  # Order of actions
     "conditions": ["condition1", "condition2"],  # List of conditions that apply
     "choices": [
@@ -46,3 +46,4 @@ Always ensure:
 6. dice_results uses string keys for ranges""",
         description="System message for rules analysis"
     )
+

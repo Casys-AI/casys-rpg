@@ -48,6 +48,7 @@ class StateManager(StateManagerProtocol):
         self.character_manager = character_manager
         self._current_state: Optional[GameState] = None
         self._game_id: Optional[str] = None
+        self._session_id: Optional[str] = None
         logger.debug("StateManager initialized with config: {}", config)
 
     async def initialize(self) -> None:
@@ -55,13 +56,21 @@ class StateManager(StateManagerProtocol):
         Sets up any necessary resources and state.
         """
         logger.info("Initializing state resources")
+        
+        # Générer les IDs nécessaires
         if not self._game_id:
             self._game_id = str(uuid.uuid4())
             logger.debug("Generated new game ID: {}", self._game_id)
+        
+        if not self._session_id:
+            self._session_id = str(uuid.uuid4())
+            logger.debug("Generated new session ID: {}", self._session_id)
             
+        # Configurer le cache
         self.config.game_id = self._game_id
         await self.cache.update_game_id(self._game_id)
-        logger.info("State manager initialized with game ID: {}", self._game_id)
+        logger.info("State manager initialized with game ID: {}, session ID: {}", 
+                   self._game_id, self._session_id)
 
     @property
     def game_id(self) -> Optional[str]:
@@ -71,6 +80,15 @@ class StateManager(StateManagerProtocol):
     async def get_game_id(self) -> Optional[str]:
         """Get current game ID."""
         return self._game_id
+
+    @property
+    def session_id(self) -> Optional[str]:
+        """Get current session ID."""
+        return self._session_id
+
+    async def get_session_id(self) -> Optional[str]:
+        """Get current session ID."""
+        return self._session_id
 
     @property
     def current_state(self) -> Optional[GameState]:
@@ -89,11 +107,6 @@ class StateManager(StateManagerProtocol):
             str: Current timestamp in ISO format
         """
         return datetime.utcnow().isoformat()
-
-    @staticmethod
-    def generate_session_id() -> str:
-        """Generate a unique session ID."""
-        return str(uuid.uuid4())
 
     def _truncate_content(self, content: Optional[str], max_length: int = 100) -> str:
         """Tronque le contenu pour les logs.
@@ -193,10 +206,10 @@ class StateManager(StateManagerProtocol):
         """Create and initialize a new game state.
         
         This method handles:
-        1. Validation and conversion of input data
-        2. Generation of new session_id and game_id if needed
-        3. Merging of input data with default state
-        4. Creation of initial character via CharacterManager
+        1. Extraction des données à préserver de l'input
+        2. Nettoyage de l'état existant
+        3. Création d'un nouvel état avec les données préservées
+        4. Validation et sauvegarde
         
         Args:
             input_data: Optional initial state data to merge
@@ -213,67 +226,26 @@ class StateManager(StateManagerProtocol):
             # 1. S'assurer que le state manager est initialisé
             if not self._game_id:
                 await self.initialize()
-
-            # 2. Extraire les IDs et section_number
-            session_id = None
-            game_id = None
-            section_number = None
-            character = None
             
-            if isinstance(input_data, GameState):
-                # Préserver les IDs et section_number de l'état précédent
-                session_id = input_data.session_id
-                game_id = input_data.game_id
-                section_number = input_data.section_number
-                character = input_data.character
-            elif isinstance(input_data, dict):
-                session_id = input_data.get("session_id")
-                game_id = input_data.get("game_id")
-                section_number = input_data.get("section_number")
-                if "character" in input_data:
-                    character = input_data["character"]
+            # 2. Extraire les données à préserver
+            preserved_data = self._extract_preserved_data(input_data)
+            logger.debug("Preserved data extracted: {}", preserved_data)
             
-            # 3. Utiliser les valeurs par défaut si nécessaire
-            if not game_id:
-                game_id = self._game_id
-            if not session_id:
-                session_id = self.generate_session_id()
-            if section_number is None:
-                section_number = 1  # Section par défaut
-                
-            # 4. Créer ou réutiliser le personnage
-            if not character:
-                character = CharacterModel(
-                    id="current",
-                    stats=CharacterStats(
-                        endurance=20,
-                        chance=20,
-                        skill=20
-                    )
-                )
-                await self.character_manager.save_character(character)
+            # 3. Nettoyer l'état existant
+            await self.clear_model_nodes()
+            logger.debug("Existing state cleared")
             
-            # 5. Créer l'état initial avec ModelFactory
+            # 4. Créer le nouvel état avec les données préservées
             initial_state = ModelFactory.create_game_state(
-                game_id=game_id,
-                session_id=session_id,
-                section_number=section_number,
-                character=character,
+                session_id=preserved_data["session_id"],
+                game_id=preserved_data["game_id"],
+                section_number=preserved_data["section_number"],
+                character=preserved_data["character"],
                 timestamp=self.current_timestamp
             )
+            logger.debug("New state created with preserved data")
             
-            # 6. Mettre à jour avec le reste des données si présentes
-            if input_data:
-                # Exclure les champs qu'on a déjà gérés
-                if isinstance(input_data, GameState):
-                    data_dict = input_data.model_dump(exclude={"game_id", "session_id", "section_number", "character"})
-                    initial_state = initial_state.with_updates(**data_dict)
-                elif isinstance(input_data, dict):
-                    data_dict = {k: v for k, v in input_data.items() 
-                               if k not in ["game_id", "session_id", "section_number", "character"]}
-                    initial_state = initial_state.with_updates(**data_dict)
-
-            # 7. Valider et sauvegarder
+            # 5. Valider et sauvegarder
             validated_state = await self.validate_state(initial_state)
             saved_state = await self.save_state(validated_state)
             
@@ -284,6 +256,69 @@ class StateManager(StateManagerProtocol):
             error_msg = f"Failed to create initial state: {str(e)}"
             logger.error(error_msg)
             raise StateError(error_msg) from e
+            
+    def _extract_preserved_data(
+        self,
+        input_data: Optional[Union[Dict[str, Any], GameState]] = None
+    ) -> Dict[str, Any]:
+        """Extrait les données à préserver de l'input.
+        
+        Args:
+            input_data: Données d'entrée (GameState ou dict)
+            
+        Returns:
+            Dict[str, Any]: Données préservées avec valeurs par défaut si nécessaire
+        """
+        # Initialiser avec les valeurs par défaut
+        preserved_data = {
+            "session_id": self._session_id,
+            "game_id": self._game_id,
+            "section_number": 1,
+            "character": None
+        }
+        
+        if isinstance(input_data, GameState):
+            # Préserver les IDs
+            preserved_data["session_id"] = input_data.session_id
+            preserved_data["game_id"] = input_data.game_id
+            
+            # Utiliser next_section du DecisionModel si disponible
+            if input_data.decision and input_data.decision.next_section:
+                preserved_data["section_number"] = input_data.decision.next_section
+            else:
+                preserved_data["section_number"] = input_data.section_number
+                
+            preserved_data["character"] = input_data.character
+            
+        elif isinstance(input_data, dict):
+            # Préserver les IDs s'ils existent
+            if "session_id" in input_data:
+                preserved_data["session_id"] = input_data["session_id"]
+            if "game_id" in input_data:
+                preserved_data["game_id"] = input_data["game_id"]
+                
+            # Utiliser next_section du DecisionModel si disponible
+            decision = input_data.get("decision", {})
+            if isinstance(decision, dict) and "next_section" in decision:
+                preserved_data["section_number"] = decision["next_section"]
+            elif "section_number" in input_data:
+                preserved_data["section_number"] = input_data["section_number"]
+                
+            if "character" in input_data:
+                preserved_data["character"] = input_data["character"]
+                
+        # Créer un nouveau character si nécessaire
+        if not preserved_data["character"]:
+            preserved_data["character"] = CharacterModel(
+                id="current",
+                stats=CharacterStats(
+                    endurance=20,
+                    chance=20,
+                    skill=20
+                )
+            )
+            
+        return preserved_data
 
     async def create_error_state(
         self, 
@@ -307,6 +342,7 @@ class StateManager(StateManagerProtocol):
                 # Utiliser la méthode de GameState
                 error_state = GameState.create_error_state(
                     error_message=error_message,
+                    section_number=base_state.section_number,
                     session_id=base_state.session_id,
                     game_id=base_state.game_id,
                     current_state=base_state
@@ -314,8 +350,8 @@ class StateManager(StateManagerProtocol):
             else:
                 # Créer un état minimal avec ModelFactory
                 error_state = ModelFactory.create_game_state(
-                    session_id=self.generate_session_id(),
-                    game_id=self._game_id or str(uuid.uuid4()),
+                    session_id=self._session_id,
+                    game_id=self._game_id,
                     error=error_message,
                     timestamp=self.current_timestamp
                 )
@@ -329,8 +365,8 @@ class StateManager(StateManagerProtocol):
             # créer un état minimal avec ModelFactory
             logger.error("Failed to create error state: {}", str(e))
             return ModelFactory.create_game_state(
-                session_id=self.generate_session_id(),
-                game_id=self._game_id or str(uuid.uuid4()),
+                session_id=self._session_id,
+                game_id=self._game_id,
                 error=f"{error_message} (Error state creation failed: {str(e)})",
                 timestamp=self.current_timestamp
             )
@@ -441,7 +477,7 @@ class StateManager(StateManagerProtocol):
             logger.error("Error getting section history: {}", str(e))
             raise StateError(f"Failed to get section history: {str(e)}")
 
-    async def clear_state(self) -> None: #no test
+    async def clear_state(self) -> None: #no test and we dont want to clear the persistance, it's persostenance, not cache
         """Clear current state and cache."""
         try:
             logger.info("Clearing game state")
@@ -527,3 +563,28 @@ class StateManager(StateManagerProtocol):
             error_msg = f"Failed to persist state: {str(e)}"
             logger.error(error_msg)
             raise StateError(error_msg) from e
+
+    async def clear_model_nodes(self) -> None:
+        """Clear all model nodes in the current state.
+        This ensures that old model instances are properly destroyed
+        before creating new ones.
+        """
+        try:
+            logger.info("Clearing model nodes")
+            if self._current_state:
+                # Créer un nouvel état vide qui préserve session_id, game_id et section_number
+                self._current_state = GameState.create_empty_state(
+                    session_id=self._current_state.session_id,
+                    game_id=self._current_state.game_id,
+                    section_number=self._current_state.section_number
+                )
+                
+            # Force garbage collection
+            import gc
+            gc.collect()
+            
+            logger.debug("Model nodes cleared")
+            
+        except Exception as e:
+            logger.error(f"Error clearing model nodes: {e}")
+            # Non-blocking error - just log it

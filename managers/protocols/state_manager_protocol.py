@@ -141,7 +141,14 @@ class StateManagerProtocol(Protocol):
     async def clear_state(self) -> None:
         """Clear current state."""
         ...
-    
+
+    async def clear_model_nodes(self) -> None:
+        """Clear all model nodes in the current state.
+        This ensures that old model instances are properly destroyed
+        before creating new ones.
+        """
+        ...
+
     def get_current_timestamp(self) -> str:
         """Get current timestamp in ISO format.
         

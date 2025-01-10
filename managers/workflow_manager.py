@@ -94,12 +94,12 @@ class WorkflowManager(WorkflowManagerProtocol):
         """Start the workflow node.
         
         Handles the workflow-specific aspects of starting a game session:
-        1. Validates and processes input data via StateManager
-        2. Manages section transitions
-        3. Adds workflow metadata
+        1. Délègue la création de l'état au StateManager
+        2. Ajoute les métadonnées du workflow
         
         Args:
-            input_data: Input data for the workflow
+            input_data: Input data for the workflow. Les game_id et session_id
+                       sont toujours présents car gérés par initialize_game.
             
         Returns:
             GameState: Initialized and processed game state
@@ -110,31 +110,19 @@ class WorkflowManager(WorkflowManagerProtocol):
         try:
             logger.info("Starting workflow")
             
-            # 1. Initialiser et valider via StateManager
-            if not input_data:
-                logger.error("No input data provided")
-                raise WorkflowError("No input data provided")
-                
-            # Laisser StateManager gérer la validation et création
+            # 1. Laisser StateManager gérer la création et validation de l'état
             state = await self.state_manager.create_initial_state(input_data)
             
-            # 2. Gérer la transition de section si nécessaire
-            state_dict = state.model_dump(exclude_unset=False, exclude_none=False)
-            state_dict = await self._handle_section_transition(state_dict)
+            # 2. Ajouter les métadonnées du workflow
+            state = state.with_updates(metadata={"node": "start"})
             
-            # 3. Ajouter les métadonnées du workflow
-            state_dict["metadata"] = {"node": "start"}
+            logger.debug("Full state in start_workflow before return: {}", state.model_dump())
+            logger.info("Workflow started successfully: session={}, game={}, section={}", 
+                       state.session_id, 
+                       state.game_id,
+                       state.section_number)
             
-            # 4. Sauvegarder l'état final
-            final_state = await self.state_manager.validate_state(state_dict)
-            saved_state = await self.state_manager.save_state(final_state)
-            
-            logger.info("Workflow started successfully: session={}, section={}", 
-                       saved_state.session_id, 
-                       saved_state.game_id,
-                       saved_state.section_number)
-            
-            return saved_state
+            return state
             
         except Exception as e:
             error_msg = f"Failed to start workflow: {str(e)}"

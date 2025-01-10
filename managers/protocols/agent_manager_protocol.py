@@ -42,16 +42,21 @@ class AgentManagerProtocol(Protocol):
         """
         ...
 
-    async def initialize_game(self) -> GameState:
-        """Initialize and setup a new game instance.
+    async def initialize_game(
+        self,
+        session_id: Optional[str] = None,
+        game_id: Optional[str] = None,
+        section_number: Optional[int] = None
+    ) -> GameState:
+        """Initialize a new game state and run initial workflow.
         
-        This will:
-        1. Initialize the state manager with a new game ID
-        2. Create and compile the story workflow
-        3. Process the initial game state
-        
+        Args:
+            session_id: Optional session ID (will be generated if not provided)
+            game_id: Optional game ID (will be generated if not provided)
+            section_number: Optional starting section number (default from GameState)
+            
         Returns:
-            GameState: The initial state of the game
+            GameState: Initialized game state
             
         Raises:
             GameError: If initialization fails
@@ -73,10 +78,10 @@ class AgentManagerProtocol(Protocol):
         ...
 
     async def process_game_state(
-        self,  
+        self,
         user_input: Optional[str] = None
-    ) -> GameState:
-        """Process game state through the workflow.
+    ) -> Optional[GameState]:
+        """Process game state and handle workflow.
         
         The state will be processed through the story workflow:
         1. Rules processing (parallel)
@@ -85,23 +90,19 @@ class AgentManagerProtocol(Protocol):
         4. End processing
         
         Args:
-            state: Optional game state to use. If None, current state will be used
-            user_input: Optional user input to process
+            user_input: User input to process (optional)
             
         Returns:
-            GameState: Updated game state
+            Optional[GameState]: Updated game state
             
         Raises:
-            GameError: If processing fails
+            GameError: If state processing fails
+            GraphInterrupt: If waiting for user input
         """
         ...
 
     async def get_state(self) -> Optional[GameState]:
-        """Get current game state.
-        
-        Returns:
-            Optional[GameState]: Current game state or None if no game is active
-        """
+        """Get current game state."""
         ...
 
     async def should_continue(self, state: GameState) -> bool:
@@ -149,11 +150,12 @@ class AgentManagerProtocol(Protocol):
         ...
 
     async def stop_game(self) -> None:
-        """Stop the game and save final state.
+        """Stop the current game and cleanup resources.
         
         This will:
-        1. Save the final state if a game is active
-        2. Clean up resources
+        1. Stop all running workflows
+        2. Clear game state
+        3. Cleanup resources
         
         Raises:
             GameError: If stopping the game fails

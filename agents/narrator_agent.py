@@ -17,6 +17,7 @@ from config.agents.narrator_agent_config import NarratorAgentConfig
 from config.logging_config import get_logger
 from managers.protocols.narrator_manager_protocol import NarratorManagerProtocol
 from agents.protocols.narrator_agent_protocol import NarratorAgentProtocol
+from agents.factories.model_factory import ModelFactory
 
 logger = get_logger('narrator_agent')
 
@@ -152,7 +153,7 @@ class NarratorAgent(BaseAgent):
                 
                 # Créer le NarratorModel
                 logger.debug("Creating NarratorModel")
-                model = NarratorModel(
+                model = ModelFactory.create_narrator_model(
                     section_number=section_number,
                     content=response_data['content'],
                     source_type=SourceType(response_data['source_type'].lower()),

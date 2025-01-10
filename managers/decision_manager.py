@@ -5,6 +5,7 @@ Handles decision management and validation.
 from typing import Dict, List, Optional
 from datetime import datetime
 import logging
+import json
 from models.game_state import GameState
 from models.decision_model import DecisionModel, AnalysisResult
 from models.errors_model import DecisionError
@@ -70,6 +71,40 @@ class DecisionManager(DecisionManagerProtocol):
         except Exception as e:
             self.logger.error(f"Error formatting response: {e}")
             raise DecisionError(f"Failed to format response: {str(e)}")
+
+    def clean_llm_json_response(self, content: str) -> Dict:
+        """
+        Clean and parse JSON from LLM response that may contain markdown.
+        
+        Args:
+            content: Raw content from LLM that may contain markdown
+            
+        Returns:
+            Dict: Parsed JSON content
+            
+        Raises:
+            DecisionError: If content cannot be parsed as JSON
+        """
+        try:
+            # Remove markdown if present
+            if "```json" in content:
+                content = content.split("```json")[1]
+            if "```" in content:
+                content = content.split("```")[0]
+            content = content.strip()
+            
+            # Parse JSON
+            try:
+                result = json.loads(content)
+                return result
+            except json.JSONDecodeError as e:
+                self.logger.error(f"JSON decode error: {str(e)}")
+                self.logger.debug(f"Raw content: {content}")
+                raise DecisionError(f"Invalid JSON format: {str(e)}")
+                
+        except Exception as e:
+            self.logger.error(f"Error cleaning LLM response: {e}")
+            raise DecisionError(f"Failed to clean LLM response: {str(e)}")
 
     async def analyze_decision(
         self,

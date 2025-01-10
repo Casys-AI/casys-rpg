@@ -48,6 +48,7 @@ class DecisionModel(BaseModel):
     """A decision made in the game."""
     section_number: int
     next_section: Optional[int] = None
+    player_input: Optional[str] = None
     error: Optional[str] = None
     awaiting_action: ActionType = ActionType.USER_INPUT
     conditions: List[str] = Field(default_factory=list)

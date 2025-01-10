@@ -323,7 +323,7 @@ class CacheManager(CacheManagerProtocol):
             if not file_path.exists():
                 return None
                 
-            content = await self._fs_adapter.read_file(file_path)
+            content = await self._fs_adapter.read_file_async(file_path)
             logger.debug("Content loaded: {}", content is not None)
             
             if content:
