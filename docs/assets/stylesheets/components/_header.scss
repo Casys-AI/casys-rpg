@@ -1,0 +1,77 @@
+// Header component styles
+.md-header {
+    transition: transform 0.25s ease;
+    height: 2rem;
+    background-color: var(--md-primary-fg-color) !important;
+    box-shadow: 0 0 0.2rem rgba(0,0,0,.1), 0 0.2rem 0.4rem rgba(0,0,0,.2);
+
+    &__inner {
+        transition: padding 0.3s ease;
+        height: 2rem;
+        padding: 0.2rem;
+    }
+
+    &__title {
+        transition: font-size 0.3s ease;
+        margin-left: 0;
+        line-height: 2rem;
+        color: var(--md-default-fg-color) !important;
+    }
+
+    &__button {
+        color: var(--md-default-fg-color) !important;
+        padding: 0.2rem;
+
+        &.md-logo {
+            padding: 0.2rem;
+        }
+    }
+
+    &__source {
+        color: var(--md-default-fg-color) !important;
+        opacity: 0.7;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    &.scrolled {
+        .md-header__inner {
+            padding-top: 0.2rem;
+            padding-bottom: 0.2rem;
+        }
+
+        .md-header__title {
+            font-size: 1.1rem;
+        }
+
+        & ~ .md-tabs {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+}
+
+// Navigation tabs
+.md-tabs {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: top;
+    background-color: var(--md-default-bg-color) !important;
+    top: 2rem;
+}
+
+// Search
+.md-search__input {
+    background-color: rgba(0,0,0,.05) !important;
+    color: var(--md-default-fg-color) !important;
+}
+
+// Keep search and repo link visible
+.md-header__option,
+.md-header__source {
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
+}

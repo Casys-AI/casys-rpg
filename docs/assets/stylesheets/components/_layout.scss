@@ -1,0 +1,41 @@
+// Main layout styles
+.parallax-wrapper {
+    overflow-x: hidden;
+    perspective: 2px;
+}
+
+.md-main {
+    position: relative;
+    z-index: 1;
+    background: var(--md-default-bg-color);
+    margin-top: 0;
+    box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1);
+
+    &__inner {
+        margin-top: 0;
+    }
+}
+
+.md-content {
+    margin-top: 0;
+    padding-top: 2.5rem;
+}
+
+// Cards and items
+.application-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+// Hover effects for cards
+[data-md-color-scheme="default"] {
+    .workflow-item,
+    .architecture-item,
+    .trace-card {
+        &:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+        }
+    }
+}

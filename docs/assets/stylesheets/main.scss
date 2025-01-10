@@ -1,7 +1,9 @@
 @import 'variables';
 
 // Components
+@import 'components/header';
 @import 'components/hero';
+@import 'components/layout';
 
 // Override Material Design styles
 .md-header {

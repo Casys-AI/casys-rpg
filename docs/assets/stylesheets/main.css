@@ -1,3 +1,53 @@
+.md-header {
+  transition: transform 0.25s ease;
+  height: 2rem;
+  background-color: var(--md-primary-fg-color) !important;
+  box-shadow: 0 0 0.2rem rgba(0, 0, 0, 0.1), 0 0.2rem 0.4rem rgba(0, 0, 0, 0.2); }
+  .md-header__inner {
+    transition: padding 0.3s ease;
+    height: 2rem;
+    padding: 0.2rem; }
+  .md-header__title {
+    transition: font-size 0.3s ease;
+    margin-left: 0;
+    line-height: 2rem;
+    color: var(--md-default-fg-color) !important; }
+  .md-header__button {
+    color: var(--md-default-fg-color) !important;
+    padding: 0.2rem; }
+    .md-header__button.md-logo {
+      padding: 0.2rem; }
+  .md-header__source {
+    color: var(--md-default-fg-color) !important;
+    opacity: 0.7; }
+    .md-header__source:hover {
+      opacity: 1; }
+  .md-header.scrolled .md-header__inner {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem; }
+  .md-header.scrolled .md-header__title {
+    font-size: 1.1rem; }
+  .md-header.scrolled ~ .md-tabs {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none; }
+
+.md-tabs {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: top;
+  background-color: var(--md-default-bg-color) !important;
+  top: 2rem; }
+
+.md-search__input {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: var(--md-default-fg-color) !important; }
+
+.md-header__option,
+.md-header__source {
+  opacity: 1 !important;
+  visibility: visible !important;
+  height: auto !important; }
+
 .hero-section {
   height: calc(100vh - 48px);
   display: flex;
@@ -41,6 +91,34 @@
     grid-template-columns: 3fr 2fr;
     gap: 2rem;
     align-items: center; }
+
+.parallax-wrapper {
+  overflow-x: hidden;
+  perspective: 2px; }
+
+.md-main {
+  position: relative;
+  z-index: 1;
+  background: var(--md-default-bg-color);
+  margin-top: 0;
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1); }
+  .md-main__inner {
+    margin-top: 0; }
+
+.md-content {
+  margin-top: 0;
+  padding-top: 2.5rem; }
+
+.application-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px); }
+
+[data-md-color-scheme="default"] .workflow-item:hover,
+[data-md-color-scheme="default"] .architecture-item:hover,
+[data-md-color-scheme="default"] .trace-card:hover {
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1); }
 
 .md-header {
   transition: transform 0.25s ease;
