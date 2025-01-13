@@ -15,30 +15,31 @@ class GameService {
 
     private handleWebSocketMessage(data: any): void {
         try {
-            // Gérer le heartbeat
-            if (data.type === 'pong') {
-                console.log('❤️ Heartbeat received');
-                return;
+            console.log('🎲 Handling WebSocket message:', data);
+
+            // Vérifier que c'est un état de jeu valide
+            if (data && 
+                typeof data === 'object' && 
+                data.game_id && 
+                data.session_id && 
+                data.narrative && 
+                data.rules) {
+                
+                console.log('🎲 Valid game state received, updating...');
+                
+                // Mettre à jour l'état du jeu
+                gameState.setState(data);
+                
+                // Mettre à jour les choix si présents
+                if (data.rules?.choices) {
+                    gameChoices.setAvailableChoices(data.rules.choices);
+                }
+            } else {
+                console.log('📝 Message reçu mais pas un état de jeu valide');
             }
 
-            // Traiter les différents types de messages
-            if (data.type === 'state_update') {
-                console.log('🔄 State update received:', data.state);
-                if (data.state) {
-                    gameState.setState(data.state);
-                    if (data.state.choices) {
-                        gameChoices.setAvailableChoices(data.state.choices);
-                    }
-                }
-            } else if (data.type === 'choice_response') {
-                console.log('🎲 Choice response received:', data);
-                if (data.state) {
-                    gameState.setState(data.state);
-                    if (data.state.choices) {
-                        gameChoices.setAvailableChoices(data.state.choices);
-                    }
-                }
-            } else if (data.type === 'error') {
+            // Gérer les erreurs spécifiques
+            if (data.error) {
                 console.error('❌ Error from server:', data.error);
             }
         } catch (error) {

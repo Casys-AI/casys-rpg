@@ -11,8 +11,6 @@
     export let data: PageData;
 
     // Utilisation des stores avec la syntaxe $
-    $: currentGameState = $gameState;
-    $: currentChoices = $gameChoices;
     $: error = $wsError || data.error;
     
     let showSettings = false;
@@ -128,8 +126,8 @@
         <header class="bg-game-background shadow-neu-flat animate-fade-in">
             <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between">
-                    <h1 class="text-3xl font-serif font-bold tracking-tight text-game-primary">
-                        CASYS RPG
+                    <h1 class="text-3xl font-bold tracking-tight text-game-primary font-serif">
+                        {$gameState.title || 'Histoire'}
                     </h1>
                     <div class="flex items-center space-x-4">
                         <div class="text-game-secondary font-serif flex items-center space-x-4">
