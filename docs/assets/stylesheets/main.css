@@ -308,13 +308,6 @@ body:has(.hero-section) .md-content__inner > * {
   opacity: 0.9;
 }
 
-:root {
-  --md-primary-fg-color: #7e57c2;
-  --md-primary-fg-color--light: #7e57c2;
-  --md-primary-fg-color--dark: #4a1d3d;
-  --md-accent-fg-color: #4a1d3d;
-}
-
 .md-main__inner {
   margin: 0 auto;
   padding: 0;
@@ -354,6 +347,13 @@ body:not(:has(.hero-section)) .md-main__inner .md-content__inner h2 {
 body:not(:has(.hero-section)) .md-main__inner .md-content__inner p {
   margin-bottom: 1rem;
   line-height: 1.6;
+}
+
+:root {
+  --md-primary-fg-color: #7e57c2;
+  --md-primary-fg-color--light: #7e57c2;
+  --md-primary-fg-color--dark: #4a1d3d;
+  --md-accent-fg-color: #4a1d3d;
 }
 
 [data-md-color-scheme=slate] {
