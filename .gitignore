@@ -53,3 +53,4 @@ build/
 .DS_Store
 Thumbs.db
 logs/debug.log
+node_modules
