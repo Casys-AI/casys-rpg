@@ -1,18 +1,9 @@
-// Import components first
-@use 'sass:map';
+// Import all dependencies first
 @use 'components/hero';
 @use 'components/cards';
 @use 'components/features';
 @use 'components/summary';
-@use 'variables' as *;
-
-// Override Material MkDocs variables
-:root {
-    --md-primary-fg-color: #{$color-primary};
-    --md-primary-fg-color--light: #{$color-primary};
-    --md-primary-fg-color--dark: #{$color-secondary};
-    --md-accent-fg-color: #{$color-secondary};
-}
+@use 'variables' as vars;
 
 // Base layout resets
 .md-main__inner {
@@ -68,30 +59,38 @@ body:not(:has(.hero-section)) {
     }
 }
 
+// Override Material MkDocs variables
+:root {
+    --md-primary-fg-color: #{vars.$color-primary};
+    --md-primary-fg-color--light: #{vars.$color-primary};
+    --md-primary-fg-color--dark: #{vars.$color-secondary};
+    --md-accent-fg-color: #{vars.$color-secondary};
+}
+
 // Dark mode overrides
 [data-md-color-scheme="slate"] {
-    --md-default-bg-color: #{$color-background-dark};
-    --md-default-fg-color: #{$color-text-dark};
+    --md-default-bg-color: #{vars.$color-background-dark};
+    --md-default-fg-color: #{vars.$color-text-dark};
     
     .md-header {
-        background: $hero-gradient-dark;
+        background: vars.$hero-gradient-dark;
     }
 }
 
 .md-header {
-    background: $hero-gradient-light;
-    height: $header-height;
+    background: vars.$hero-gradient-light;
+    height: vars.$header-height;
 }
 
 // Responsive adjustments
-@media (max-width: $breakpoint-sm) {
+@media (max-width: vars.$breakpoint-sm) {
     // Mobile styles
 }
 
-@media (min-width: $breakpoint-md) {
+@media (min-width: vars.$breakpoint-md) {
     // Tablet styles
 }
 
-@media (min-width: $breakpoint-lg) {
+@media (min-width: vars.$breakpoint-lg) {
     // Desktop styles
 }
