@@ -8,6 +8,20 @@
     --md-accent-fg-color: #{$color-secondary};
 }
 
+// Full width layout
+.md-grid {
+    max-width: 100%;
+}
+
+.md-content {
+    max-width: none;
+}
+
+.md-main__inner {
+    max-width: none;
+    margin: 0;
+}
+
 // Dark mode overrides
 [data-md-color-scheme="slate"] {
     --md-default-bg-color: #{$color-background-dark};
@@ -25,13 +39,19 @@
 
 // Responsive adjustments
 @media (max-width: $breakpoint-sm) {
-    // Mobile styles
+    .md-grid {
+        padding: 0 1rem;
+    }
 }
 
 @media (min-width: $breakpoint-md) {
-    // Tablet styles
+    .md-grid {
+        padding: 0 2rem;
+    }
 }
 
 @media (min-width: $breakpoint-lg) {
-    // Desktop styles
+    .md-grid {
+        padding: 0 3rem;
+    }
 }

@@ -785,6 +785,19 @@ body:has(.hero-section) .md-content__inner > * {
   --md-accent-fg-color: #4a1d3d;
 }
 
+.md-grid {
+  max-width: 100%;
+}
+
+.md-content {
+  max-width: none;
+}
+
+.md-main__inner {
+  max-width: none;
+  margin: 0;
+}
+
 [data-md-color-scheme=slate] {
   --md-default-bg-color: var(--md-default-bg-color);
   --md-default-fg-color: #ffffff;
@@ -796,6 +809,22 @@ body:has(.hero-section) .md-content__inner > * {
 .md-header {
   background: linear-gradient(135deg, #e8e0f7 0%, #b8a2e3 40%, var(--md-default-bg-color) 100%);
   height: 2rem;
+}
+
+@media (max-width: 480px) {
+  .md-grid {
+    padding: 0 1rem;
+  }
+}
+@media (min-width: 768px) {
+  .md-grid {
+    padding: 0 2rem;
+  }
+}
+@media (min-width: 1200px) {
+  .md-grid {
+    padding: 0 3rem;
+  }
 }
 
 /*# sourceMappingURL=main.css.map */
