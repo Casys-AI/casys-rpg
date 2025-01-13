@@ -45,7 +45,13 @@ jobs:
 
       - name: Build SASS
         run: |
-          poetry run python -c "import sass; sass.compile(dirname=('docs/assets/stylesheets', 'docs/assets/stylesheets'))"
+          mkdir -p docs/assets/stylesheets/dist
+          poetry run python -c "import sass; sass.compile(dirname=('docs/assets/stylesheets', 'docs/assets/stylesheets/dist'))"
+          if [ ! -f docs/assets/stylesheets/dist/main.css ]; then
+            echo "Error: main.css was not generated"
+            exit 1
+          fi
+          echo "SASS compilation successful"
           
       - name: Build site
         run: poetry run mkdocs build
