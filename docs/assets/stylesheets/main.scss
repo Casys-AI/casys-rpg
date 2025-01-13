@@ -1,18 +1,16 @@
-// Import variables first
-@import 'variables';
-
-// Import components
+// Import components first
 @use 'components/hero';
 @use 'components/cards';
 @use 'components/features';
 @use 'components/summary';
+@use 'variables' as vars;
 
 // Override Material MkDocs variables
 :root {
-    --md-primary-fg-color: #{$color-primary};
-    --md-primary-fg-color--light: #{$color-primary}dd;
-    --md-primary-fg-color--dark: #{$color-secondary};
-    --md-accent-fg-color: #{$color-secondary};
+    --md-primary-fg-color: #{vars.$color-primary};
+    --md-primary-fg-color--light: #{vars.$color-primary}dd;
+    --md-primary-fg-color--dark: #{vars.$color-secondary};
+    --md-accent-fg-color: #{vars.$color-secondary};
 }
 
 // Base layout resets
