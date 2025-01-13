@@ -62,28 +62,23 @@ jobs:
           import os
           
           try:
-              print('Current directory:', os.getcwd())
-              print('Files in directory:', os.listdir('.'))
+              # Ensure we're in the right directory
+              print('Working directory:', os.getcwd())
               
-              # Ensure _variables.scss exists and is readable
-              with open('_variables.scss', 'r') as f:
-                  print('_variables.scss content length:', len(f.read()))
+              # List all SCSS files
+              scss_files = [f for f in os.listdir('.') if f.endswith('.scss')]
+              print('SCSS files found:', scss_files)
               
-              # Compile with explicit load path
+              # Compile with explicit include path
               css = sass.compile(
                   filename='main.scss',
-                  include_paths=[os.getcwd()],
-                  source_map_embed=True
+                  include_paths=['.', './components']
               )
               
+              # Write output
               with open('dist/main.css', 'w') as f:
                   f.write(css)
               
-              if os.path.exists('dist/main.css'):
-                  print('Successfully created main.css')
-              else:
-                  raise Exception('main.css was not created')
-                  
               print('SASS compilation successful')
               
           except Exception as e:
