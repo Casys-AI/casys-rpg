@@ -1,6 +1,7 @@
 @use 'sass:math';
 @use 'sass:color';
-@use 'variables' as vars;
+@forward 'variables';
+@use 'variables' as *;
 @use 'components/hero' as hero;
 @use 'components/cards' as cards;
 @use 'components/features' as features;
@@ -62,36 +63,36 @@ body:not(:has(.hero-section)) {
 
 // Override Material MkDocs variables
 :root {
-    --md-primary-fg-color: #{vars.$color-primary};
-    --md-primary-fg-color--light: #{vars.$color-primary}dd;
-    --md-primary-fg-color--dark: #{vars.$color-secondary};
-    --md-accent-fg-color: #{vars.$color-secondary};
+    --md-primary-fg-color: #{$color-primary};
+    --md-primary-fg-color--light: #{$color-primary}dd;
+    --md-primary-fg-color--dark: #{$color-secondary};
+    --md-accent-fg-color: #{$color-secondary};
 }
 
 // Dark mode overrides
 [data-md-color-scheme="slate"] {
-    --md-default-bg-color: #{vars.$color-background-dark};
-    --md-default-fg-color: #{vars.$color-text-dark};
+    --md-default-bg-color: #{$color-background-dark};
+    --md-default-fg-color: #{$color-text-dark};
     
     .md-header {
-        background: vars.$hero-gradient-dark;
+        background: $hero-gradient-dark;
     }
 }
 
 .md-header {
-    background: vars.$hero-gradient-light;
-    height: vars.$header-height;
+    background: $hero-gradient-light;
+    height: $header-height;
 }
 
 // Responsive adjustments
-@media (max-width: vars.$breakpoint-sm) {
+@media (max-width: $breakpoint-sm) {
     // Mobile styles
 }
 
-@media (min-width: vars.$breakpoint-md) {
+@media (min-width: $breakpoint-md) {
     // Tablet styles
 }
 
-@media (min-width: vars.$breakpoint-lg) {
+@media (min-width: $breakpoint-lg) {
     // Desktop styles
 }
