@@ -60,11 +60,32 @@ jobs:
           poetry run python -c "
           import sass
           import os
+          
           try:
-              css = sass.compile(filename='main.scss', include_paths=['.'])
+              print('Current directory:', os.getcwd())
+              print('Files in directory:', os.listdir('.'))
+              
+              # Ensure _variables.scss exists and is readable
+              with open('_variables.scss', 'r') as f:
+                  print('_variables.scss content length:', len(f.read()))
+              
+              # Compile with explicit load path
+              css = sass.compile(
+                  filename='main.scss',
+                  include_paths=[os.getcwd()],
+                  source_map_embed=True
+              )
+              
               with open('dist/main.css', 'w') as f:
                   f.write(css)
+              
+              if os.path.exists('dist/main.css'):
+                  print('Successfully created main.css')
+              else:
+                  raise Exception('main.css was not created')
+                  
               print('SASS compilation successful')
+              
           except Exception as e:
               print('Error:', str(e))
               exit(1)
