@@ -232,26 +232,27 @@ body:has(.hero-section) .md-content__inner > * {
   padding: 0 2rem;
 }
 
-.summary-section {
+.intro-section, .applications-section, .architecture-section, .workflow-section, .feature-section, .summary-section {
   padding: 4rem 0;
   background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
   color: white;
 }
 
-.summary-grid, .feature-grid {
+.applications-grid, .architecture-grid, .workflow-grid, .summary-grid, .feature-grid {
   display: grid;
   gap: 2rem;
   margin-top: 2rem;
 }
 
-.feature-item {
+.application-card, .workflow-item, .feature-item {
   background: rgba(255, 255, 255, 0.1);
   padding: 2rem;
   border-radius: 8px;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
-[data-md-color-scheme=slate] .feature-item {
+
+[data-md-color-scheme=slate] .application-card, [data-md-color-scheme=slate] .workflow-item, [data-md-color-scheme=slate] .feature-item {
   background: rgba(0, 0, 0, 0.2);
 }
 
@@ -296,6 +297,36 @@ body:has(.hero-section) .md-content__inner > * {
   color: var(--md-primary-fg-color);
 }
 
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.intro-section, .applications-section, .architecture-section, .workflow-section, .feature-section, .summary-section {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.applications-grid, .architecture-grid, .workflow-grid, .feature-grid, .summary-grid {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.application-card, .workflow-item, .feature-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-md-color-scheme=slate] .application-card, [data-md-color-scheme=slate] .workflow-item, [data-md-color-scheme=slate] .feature-item {
+  background: rgba(0, 0, 0, 0.2);
+}
+
 .summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   text-align: center;
@@ -308,45 +339,443 @@ body:has(.hero-section) .md-content__inner > * {
   opacity: 0.9;
 }
 
+.hero-buttons {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  margin-top: 2rem;
+}
+@media (max-width: 768px) {
+  .hero-buttons {
+    justify-content: center;
+  }
+}
+
+.hero-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.8rem 1.6rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.hero-button.primary {
+  background: var(--md-primary-fg-color);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.hero-button.primary:hover {
+  background: var(--md-primary-fg-color--dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+.hero-button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  backdrop-filter: blur(10px);
+}
+[data-md-color-scheme=default] .hero-button.secondary {
+  color: #5c35a4;
+  background: rgba(232, 224, 247, 0.3);
+}
+[data-md-color-scheme=default] .hero-button.secondary:hover {
+  background: rgba(232, 224, 247, 0.5);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.intro-section, .applications-section, .architecture-section, .workflow-section, .feature-section, .summary-section {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.applications-grid, .architecture-grid, .workflow-grid, .feature-grid, .summary-grid {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.application-card, .workflow-item, .feature-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+[data-md-color-scheme=slate] .application-card, [data-md-color-scheme=slate] .workflow-item, [data-md-color-scheme=slate] .feature-item {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.md-header {
+  transition: transform 0.25s ease;
+  height: 2rem;
+  background-color: var(--md-primary-fg-color) !important;
+  box-shadow: 0 0 0.2rem rgba(0, 0, 0, 0.1), 0 0.2rem 0.4rem rgba(0, 0, 0, 0.2);
+}
+.md-header__inner {
+  transition: padding 0.3s ease;
+  height: 2rem;
+  padding: 0.2rem;
+}
+.md-header__title {
+  transition: font-size 0.3s ease;
+  margin-left: 0;
+  line-height: 2rem;
+}
+.md-header.scrolled .md-header__inner {
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+.md-header.scrolled .md-header__title {
+  font-size: 1.1rem;
+}
+
+.parallax-wrapper {
+  overflow-x: hidden;
+  perspective: 2px;
+}
+
+.md-main {
+  position: relative;
+  z-index: 1;
+  background: var(--md-default-bg-color);
+  margin-top: 0;
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1);
+}
 .md-main__inner {
-  margin: 0 auto;
-  padding: 0;
+  margin-top: 0;
 }
 
-body:has(.hero-section) .md-main {
-  height: calc(100vh - var(--md-header-height) - var(--md-tabs-height));
-  overflow: hidden;
-}
-body:has(.hero-section) .md-container,
-body:has(.hero-section) .md-main,
-body:has(.hero-section) .md-main__inner,
-body:has(.hero-section) .md-content,
-body:has(.hero-section) .md-content__inner {
-  margin: 0 !important;
-  padding: 0 !important;
-  max-width: none !important;
-  background: transparent !important;
+.md-content {
+  margin-top: 0;
+  padding-top: 2.5rem;
 }
 
-body:not(:has(.hero-section)) .md-container {
-  padding-top: 2rem !important;
+[data-md-color-scheme=default] .workflow-item:hover,
+[data-md-color-scheme=default] .architecture-item:hover,
+[data-md-color-scheme=default] .trace-card:hover {
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
 }
-body:not(:has(.hero-section)) .md-main__inner {
+
+.md-tabs {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: top;
+  background-color: var(--md-default-bg-color) !important;
+  top: 2rem;
+}
+.md-header.scrolled ~ .md-tabs {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.md-nav__link:focus, .md-nav__link:hover {
+  color: var(--md-accent-fg-color);
+}
+.md-nav__link--active {
+  color: var(--md-accent-fg-color);
+}
+
+.md-header__option, .md-header__source {
+  opacity: 1 !important;
+  visibility: visible !important;
+  height: auto !important;
+}
+.md-header__button {
+  color: var(--md-default-fg-color) !important;
+  padding: 0.2rem;
+}
+.md-header__button.md-logo {
+  padding: 0.2rem;
+}
+
+.md-search__input {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: var(--md-default-fg-color) !important;
+}
+
+@media (max-width: 1220px) {
+  .hero-title {
+    font-size: 4rem;
+  }
+  .hero-subtitle {
+    font-size: 1.5rem;
+  }
+}
+@media (max-width: 960px) {
+  .hero-title {
+    font-size: 3.5rem;
+  }
+  .hero-content {
+    padding: 2rem;
+  }
+}
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 3.2rem;
+  }
+  .hero-subtitle {
+    font-size: 1.2rem;
+  }
+  .hero-content {
+    padding: 1.5rem;
+  }
+}
+.intro-section, .applications-section, .architecture-section, .workflow-section, .feature-section, .summary-section {
+  padding: 4rem 0;
+}
+
+.applications-grid, .architecture-grid, .workflow-grid, .feature-grid, .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.container {
+  max-width: 1200px;
   margin: 0 auto;
-  max-width: 61rem;
+  padding: 0 2rem;
 }
-body:not(:has(.hero-section)) .md-main__inner .md-content__inner {
-  padding: 2rem 0;
+
+.feature-section {
+  background: var(--section-bg-light);
 }
-body:not(:has(.hero-section)) .md-main__inner .md-content__inner h1 {
-  margin-bottom: 2rem;
+
+.feature-item {
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
-body:not(:has(.hero-section)) .md-main__inner .md-content__inner h2 {
-  margin: 2rem 0 1rem;
-}
-body:not(:has(.hero-section)) .md-main__inner .md-content__inner p {
+.feature-item .icon {
+  font-size: 2.5em;
   margin-bottom: 1rem;
+  color: var(--accent-color);
+}
+
+.workflow-section {
+  background: var(--section-bg-light);
+}
+
+.workflow-item {
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.workflow-item h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--accent-color);
+  margin-bottom: 1rem;
+}
+.workflow-item:hover {
+  transform: translateY(-3px);
+}
+
+.architecture-section {
+  background: var(--section-bg-light);
+}
+
+.architecture-item {
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.architecture-item h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--accent-color);
+  margin-bottom: 1rem;
+}
+.architecture-item:hover {
+  transform: translateY(-3px);
+}
+
+.summary-section {
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.applications-section {
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.intro-section {
+  background: var(--section-bg-light);
+}
+.intro-section .intro-text {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+.intro-section .intro-text h2 {
+  margin-bottom: 1.5rem;
+}
+.intro-section .intro-text p {
+  font-size: 1.2rem;
   line-height: 1.6;
+  opacity: 0.9;
+}
+
+[data-md-color-scheme=default] .workflow-item:hover,
+[data-md-color-scheme=default] .architecture-item:hover {
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.summary-section, .feature-section, .workflow-section, .architecture-section, .applications-section, .intro-section {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.feature-grid, .summary-grid, .workflow-grid, .architecture-grid, .applications-grid {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.application-card, .feature-item, .workflow-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-md-color-scheme=slate] .application-card, [data-md-color-scheme=slate] .feature-item, [data-md-color-scheme=slate] .workflow-item {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.workflow-section {
+  background: var(--md-default-bg-color);
+  padding: 4rem 0;
+}
+
+.workflow-grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.workflow-item {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.workflow-item:hover {
+  transform: translateY(-5px);
+}
+.workflow-item h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--md-primary-fg-color);
+}
+.workflow-item h3 .material-icons {
+  font-size: 1.5rem;
+}
+.workflow-item ul {
+  list-style: none;
+  padding-left: 0;
+}
+.workflow-item ul li {
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+  position: relative;
+}
+.workflow-item ul li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--md-primary-fg-color);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.summary-section, .feature-section, .workflow-section, .architecture-section, .applications-section, .intro-section {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+  color: white;
+}
+
+.feature-grid, .summary-grid, .workflow-grid, .architecture-grid, .applications-grid {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.feature-item, .workflow-item, .application-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-md-color-scheme=slate] .feature-item, [data-md-color-scheme=slate] .workflow-item, [data-md-color-scheme=slate] .application-card {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.applications-grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.application-card .material-icons {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: var(--md-primary-fg-color);
+}
+.application-card h3 {
+  margin: 1rem 0;
+  font-size: 1.5rem;
+}
+.application-card ul {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 1rem;
+}
+.application-card ul li {
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+  position: relative;
+}
+.application-card ul li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--md-primary-fg-color);
 }
 
 :root {
