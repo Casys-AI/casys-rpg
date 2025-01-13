@@ -1,16 +1,17 @@
 // Import components first
+@use 'sass:map';
 @use 'components/hero';
 @use 'components/cards';
 @use 'components/features';
 @use 'components/summary';
-@use 'variables' as vars;
+@use 'variables' as *;
 
 // Override Material MkDocs variables
 :root {
-    --md-primary-fg-color: #{vars.$color-primary};
-    --md-primary-fg-color--light: #{vars.$color-primary}dd;
-    --md-primary-fg-color--dark: #{vars.$color-secondary};
-    --md-accent-fg-color: #{vars.$color-secondary};
+    --md-primary-fg-color: #{$color-primary};
+    --md-primary-fg-color--light: #{$color-primary};
+    --md-primary-fg-color--dark: #{$color-secondary};
+    --md-accent-fg-color: #{$color-secondary};
 }
 
 // Base layout resets
@@ -65,4 +66,32 @@ body:not(:has(.hero-section)) {
             }
         }
     }
+}
+
+// Dark mode overrides
+[data-md-color-scheme="slate"] {
+    --md-default-bg-color: #{$color-background-dark};
+    --md-default-fg-color: #{$color-text-dark};
+    
+    .md-header {
+        background: $hero-gradient-dark;
+    }
+}
+
+.md-header {
+    background: $hero-gradient-light;
+    height: $header-height;
+}
+
+// Responsive adjustments
+@media (max-width: $breakpoint-sm) {
+    // Mobile styles
+}
+
+@media (min-width: $breakpoint-md) {
+    // Tablet styles
+}
+
+@media (min-width: $breakpoint-lg) {
+    // Desktop styles
 }
