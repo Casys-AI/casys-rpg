@@ -1,0 +1,43 @@
+// Card styles
+.application-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+        transform: translateY(-5px);
+    }
+}
+
+.workflow-item,
+.architecture-item,
+.trace-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    
+    &:hover {
+        transform: translateY(-3px);
+    }
+}
+
+// Color scheme specific styles
+[data-md-color-scheme="slate"] {
+    .workflow-item,
+    .architecture-item,
+    .trace-card {
+        &:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+    }
+}
+
+[data-md-color-scheme="default"] {
+    .workflow-item,
+    .architecture-item,
+    .trace-card {
+        &:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+        }
+    }
+}

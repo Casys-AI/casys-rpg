@@ -1,0 +1,33 @@
+// Common styles for layout and containers
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+// Common section styles
+%section-base {
+    padding: 4rem 0;
+    background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+    color: white;
+}
+
+// Common grid styles
+%grid-base {
+    display: grid;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+// Common card styles
+%card-base {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    [data-md-color-scheme="slate"] & {
+        background: rgba(0, 0, 0, 0.2);
+    }
+}

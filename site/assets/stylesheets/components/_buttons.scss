@@ -1,0 +1,53 @@
+// Button container
+.hero-buttons {
+    display: flex;
+    gap: 1.2rem;
+    align-items: center;
+    margin-top: 2rem;
+
+    @media (max-width: 768px) {
+        justify-content: center;
+    }
+}
+
+// Base button styles
+.hero-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.8rem 1.6rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+
+    // Primary button
+    &.primary {
+        background: var(--md-primary-fg-color);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        &:hover {
+            background: var(--md-primary-fg-color--dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+    }
+
+    // Secondary button
+    &.secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: inherit;
+        backdrop-filter: blur(10px);
+
+        [data-md-color-scheme="default"] & {
+            color: #5c35a4;
+            background: rgba(232, 224, 247, 0.3);
+
+            &:hover {
+                background: rgba(232, 224, 247, 0.5);
+            }
+        }
+    }
+}

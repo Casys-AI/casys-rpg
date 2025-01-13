@@ -1,0 +1,50 @@
+@use 'common' as *;
+
+.feature-section {
+    padding: 4rem 0;
+    background: var(--md-default-bg-color);
+}
+
+.feature-grid {
+    @extend %grid-base;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.feature-item {
+    @extend %card-base;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+        transform: translateY(-5px);
+    }
+
+    .icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    h3 {
+        margin: 1rem 0;
+        color: var(--md-primary-fg-color);
+    }
+
+    ul {
+        list-style: none;
+        padding-left: 0;
+        margin-top: 1rem;
+
+        li {
+            margin-bottom: 0.5rem;
+            padding-left: 1.5rem;
+            position: relative;
+
+            &::before {
+                content: "•";
+                position: absolute;
+                left: 0;
+                color: var(--md-primary-fg-color);
+            }
+        }
+    }
+}

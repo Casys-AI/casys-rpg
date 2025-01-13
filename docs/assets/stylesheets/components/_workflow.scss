@@ -1,0 +1,50 @@
+@use 'common' as *;
+
+.workflow-section {
+    background: var(--md-default-bg-color);
+    padding: 4rem 0;
+}
+
+.workflow-grid {
+    @extend %grid-base;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.workflow-item {
+    @extend %card-base;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+        transform: translateY(-5px);
+    }
+
+    h3 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        color: var(--md-primary-fg-color);
+
+        .material-icons {
+            font-size: 1.5rem;
+        }
+    }
+
+    ul {
+        list-style: none;
+        padding-left: 0;
+
+        li {
+            margin-bottom: 0.5rem;
+            padding-left: 1.5rem;
+            position: relative;
+
+            &::before {
+                content: "→";
+                position: absolute;
+                left: 0;
+                color: var(--md-primary-fg-color);
+            }
+        }
+    }
+}

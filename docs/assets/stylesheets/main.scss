@@ -1,21 +1,70 @@
-@import 'variables';
+// Import variables first
+@use 'variables' as *;
 
-// Components
-@import 'components/header';
-@import 'components/hero';
-@import 'components/layout';
+// Import components
+@use 'components/hero';
+@use 'components/cards';
+@use 'components/features';
+@use 'components/summary';
 
-// Override Material Design styles
-.md-header {
-    transition: transform 0.25s ease;
-    height: $header-height;
-    background-color: var(--md-primary-fg-color) !important;
-    box-shadow: 0 0 0.2rem rgba(0,0,0,.1), 0 0.2rem 0.4rem rgba(0,0,0,.2);
+// Override Material MkDocs variables
+:root {
+    --md-primary-fg-color: #{$color-primary};
+    --md-primary-fg-color--light: #{$color-primary}dd;
+    --md-primary-fg-color--dark: #{$color-secondary};
+    --md-accent-fg-color: #{$color-secondary};
 }
 
-.md-tabs {
-    transition: transform 0.3s ease, opacity 0.3s ease;
-    transform-origin: top;
-    background-color: var(--md-default-bg-color) !important;
-    top: $header-height;
+// Base layout resets
+.md-main__inner {
+    margin: 0 auto;
+    padding: 0;
+}
+
+// Hero pages layout
+body:has(.hero-section) {
+    .md-main {
+        height: calc(100vh - var(--md-header-height) - var(--md-tabs-height));
+        overflow: hidden;
+    }
+
+    .md-container,
+    .md-main,
+    .md-main__inner,
+    .md-content,
+    .md-content__inner {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+        background: transparent !important;
+    }
+}
+
+// Regular pages layout
+body:not(:has(.hero-section)) {
+    .md-container {
+        padding-top: 2rem !important;
+    }
+
+    .md-main__inner {
+        margin: 0 auto;
+        max-width: 61rem;
+
+        .md-content__inner {
+            padding: 2rem 0;
+
+            h1 {
+                margin-bottom: 2rem;
+            }
+
+            h2 {
+                margin: 2rem 0 1rem;
+            }
+
+            p {
+                margin-bottom: 1rem;
+                line-height: 1.6;
+            }
+        }
+    }
 }

@@ -1,0 +1,35 @@
+@import 'variables';
+
+// Import components
+@import 'components/header';
+@import 'components/layout';
+@import 'components/hero';
+@import 'components/cards';
+@import 'components/navigation';
+@import 'components/sections';
+@import 'components/buttons';
+@import 'components/responsive';
+
+// Override Material Design styles
+.md-header {
+    transition: transform 0.25s ease;
+    height: $header-height;
+    background-color: var(--md-primary-fg-color) !important;
+    box-shadow: 0 0 0.2rem rgba(0,0,0,.1), 0 0.2rem 0.4rem rgba(0,0,0,.2);
+}
+
+.md-tabs {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: top;
+    background-color: var(--md-default-bg-color) !important;
+    top: $header-height;
+}
+
+// Variables
+:root {
+    --md-primary-fg-color: #{hex-to-rgb(#2196f3)};
+    --md-accent-fg-color: #{hex-to-rgb(#526cfe)};
+    --section-bg-light: var(--md-default-bg-color);
+    --card-bg: var(--md-default-bg-color);
+    --accent-color: var(--md-accent-fg-color);
+}

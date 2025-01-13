@@ -1,6 +1,6 @@
 # 🧠 CASYS - Complex Adaptive Systems of AI
 
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-00A36C.svg)](https://openai.com/)
 [![Coverage](https://img.shields.io/badge/coverage-54%25-yellow.svg)](https://coverage.readthedocs.io/)
@@ -51,11 +51,8 @@ graph TD
 ## 🛠 System Requirements
 
 ### Python Compatibility
-- **Recommended**: Python 3.11 or 3.12
-- **Note**: While the project can run on Python 3.13, you might encounter some dependency installation issues with poetry. In this case, it's recommended to:
-  1. Use pip for installing numpy and other compiled packages
-  2. Use the provided `freeze-requirements.txt` for consistent dependency management
-  3. Consider using Python 3.11 or 3.12 for the best development experience
+- **Recommended**: Python 3.13
+- **Note**: Make sure you have Python 3.13 installed.
 
 ### Dependencies
 The project uses several key dependencies:
@@ -154,7 +151,7 @@ git clone https://github.com/Casys-AI/casys-rpg.git
 cd casys-rpg
 
 # Install dependencies
-pip install -r requirements.txt
+poetry install
 
 # Run the demo RPG application
 python -m casys_rpg

@@ -1,0 +1,16 @@
+{
+  "name": "casys-rpg",
+  "version": "1.0.0",
+  "description": "Documentation for Casys RPG",
+  "scripts": {
+    "sass": "sass docs/assets/stylesheets/main.scss docs/assets/stylesheets/main.css",
+    "sass:watch": "sass --watch docs/assets/stylesheets/main.scss docs/assets/stylesheets/main.css",
+    "docs": "mkdocs serve",
+    "docs:build": "mkdocs build",
+    "dev": "npm-run-all --parallel sass:watch docs"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "sass": "^1.69.5"
+  }
+}

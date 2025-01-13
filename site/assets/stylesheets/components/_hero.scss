@@ -1,0 +1,120 @@
+// Hero section
+.hero-section {
+    height: calc(100vh - 48px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    color: #ffffff;
+    overflow: hidden;
+    margin: -2rem 0 0 0;
+    padding: 0;
+    background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 3rem;
+    max-width: 600px;
+}
+
+.hero-title {
+    font-size: 4.5rem;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(45deg, #fff, rgba(255, 255, 255, 0.8));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    strong {
+        font-weight: 800;
+        display: inline;
+    }
+
+    [data-md-color-scheme="default"] & {
+        background: linear-gradient(45deg, #5c35a4, #7e57c2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 2.5rem;
+    line-height: 1.7;
+    opacity: 0.9;
+    font-weight: 400;
+    max-width: 540px;
+
+    [data-md-color-scheme="default"] & {
+        color: #4a1d3d;
+    }
+}
+
+.hero-logo {
+    position: relative;
+    width: 100%;
+    height: 110%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translateZ(0);
+    will-change: transform;
+    pointer-events: none;
+    z-index: 1;
+
+    img {
+        width: 100%;
+        height: auto;
+        max-width: none;
+        filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.25));
+        object-fit: contain;
+        opacity: 0.9;
+
+        [data-md-color-scheme="default"] & {
+            filter: drop-shadow(0 20px 30px rgba(92, 53, 164, 0.25));
+            opacity: 0.85;
+        }
+    }
+}
+
+// Responsive styles
+@media (max-width: 1200px) {
+    .hero-title {
+        font-size: 4rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-content {
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.1rem;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .hero-buttons {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 3rem;
+    }
+
+    .hero-content {
+        padding: 1.5rem;
+    }
+}

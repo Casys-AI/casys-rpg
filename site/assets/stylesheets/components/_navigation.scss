@@ -1,0 +1,54 @@
+// Navigation tabs
+.md-tabs {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: top;
+    background-color: var(--md-default-bg-color) !important;
+    top: 2rem;
+
+    .md-header.scrolled ~ & {
+        transform: translateY(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+// Navigation links
+.md-nav {
+    &__link {
+        &:focus,
+        &:hover {
+            color: var(--md-accent-fg-color);
+        }
+
+        &--active {
+            color: var(--md-accent-fg-color);
+        }
+    }
+}
+
+// Navigation buttons and options
+.md-header {
+    &__option,
+    &__source {
+        opacity: 1 !important;
+        visibility: visible !important;
+        height: auto !important;
+    }
+
+    &__button {
+        color: var(--md-default-fg-color) !important;
+        padding: 0.2rem;
+
+        &.md-logo {
+            padding: 0.2rem;
+        }
+    }
+}
+
+// Search input
+.md-search {
+    &__input {
+        background-color: rgba(0,0,0,.05) !important;
+        color: var(--md-default-fg-color) !important;
+    }
+}

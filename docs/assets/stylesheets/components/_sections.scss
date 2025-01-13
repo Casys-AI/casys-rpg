@@ -1,0 +1,160 @@
+// Common section styles
+%section-base {
+    padding: 4rem 0;
+}
+
+%grid-base {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+// Container
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+// Feature section
+.feature-section {
+    @extend %section-base;
+    background: var(--section-bg-light);
+}
+
+.feature-grid {
+    @extend %grid-base;
+}
+
+.feature-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+
+    .icon {
+        font-size: 2.5em;
+        margin-bottom: 1rem;
+        color: var(--accent-color);
+    }
+}
+
+// Workflow section
+.workflow-section {
+    @extend %section-base;
+    background: var(--section-bg-light);
+}
+
+.workflow-grid {
+    @extend %grid-base;
+}
+
+.workflow-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    h3 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--accent-color);
+        margin-bottom: 1rem;
+    }
+
+    &:hover {
+        transform: translateY(-3px);
+    }
+}
+
+// Architecture section
+.architecture-section {
+    @extend %section-base;
+    background: var(--section-bg-light);
+}
+
+.architecture-grid {
+    @extend %grid-base;
+}
+
+.architecture-item {
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    h3 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--accent-color);
+        margin-bottom: 1rem;
+    }
+
+    &:hover {
+        transform: translateY(-3px);
+    }
+}
+
+// Summary section
+.summary-section {
+    @extend %section-base;
+    background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+    color: white;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+    text-align: center;
+}
+
+// Applications section
+.applications-section {
+    @extend %section-base;
+    background: linear-gradient(135deg, var(--md-primary-fg-color--dark) 0%, var(--md-primary-fg-color--darker) 100%);
+    color: white;
+}
+
+.applications-grid {
+    @extend %grid-base;
+}
+
+// Intro section
+.intro-section {
+    @extend %section-base;
+    background: var(--section-bg-light);
+    
+    .intro-text {
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+        
+        h2 {
+            margin-bottom: 1.5rem;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+    }
+}
+
+// Color scheme specific styles
+[data-md-color-scheme="default"] {
+    .workflow-item,
+    .architecture-item {
+        &:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+        }
+    }
+}
