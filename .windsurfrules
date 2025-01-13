@@ -1,0 +1,76 @@
+🎲 CASYS RPG - ARCHITECTURE ET TECHNOLOGIES
+
+ARCHITECTURE GLOBALE
+
+Système d'Agents
+Architecture multi-agents basée sur LangChain / langgraph
+
+Cinq agents spécialisés :
+
+StoryGraph : Gestion du workflow et des transitions d'état
+RulesAgent : Analyse et interprétation des règles du jeu
+DecisionAgent : Gestion de la logique décisionnelle
+NarratorAgent : Présentation et formatage du contenu
+TraceAgent : Gestion de l'historique des actions et des statistiques du personnage
+Communication :
+
+Configuration hiérarchique à plusieurs niveaux :
+GameConfig : Configuration principale du jeu
+AgentConfigs : Configurations spécifiques pour chaque agent
+ManagerConfigs : Configurations pour les managers
+StorageConfig : Configuration du stockage
+
+Gestionnaires (Managers)
+
+Managers Principaux :
+AgentManager : Coordinateur de haut niveau
+Gestion des interactions utilisateur
+Coordination de l'état du jeu
+Gestion des erreurs
+Gestion des sessions
+
+Managers d'État et Cache :
+StateManager : Gestion de l'état du jeu
+CacheManager : Gestion du cache en mémoire
+Managers de Contenu :
+RulesManager : Gestion des règles du jeu
+NarratorManager : Gestion du contenu narratif
+DecisionManager : Gestion des décisions
+CharacterManager : Gestion des personnages
+TraceManager : Gestion de l'historique
+Infrastructure :
+FilesystemAdapter : Gestion des accès fichiers
+
+Orchestration via LangGraph (StateGraph)
+Coordination centralisée par StoryGraph
+Communication asynchrone (AsyncGenerator)
+Le StoryGraph est en fait l'agent principal qui orchestre le workflow du jeu Il gère :
+
+Les transitions d'état
+L'exécution du workflow principal
+La coordination entre les autres agents
+La gestion des erreurs
+
+Gestion d'État
+Système d'état immutable avec validation Pydantic v2
+Traçabilité complète des actions et décisions
+Gestion des événements asynchrones
+Cache en mémoire pour les performances
+Moteur de Règles
+Système de cache en mémoire pour les règles
+Analyse LLM (gpt-4o-mini) pour l'interprétation
+Système de dés contextuel (chance et combat)
+Validation des conditions en temps réel
+Stockage des règles en format Markdown
+
+
+TECHNOLOGIES UTILISÉES
+
+FastAPI : API REST et WebSocket
+Pydantic v2 : Validation de données et sérialisation
+LangGraph : Orchestration des agents
+OpenAI API (gpt-4o-mini) : Modèle de langage
+AsyncIO : Gestion asynchrone
+
+Frontend
+svlete / sveltekit / storybook / tailwindcss
