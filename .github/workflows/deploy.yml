@@ -3,6 +3,16 @@ name: Deploy MkDocs to GitHub Pages
 on:
   push:
     branches: ['main']  # ou 'master' selon ta branche principale
+    paths:
+      - 'docs/**'                   # Tous les fichiers de documentation
+      - 'mkdocs.yml'               # Configuration MkDocs
+      - '.github/workflows/**'      # Les workflows eux-mêmes
+      - 'pyproject.toml'           # Configuration Poetry
+      - 'poetry.lock'              # Lock file Poetry
+      - 'docs/assets/stylesheets/**' # Fichiers SASS
+      - 'docs/assets/images/**'     # Images de la doc
+      - 'docs/assets/javascripts/**' # Scripts JS de la doc
+      - 'docs/overrides/**'         # Overrides de thème MkDocs
   workflow_dispatch:
 
 permissions:
