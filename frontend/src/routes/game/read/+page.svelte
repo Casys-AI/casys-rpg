@@ -17,14 +17,22 @@
     let y: number;
     let lastY = 0;
     let showChoices = true;
+    let contentHeight: number;
+    let windowHeight: number;
     
     // État de connexion WebSocket via le store
     $: connectionStatus = $wsStore ? ($wsStore.error ? 'error' : 'connected') : 'disconnected';
 
     $: {
         if (y !== undefined) {
-            showChoices = y > lastY;
-            lastY = y;
+            // Si le contenu est plus petit que la fenêtre, toujours afficher les choix
+            if (contentHeight <= windowHeight) {
+                showChoices = true;
+            } else {
+                // Sinon, afficher les choix quand on scrolle vers le bas
+                showChoices = y > lastY;
+                lastY = y;
+            }
         }
     }
 
@@ -112,7 +120,7 @@
     }
 </script>
 
-<svelte:window bind:scrollY={y}/>
+<svelte:window bind:scrollY={y} bind:innerHeight={windowHeight}/>
 
 {#if error}
     <div class="min-h-screen bg-game-background flex items-center justify-center">
@@ -121,7 +129,7 @@
         </div>
     </div>
 {:else if $gameState}
-    <div class="min-h-screen bg-game-background flex flex-col">
+    <div class="min-h-screen bg-game-background flex flex-col" bind:clientHeight={contentHeight}>
         <!-- En-tête -->
         <header class="bg-game-background shadow-neu-flat animate-fade-in">
             <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">

@@ -72,7 +72,13 @@ export class WebSocketService {
           const data = JSON.parse(event.data);
           console.log('📥 Parsed message:', data);
           
-          // Notifier tous les handlers enregistrés
+          // Gérer le heartbeat ici
+          if (data.type === 'pong') {
+            console.log('❤️ Heartbeat received');
+            return;
+          }
+          
+          // Notifier tous les handlers enregistrés uniquement pour les messages non-heartbeat
           this.messageHandlers.forEach(handler => handler(data));
         } catch (error) {
           console.error('❌ Error parsing WebSocket message:', error, 'Raw message:', event.data);
