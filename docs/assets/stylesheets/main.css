@@ -351,7 +351,7 @@ body:not(:has(.hero-section)) .md-main__inner .md-content__inner p {
 
 :root {
   --md-primary-fg-color: #7e57c2;
-  --md-primary-fg-color--light: #7e57c2;
+  --md-primary-fg-color--light: #7e57c2dd;
   --md-primary-fg-color--dark: #4a1d3d;
   --md-accent-fg-color: #4a1d3d;
 }
