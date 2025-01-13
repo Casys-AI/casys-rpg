@@ -30,7 +30,7 @@ numpy = "2.2.1"
 langsmith = "0.2.4"
 tenacity = "9.0.0"
 packaging = "24.2"
-libsass = "0.23.0"
+libsass = "^0.22.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
