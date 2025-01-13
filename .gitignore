@@ -48,9 +48,17 @@ dist/
 build/
 *.egg-info/
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn-integrity
+
 # Autres
 *.pdf
 .DS_Store
 Thumbs.db
 logs/debug.log
-node_modules
