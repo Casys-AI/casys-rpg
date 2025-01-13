@@ -2,17 +2,17 @@ name: Deploy MkDocs to GitHub Pages
 
 on:
   push:
-    branches: ['main']  # ou 'master' selon ta branche principale
+    branches: ['main']
     paths:
-      - 'docs/**'                   # Tous les fichiers de documentation
-      - 'mkdocs.yml'               # Configuration MkDocs
-      - '.github/workflows/**'      # Les workflows eux-mêmes
-      - 'pyproject.toml'           # Configuration Poetry
-      - 'poetry.lock'              # Lock file Poetry
-      - 'docs/assets/stylesheets/**' # Fichiers SASS
-      - 'docs/assets/images/**'     # Images de la doc
-      - 'docs/assets/javascripts/**' # Scripts JS de la doc
-      - 'docs/overrides/**'         # Overrides de thème MkDocs
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/**'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+      - 'docs/assets/stylesheets/**'
+      - 'docs/assets/images/**'
+      - 'docs/assets/javascripts/**'
+      - 'docs/overrides/**'
   workflow_dispatch:
 
 permissions:
@@ -37,14 +37,32 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
+          cache: 'pip'
+          
+      - name: Load cached Poetry installation
+        uses: actions/cache@v3
+        with:
+          path: ~/.local
+          key: poetry-${{ runner.os }}
+          id: cached-poetry
           
       - name: Install Poetry
+        if: steps.cached-poetry.outputs.cache-hit != 'true'
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           
+      - name: Load cached dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          id: cached-venv
+          
       - name: Install dependencies
+        if: steps.cached-venv.outputs.cache-hit != 'true'
         run: |
+          poetry config virtualenvs.in-project true
           poetry install --no-interaction --no-ansi
           
       - name: Verify critical dependencies
@@ -60,16 +78,40 @@ jobs:
           poetry run python -c "
 import sass
 import os
+import sys
 
 try:
-    css = sass.compile(filename='main.scss', include_paths=['.'])
+    print('Starting SASS compilation...')
+    print('Current directory:', os.getcwd())
+    print('Files in current directory:', os.listdir('.'))
+    
+    css = sass.compile(
+        filename='main.scss',
+        include_paths=['.'],
+        output_style='compressed'
+    )
+    
     os.makedirs('dist', exist_ok=True)
-    with open('dist/main.css', 'w') as f:
+    css_file = 'dist/main.css'
+    
+    with open(css_file, 'w') as f:
         f.write(css)
+    
+    if os.path.exists(css_file):
+        print(f'Successfully created {css_file}')
+        print(f'File size: {os.path.getsize(css_file)} bytes')
+    else:
+        print(f'Error: {css_file} was not created')
+        sys.exit(1)
+        
     print('SASS compilation successful')
+    
 except sass.CompileError as e:
     print('SASS compilation error:', str(e))
-    exit(1)
+    sys.exit(1)
+except Exception as e:
+    print('Unexpected error:', str(e))
+    sys.exit(1)
 "
           cd ../../..
           
@@ -77,7 +119,12 @@ except sass.CompileError as e:
         run: poetry run mkdocs build
         
       - name: Copy CNAME
-        run: cp docs/static/CNAME site/
+        run: |
+          if [ -f docs/static/CNAME ]; then
+            cp docs/static/CNAME site/
+          else
+            echo "Warning: CNAME file not found"
+          fi
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
