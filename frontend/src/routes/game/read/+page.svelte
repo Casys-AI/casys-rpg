@@ -5,22 +5,23 @@
     import type { GameState } from '$lib/types/game';
     import type { ConnectionStatus } from '$lib/services/gameService';
     import { goto } from '$app/navigation';
+    import { gameState, gameChoices } from '$lib/stores/gameStore';
+    import { wsStore, wsError } from '$lib/stores/websocketStore';
 
     export let data: PageData;
 
-    let gameState: GameState | null = data.gameState;
-    let error = data.error;
-    let unsubscribe: (() => void) | null = null;
+    // Utilisation des stores avec la syntaxe $
+    $: currentGameState = $gameState;
+    $: currentChoices = $gameChoices;
+    $: error = $wsError || data.error;
+    
     let showSettings = false;
     let y: number;
     let lastY = 0;
     let showChoices = true;
     
-    // S'abonner au store connectionStatus
-    let connectionStatus: ConnectionStatus = 'disconnected';
-    gameService.connectionStatus.subscribe((status) => {
-        connectionStatus = status;
-    });
+    // État de connexion WebSocket via le store
+    $: connectionStatus = $wsStore ? ($wsStore.error ? 'error' : 'connected') : 'disconnected';
 
     $: {
         if (y !== undefined) {
@@ -34,35 +35,28 @@
         
         try {
             // Si pas d'état, on essaie de le récupérer
-            if (!gameState) {
+            if (!$gameState) {
                 console.log('🎲 Tentative de récupération de l\'état du jeu...');
                 try {
                     const stateResponse = await gameService.getGameState();
-                    if (stateResponse.success) {
-                        console.log('✅ État du jeu récupéré avec succès');
-                        gameState = stateResponse.state;
-                    } else {
+                    if (!stateResponse.success) {
                         throw new Error(stateResponse.message || 'État du jeu non trouvé');
                     }
                 } catch (error) {
                     console.error('❌ Erreur lors de la récupération de l\'état:', error);
-                    // Rediriger vers /game si l'état n'est pas trouvé
                     await gameService.clearSession();
                     await goto('/game');
                     return;
                 }
             }
             
-            console.log('📋 État actuel du jeu:', gameState);
+            console.log('📋 État actuel du jeu:', $gameState);
 
-            // S'abonner aux mises à jour WebSocket
-            unsubscribe = gameService.onMessage((data) => {
-                console.log('📥 Mise à jour du jeu reçue:', data);
-                if (data.state) {
-                    console.log('🔄 Mise à jour de l\'état du jeu');
-                    gameState = data.state;
-                }
-            });
+            // Écouter les erreurs et événements WebSocket via le store
+            $: if ($wsStore?.error) {
+                console.error('❌ Erreur WebSocket:', $wsStore.error);
+                error = $wsStore.error;
+            }
         } catch (e) {
             console.error('❌ Erreur:', e);
             error = e instanceof Error ? e.message : 'Une erreur est survenue';
@@ -84,9 +78,6 @@
 
     onDestroy(() => {
         console.log('👋 Nettoyage de la page de lecture');
-        if (unsubscribe) {
-            unsubscribe();
-        }
         gameService.disconnect();
     });
 
@@ -131,7 +122,7 @@
             <p class="text-game-error font-serif text-center">{error}</p>
         </div>
     </div>
-{:else if gameState}
+{:else if $gameState}
     <div class="min-h-screen bg-game-background flex flex-col">
         <!-- En-tête -->
         <header class="bg-game-background shadow-neu-flat animate-fade-in">
@@ -142,8 +133,8 @@
                     </h1>
                     <div class="flex items-center space-x-4">
                         <div class="text-game-secondary font-serif flex items-center space-x-4">
-                            <span>Section: {gameState.section_number}</span>
-                            {#if gameState.rules?.needs_dice}
+                            <span>Section: {$gameState.section_number}</span>
+                            {#if $gameState.rules?.needs_dice}
                                 <span class="px-3 py-1 rounded-lg bg-game-primary/10">
                                     Dés requis
                                 </span>
@@ -218,9 +209,9 @@
                 <!-- Narrative Content -->
                 <div class="bg-game-surface/50 rounded-2xl p-4">
                     <div class="prose prose-lg prose-game max-w-none">
-                        {#if gameState.narrative}
+                        {#if $gameState.narrative}
                             <div class="font-serif text-game-text text-justify leading-relaxed whitespace-pre-wrap">
-                                {@html gameState.narrative.content}
+                                {@html $gameState.narrative.content}
                             </div>
                         {/if}
                     </div>
@@ -229,13 +220,13 @@
         </main>
 
         <!-- Barre de choix avec transition basée sur le scroll -->
-        {#if gameState.rules?.choices}
+        {#if $gameState.rules?.choices}
             <div 
                 class="fixed bottom-0 left-0 right-0 bg-game-surface/95 backdrop-blur-sm shadow-neu-up p-4 z-50 transition-transform duration-300"
                 class:translate-y-full={!showChoices}
             >
                 <div class="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4 justify-center">
-                    {#each gameState.rules.choices as choice}
+                    {#each $gameState.rules.choices as choice}
                         <button
                             on:click={() => handleChoice(choice)}
                             class="transform rounded-xl bg-game-background px-6 py-3 text-lg font-serif font-medium text-game-primary shadow-neu-flat hover:bg-opacity-95 active:shadow-neu-pressed transition-all duration-300 focus:outline-none"

@@ -23,8 +23,11 @@ export const load: PageLoad = async ({ fetch }) => {
     const hasSession = !!currentSession.gameId;
     
     try {
+        let stateResponse;
+        
         if (!hasSession) {
-            // Initialiser le WebSocket et récupérer l'état initial
+            // Initialiser une nouvelle partie
+            console.log('🎲 Initializing new game...');
             const gameResponse = await gameService.initialize();
             console.log('🎲 Game response:', gameResponse);
 
@@ -34,13 +37,17 @@ export const load: PageLoad = async ({ fetch }) => {
                     gameState: null
                 };
             }
+            
+            stateResponse = {
+                success: true,
+                state: gameResponse.state
+            };
         } else {
-            // Se connecter au WebSocket avec la session existante
-            await gameService.connectWebSocket();
+            // Récupérer l'état existant
+            console.log('🎲 Loading existing game state...');
+            stateResponse = await gameService.getGameState();
         }
-
-        // Récupérer l'état du jeu
-        const stateResponse = await gameService.getGameState();
+        
         console.log('📥 Initial state:', stateResponse);
 
         return {

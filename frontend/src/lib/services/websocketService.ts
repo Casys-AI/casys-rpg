@@ -1,18 +1,16 @@
 import { browser } from '$app/environment';
 import { writable, get, type Writable } from 'svelte/store';
-import type { Choice } from '$lib/types/game';
-import { gameState } from '$lib/stores/gameStore';
+import type { GameResponse } from '$lib/types/game';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private messageHandlers: ((data: any) => void)[] = [];
-  private reconnectTimeout: number = 1000;
-  private maxReconnectAttempts: number = 5;
-  private reconnectAttempts: number = 0;
   private heartbeatInterval: number | null = null;
-  private maxReconnectDelay: number = 30000;
+  private messageQueue: any[] = [];
+  private isConnecting: boolean = false;
+  private reconnectTimeout: number | null = null;
 
   // Store pour l'état de la connexion
   public connectionStatus: Writable<ConnectionStatus> = writable('disconnected');
@@ -23,81 +21,96 @@ export class WebSocketService {
     }
   }
 
-  public connect(): void {
+  public async connect(): Promise<void> {
+    if (!browser || this.isConnecting) return;
+
+    this.isConnecting = true;
     console.log('🔌 Connecting to WebSocket...', this.wsUrl);
     this.connectionStatus.set('connecting');
 
-    this.ws = new WebSocket(this.wsUrl);
-    this.ws.onopen = this.onopen.bind(this);
-    this.ws.onmessage = this.onmessage.bind(this);
-    this.ws.onclose = this.onclose.bind(this);
-    this.ws.onerror = this.onerror.bind(this);
-  }
-
-  private onopen(): void {
-    console.log('🔌 WebSocket connected');
-    this.connectionStatus.set('connected');
-    this.reconnectAttempts = 0;
-    this.startHeartbeat();
-  }
-
-  private onmessage(event: MessageEvent): void {
     try {
-      const data = JSON.parse(event.data);
-      
-      // Gérer le heartbeat
-      if (data.type === 'pong') {
-        console.log('❤️ Heartbeat received');
-        return;
-      }
+      // Créer la connexion WebSocket
+      this.ws = new WebSocket(this.wsUrl);
 
-      console.log('📥 Received message:', data);
-      this.messageHandlers.forEach(handler => handler(data));
+      this.ws.onopen = () => {
+        console.log('🟢 WebSocket connected');
+        this.connectionStatus.set('connected');
+        this.startHeartbeat();
+        this.processMessageQueue();
+        this.isConnecting = false;
+        if (this.reconnectTimeout) {
+          clearTimeout(this.reconnectTimeout);
+          this.reconnectTimeout = null;
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('🔴 WebSocket disconnected');
+        this.connectionStatus.set('disconnected');
+        this.stopHeartbeat();
+        this.isConnecting = false;
+        this.ws = null;
+
+        // Tentative de reconnexion après 1 seconde
+        if (!this.reconnectTimeout) {
+          this.reconnectTimeout = window.setTimeout(() => {
+            console.log('🔄 Attempting to reconnect...');
+            this.connect();
+          }, 1000);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        this.connectionStatus.set('error');
+        this.isConnecting = false;
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          console.log('📥 Raw WebSocket message:', event.data);
+          const data = JSON.parse(event.data);
+          console.log('📥 Parsed message:', data);
+          
+          // Notifier tous les handlers enregistrés
+          this.messageHandlers.forEach(handler => handler(data));
+        } catch (error) {
+          console.error('❌ Error parsing WebSocket message:', error, 'Raw message:', event.data);
+        }
+      };
+
     } catch (error) {
-      console.error('Error parsing WebSocket message:', error);
+      console.error('Error connecting to WebSocket:', error);
+      this.connectionStatus.set('error');
+      this.isConnecting = false;
     }
   }
 
-  private onclose(): void {
-    console.log('🔌 WebSocket disconnected');
-    this.connectionStatus.set('disconnected');
-    this.stopHeartbeat();
-    this.handleReconnect();
-  }
-
-  private onerror(error: Event): void {
-    console.error('❌ WebSocket error:', error);
-    this.connectionStatus.set('error');
-  }
-
-  private handleReconnect(): void {
-    if (!browser) return; // Ne pas tenter de reconnexion côté serveur
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('🔌 Max reconnection attempts reached');
-      return;
+  private async processMessageQueue(): Promise<void> {
+    console.log('📤 Processing message queue:', this.messageQueue.length, 'messages');
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+      try {
+        await this.send(message, false);
+      } catch (error) {
+        console.error('Error sending queued message:', error);
+        // Remettre le message dans la file si erreur
+        this.messageQueue.unshift(message);
+        break;
+      }
     }
-
-    const timeout = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay);
-    console.log(`🔄 Attempting to reconnect in ${timeout}ms (attempt ${this.reconnectAttempts + 1})`);
-
-    setTimeout(() => {
-      this.reconnectAttempts++;
-      this.connect();
-    }, timeout);
   }
 
   private startHeartbeat(): void {
     console.log('❤️ Starting heartbeat');
     this.stopHeartbeat();
     
-    // Vérifier si on est dans un environnement browser
     if (browser) {
       this.heartbeatInterval = window.setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          console.log('❤️ Sending heartbeat');
-          this.send({ type: 'ping' });
-        }
-      }, 30000); // 30 secondes
+        this.send({ type: 'ping' }, false).catch(error => {
+          console.error('Error sending heartbeat:', error);
+        });
+      }, 30000);
     }
   }
 
@@ -109,59 +122,44 @@ export class WebSocketService {
   }
 
   public async disconnect(): Promise<void> {
+    this.stopHeartbeat();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
       this.ws.close();
-      this.connectionStatus.set('disconnected');
-      
-      if (browser && this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-        this.heartbeatInterval = null;
-      }
+      this.ws = null;
     }
+    this.connectionStatus.set('disconnected');
   }
 
-  private async send(message: any): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket not connected');
-    }
-    this.ws.send(JSON.stringify(message));
-  }
-
-  public async sendAction(action: string, data: any = {}): Promise<void> {
-    await this.send({ action, ...data });
-  }
-
-  public async sendChoice(choice: Choice): Promise<void> {
-    if (!this.ws || get(this.connectionStatus) !== 'connected') {
-      throw new Error('WebSocket not connected');
-    }
-
-    const currentGameState = get(gameState);
-    if (!currentGameState?.game_id) {
-      throw new Error('No game ID available');
-    }
-
-    console.log('📤 Sending choice:', choice);
-    const message = {
-      type: 'choice',
-      choice: {
-        game_id: currentGameState.game_id,
-        choice_id: String(choice.target_section),
-        choice_text: choice.text,
-        metadata: {
-          type: choice.type,
-          target_section: choice.target_section,
-          conditions: choice.conditions,
-          dice_type: choice.dice_type,
-          dice_results: choice.dice_results
+  public async send(message: any, queue: boolean = true): Promise<void> {
+    const status = get(this.connectionStatus);
+    
+    if (status !== 'connected' || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (queue) {
+        console.log('📥 Queuing message:', message);
+        this.messageQueue.push(message);
+        
+        if (status === 'disconnected') {
+          console.log('🔄 Reconnecting WebSocket...');
+          await this.connect();
         }
+        return;
       }
-    };
+      throw new Error(`WebSocket not connected (status: ${status})`);
+    }
 
     try {
-      await this.ws.send(JSON.stringify(message));
+      console.log('📤 Sending message:', message);
+      this.ws.send(JSON.stringify(message));
     } catch (error) {
-      console.error('Error sending choice:', error);
+      console.error('Error sending message:', error);
+      if (queue) {
+        console.log('📥 Queuing failed message:', message);
+        this.messageQueue.push(message);
+      }
       throw error;
     }
   }
@@ -177,3 +175,6 @@ export class WebSocketService {
     return get(this.connectionStatus);
   }
 }
+
+// Export d'une instance unique du service
+export const websocketService = new WebSocketService('ws://127.0.0.1:8000/api/ws/game');
