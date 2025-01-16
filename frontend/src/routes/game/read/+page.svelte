@@ -9,6 +9,7 @@
     import { wsStore, wsError } from '$lib/stores/websocketStore';
     import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
     import Settings from '$lib/components/Settings.svelte';
+    import DiceRoller from '$lib/components/game/DiceRoller.svelte';
 
     export let data: PageData;
 
@@ -98,6 +99,10 @@
             console.error('Error sending choice:', error);
             error = error instanceof Error ? error.message : 'Une erreur est survenue lors de l\'envoi du choix';
         }
+    }
+
+    async function handleDiceRoll(result: DiceResult) {
+        console.log('🎲 Résultat des dés:', result);
     }
 
     function toggleSettings() {
@@ -208,6 +213,18 @@
                 </div>
             </div>
         </main>
+
+        <!-- Dés si nécessaire -->
+        {#if $gameState.rules?.needs_dice}
+            <div class="fixed bottom-24 left-0 right-0 flex justify-center z-50">
+                <div class="bg-game-surface/95 backdrop-blur-sm shadow-neu-up rounded-lg">
+                    <DiceRoller 
+                        diceType={$gameState.rules.dice_type} 
+                        onRoll={handleDiceRoll}
+                    />
+                </div>
+            </div>
+        {/if}
 
         <!-- Barre de choix avec transition basée sur le scroll -->
         {#if $gameState.rules?.choices}

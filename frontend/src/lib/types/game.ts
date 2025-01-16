@@ -45,6 +45,18 @@ interface GameState {
     content: string | null;
 }
 
+export interface DiceResult {
+    dice1: number;
+    dice2: number;
+    total: number;
+}
+
+export interface DiceResponse {
+    type: 'dice_roll';
+    dice_type: string;
+    result: DiceResult;
+}
+
 export interface GameResponse {
     game_id: string;
     state: GameState;

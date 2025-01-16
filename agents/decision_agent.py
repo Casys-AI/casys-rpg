@@ -112,6 +112,21 @@ class DecisionAgent(BaseAgent):
             next_action = rules.next_action
             self._logger.debug("Rules state: needs_dice={}, next_action={}", needs_dice, next_action)
 
+            # Si on a déjà un jet de dés comme input, l'analyser directement
+            if player_input and "jet de" in player_input.lower():
+                self._logger.info("Processing dice roll result")
+                analysis_result = await self.analyze_response(
+                    section_number,
+                    player_input,
+                    rules.model_dump(mode='json')
+                )
+                return ModelFactory.create_decision_model(
+                    section_number=section_number,
+                    next_section=analysis_result.next_section,
+                    analysis=analysis_result.analysis,
+                    error=analysis_result.error
+                )
+
             # Si un ordre est spécifié
             if next_action == NextActionType.USER_FIRST and not player_input:
                 self._logger.info("Waiting for user input first")
